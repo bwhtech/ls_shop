@@ -24,7 +24,7 @@ def get_filter_brands(filters=None):
 	query = query.select(item.brand).distinct().orderby(item.brand)
 	brands = query.run(pluck=True)
 	print(brands)
-	if not brands[0]:
+	if not brands or not brands[0]:
 		return []
 	brands = [b.title() for b in brands]
 	return brands
