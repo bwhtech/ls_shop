@@ -114,10 +114,7 @@ def get_data(filters=None):
 		.left_join(website_slideshow_item)
 		.on(website_slideshow_item.parent == style_attribute_variant.name)
 		.left_join(bin)
-		.on(
-			(color_size_item.item_code == bin.item_code)
-			& (bin.warehouse == ecommerce_warehouse)
-		)
+		.on((color_size_item.item_code == bin.item_code) & (bin.warehouse == ecommerce_warehouse))
 		.select(
 			style_attribute_variant.name,
 			style_attribute_variant.display_name,
@@ -137,9 +134,7 @@ def get_data(filters=None):
 		elif filters.unpublished_but_has_stock and not filters.published_but_no_stock:
 			query = query.having(unpublished_has_stock == 1)
 		else:
-			query = query.having(
-				(published_no_stock == 1) | (unpublished_has_stock == 1)
-			)
+			query = query.having((published_no_stock == 1) | (unpublished_has_stock == 1))
 	else:
 		query = query.having((published_no_stock == 1) | (unpublished_has_stock == 1))
 
@@ -168,6 +163,4 @@ def bulk_publish(filters):
 
 	style_attribute_variants = [d.name for d in data]
 	doc = frappe.get_single("Bulk Publish Variants")
-	return doc.bulk_toggle_publish(
-		publish=True, style_attribute_variant_list=style_attribute_variants
-	)
+	return doc.bulk_toggle_publish(publish=True, style_attribute_variant_list=style_attribute_variants)

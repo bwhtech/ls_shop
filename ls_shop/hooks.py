@@ -29,7 +29,7 @@ website_route_rules = [
 	# ------------
 	#
 	# -> Landing
-	{"from_route": "/en", "to_route": "/products/list.html"},
+	{"from_route": "/en", "to_route": "/index.html"},
 	# -> Products
 	{"from_route": "/en/products", "to_route": "/products/list.html"},
 	{"from_route": "/en/products/<path:route>", "to_route": "/products/details.html"},
@@ -56,7 +56,7 @@ website_route_rules = [
 	# ------------
 	#
 	# -> Landing
-	{"from_route": "/ar", "to_route": "/products/list.html"},
+	{"from_route": "/ar", "to_route": "/index.html"},
 	# -> Products
 	{"from_route": "/ar/products", "to_route": "/products/list.html"},
 	{"from_route": "/ar/products/<path:route>", "to_route": "/products/details.html"},
@@ -95,7 +95,6 @@ doc_events = {
 	},
 	"Payment Entry": {
 		"on_submit": [
-
 			"ls_shop.lifestyle_shop_ecommerce.doctype.telr_payment_request.telr_payment_request.refund_payment_for_payment_entry",
 		],
 	},
@@ -109,9 +108,7 @@ doc_events = {
 			"ls_shop.utils.update_so_status_from_related_doc",
 		],
 	},
-	"Stock Ledger Entry": {
-		"after_insert": ["ls_shop.jobs.send_product_back_in_stock_email"]
-	},
+	"Stock Ledger Entry": {"after_insert": ["ls_shop.jobs.send_product_back_in_stock_email"]},
 	"Sales Invoice": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},
 	"Delivery Note": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},
 	"Shipment": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},

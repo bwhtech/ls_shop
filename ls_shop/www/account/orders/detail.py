@@ -16,9 +16,7 @@ def get_context(context):
 	context.return_period = frappe.get_cached_value(
 		"Lifestyle Settings", "Lifestyle Settings", "return_period"
 	)
-	return_reasons = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "reason_for_return"
-	)
+	return_reasons = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "reason_for_return")
 	context.return_reasons = [
 		{"name": return_reason.name, "display_name": return_reason.display_name}
 		for return_reason in return_reasons

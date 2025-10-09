@@ -53,3 +53,5 @@ jspm_packages/
 
 # Aider AI Chat
 .aider*
+
+ls_shop/public/css/tailwind.css

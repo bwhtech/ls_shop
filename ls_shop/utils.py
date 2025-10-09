@@ -44,9 +44,7 @@ def get_nested_links(link_doctype, link_name):
 	return _get_nested_links(link_doctype, link_name, ignore_permissions=True)
 
 
-def get_product_list(
-	filters=None, product_list=None, page=1, page_length=30, sort_by="default"
-):
+def get_product_list(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
 	"""Fetches products dynamically based on selected filters."""
 
 	query = get_product_base_query(filters, product_list)
@@ -64,10 +62,7 @@ def get_product_list(
 		.when(
 			Min(item_price_default.price_list_rate) > 0,
 			(
-				(
-					Min(item_price_default.price_list_rate)
-					- Min(item_price_sale.price_list_rate)
-				)
+				(Min(item_price_default.price_list_rate) - Min(item_price_sale.price_list_rate))
 				/ Min(item_price_default.price_list_rate)
 			)
 			* 100,
@@ -118,9 +113,7 @@ def get_total_product_count(filters=None, product_list=None):
 
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")
-	query = query.select(
-		Count(style_attribute_variant.name).distinct().as_("total_count")
-	)
+	query = query.select(Count(style_attribute_variant.name).distinct().as_("total_count"))
 	result = query.run(as_dict=True)
 	return result[0]["total_count"] if result else 0
 
@@ -169,17 +162,11 @@ def get_product_base_query(filters=None, product_list=None):
 	# Apply Filters
 	if filters:
 		if filters.get("has_discount"):
-			query = query.where(
-				item_price_default.price_list_rate > item_price_sale.price_list_rate
-			)
+			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
 		if filters.get("subcategory"):
-			query = query.where(
-				style_attribute_variant.item_group.isin(filters["subcategory"])
-			)
+			query = query.where(style_attribute_variant.item_group.isin(filters["subcategory"]))
 		if filters.get("colors"):
-			query = query.where(
-				style_attribute_variant.attribute_name.isin(filters["colors"])
-			)
+			query = query.where(style_attribute_variant.attribute_name.isin(filters["colors"]))
 		if filters.get("sizes"):
 			query = query.where(color_size_item.size.isin(filters["sizes"]))
 		if filters.get("brands"):
@@ -202,15 +189,13 @@ def get_product_base_query(filters=None, product_list=None):
 				| (item.name.like(f"%{search}%"))
 			)
 			if child_categories:
-				search_condition |= style_attribute_variant.item_group.isin(
-					child_categories
-				)
+				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 
 			# Add exclusion condition if search starts with "men"
 			if search.lower().startswith("men"):
-				exclusion_condition = (
-					~style_attribute_variant.display_name.like("%women%")
-				) & (~style_attribute_variant.item_group.like("%women%"))
+				exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
+					~style_attribute_variant.item_group.like("%women%")
+				)
 				search_condition = search_condition & exclusion_condition
 
 			query = query.where(search_condition)
@@ -221,9 +206,7 @@ def get_delivery_configuration():
 	shoe_arena_settings = frappe.get_cached_doc("Lifestyle Settings")
 	if not shoe_arena_settings.shipping_rule:
 		return 0, 0
-	shipping_rule = frappe.get_cached_doc(
-		"Shipping Rule", shoe_arena_settings.shipping_rule
-	)
+	shipping_rule = frappe.get_cached_doc("Shipping Rule", shoe_arena_settings.shipping_rule)
 	if not shipping_rule or not shipping_rule.conditions:
 		return 0, 0
 	condition = shipping_rule.conditions[0]
@@ -239,9 +222,7 @@ def get_cod_configuration():
 
 
 def get_currency_symbol():
-	currency = frappe.get_cached_value(
-		"Global Defaults", "Global Defaults", "default_currency"
-	)
+	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
 	if currency == "SAR" or frappe.conf.developer_mode:
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
 	return frappe.get_cached_value("Currency", currency, "symbol")
@@ -269,9 +250,7 @@ def format_addresses(addresses, address_type):
 						address.get("state", ""),
 						address.get("country", ""),
 						address.get("pincode", ""),
-						f"Phone: {address.get('phone')}"
-						if address.get("phone")
-						else "",
+						f"Phone: {address.get('phone')}" if address.get("phone") else "",
 					]
 					if part
 				]
@@ -330,9 +309,7 @@ def get_current_page():
 def can_return(order_name, return_period_days):
 	"""Check if the order is still within the return period."""
 
-	invoices = frappe.get_all(
-		"Sales Invoice", {"sales_order": order_name}, ["name", "creation"], limit=1
-	)
+	invoices = frappe.get_all("Sales Invoice", {"sales_order": order_name}, ["name", "creation"], limit=1)
 	if not invoices:
 		return False
 	invoice_creation_date = invoices[0].creation
@@ -356,9 +333,7 @@ def get_available_stock(item_code, warehouse):
 			"in_stock": 0,
 		}
 	pos_reserved_qty = get_pos_reserved_qty(item_code, warehouse)
-	actual_qty = (
-		flt(bin_data.actual_qty) - flt(bin_data.reserved_qty) - flt(pos_reserved_qty)
-	)
+	actual_qty = flt(bin_data.actual_qty) - flt(bin_data.reserved_qty) - flt(pos_reserved_qty)
 	return {
 		"stock_qty": actual_qty,
 		"in_stock": int(actual_qty > 0),
@@ -406,9 +381,7 @@ def update_so_status_from_related_doc(doc, method):
 		sales_orders.update([d.sales_order for d in doc.items if d.sales_order])
 
 	elif doc.doctype == "Delivery Note":
-		sales_orders.update(
-			[d.against_sales_order for d in doc.items if d.against_sales_order]
-		)
+		sales_orders.update([d.against_sales_order for d in doc.items if d.against_sales_order])
 
 	elif doc.doctype == "Shipment":
 		for dn in doc.shipment_delivery_note:
@@ -435,9 +408,7 @@ def update_sales_order_ecommerce_status(sales_order_name):
 		new_status = "Waiting for Approval"
 	elif sales_order.docstatus == 1:
 		# Check related documents
-		dn_exists = frappe.db.exists(
-			"Delivery Note Item", {"against_sales_order": sales_order.name}
-		)
+		dn_exists = frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order.name})
 		shipment_exists = frappe.db.exists(
 			"Shipment Delivery Note",
 			{
@@ -451,9 +422,7 @@ def update_sales_order_ecommerce_status(sales_order_name):
 				]
 			},
 		)
-		invoice_exists = frappe.db.exists(
-			"Sales Invoice Item", {"sales_order": sales_order.name}
-		)
+		invoice_exists = frappe.db.exists("Sales Invoice Item", {"sales_order": sales_order.name})
 
 		if invoice_exists:
 			new_status = "Delivered"
@@ -464,6 +433,4 @@ def update_sales_order_ecommerce_status(sales_order_name):
 		else:
 			new_status = "Order Received"
 
-	frappe.db.set_value(
-		"Sales Order", sales_order.name, "custom_ecommerce_status", new_status
-	)
+	frappe.db.set_value("Sales Order", sales_order.name, "custom_ecommerce_status", new_status)

@@ -45,11 +45,7 @@ def return_items(sales_order_id, items):
 			)
 
 	if not return_dn.items:
-		frappe.throw(
-			frappe._(
-				"None of the items to return were found in the original Delivery Note."
-			)
-		)
+		frappe.throw(frappe._("None of the items to return were found in the original Delivery Note."))
 
 	return_dn.insert(ignore_permissions=True)
 
@@ -95,9 +91,7 @@ def get_returned_items(sales_order_id):
 
 	returned_draft_item_codes = [item.item_code for item in returned_items_in_draft]
 
-	is_fully_returned = all(
-		item_code in returned_item_codes for item_code in ordered_item_codes
-	)
+	is_fully_returned = all(item_code in returned_item_codes for item_code in ordered_item_codes)
 	partially_returned = len(returned_item_codes) > 0 and not is_fully_returned
 
 	return {

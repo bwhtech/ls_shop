@@ -44,9 +44,7 @@ def get_context(context):
 	context.billing_addresses = get_addresses()
 	context.shipping_addresses = get_addresses(address_type="Shipping")
 	context.store_pickup_addresses = get_store_pickup_addresses()
-	context.delivery_charge, context.delivery_charge_applicable_below = (
-		get_delivery_configuration()
-	)
+	context.delivery_charge, context.delivery_charge_applicable_below = get_delivery_configuration()
 	context.cod_charge_applicable_below, context.cod_charge = get_cod_configuration()
 	context.breadcrumbs = [
 		{
@@ -63,9 +61,7 @@ def get_context(context):
 def get_coupon_code(cart_quotation):
 	coupon_code = ""
 	try:
-		coupon_code = frappe.get_cached_value(
-			"Coupon Code", cart_quotation.coupon_code, "coupon_code"
-		)
+		coupon_code = frappe.get_cached_value("Coupon Code", cart_quotation.coupon_code, "coupon_code")
 	except Exception:
 		pass
 	return coupon_code
@@ -117,9 +113,7 @@ def get_checkout_items(cart_quotation):
 @site_cache(ttl=60 * 60)
 def get_store_pickup_addresses():
 	# Get all warehouse names with store pickup
-	warehouses = frappe.get_all(
-		"Warehouse", filters={"custom_store_pickup": 1}, pluck="name"
-	)
+	warehouses = frappe.get_all("Warehouse", filters={"custom_store_pickup": 1}, pluck="name")
 	if not warehouses:
 		return []
 
@@ -140,9 +134,7 @@ def get_store_pickup_addresses():
 	# Map address to warehouse
 	address_to_warehouse = {link["parent"]: link["link_name"] for link in links}
 	address_names = list(address_to_warehouse.keys())
-	addresses = frappe.get_all(
-		"Address", filters={"name": ["in", address_names]}, fields=["*"]
-	)
+	addresses = frappe.get_all("Address", filters={"name": ["in", address_names]}, fields=["*"])
 	# Format and attach warehouse info
 	formatted_addresses = format_addresses(addresses, address_type="Shop")
 	for addr in formatted_addresses:

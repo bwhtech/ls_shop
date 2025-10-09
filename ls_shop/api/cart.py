@@ -12,15 +12,11 @@ from ls_shop.www.products.details import (
 @frappe.whitelist(allow_guest=True)
 def get_detail_for_cart_items(items):
 	stock_data = {}
-	warehouse = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse"
-	)
+	warehouse = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
 	default_price_list = frappe.get_cached_value(
 		"Lifestyle Settings", "Lifestyle Settings", "default_price_list"
 	)
-	sale_price_list = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "sale_price_list"
-	)
+	sale_price_list = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "sale_price_list")
 	default_price = 0
 	sale_price = 0
 	for entry in items:
@@ -61,9 +57,7 @@ def get_detail_for_cart_items(items):
 @frappe.whitelist(allow_guest=True)
 def validate_cart_stock(items):
 	errors = []
-	warehouse = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse"
-	)
+	warehouse = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
 	for entry in items:
 		item_code = entry.get("variant", {}).get("item_code")
 		item_name = entry.get("item", {}).get("display_name")

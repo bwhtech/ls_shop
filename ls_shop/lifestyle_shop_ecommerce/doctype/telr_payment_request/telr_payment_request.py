@@ -127,6 +127,4 @@ def refund_payment_for_payment_entry(doc, event=None):
 		return
 	payment_amount = doc.paid_amount
 
-	frappe.get_doc("Telr Payment Request", {"telr_order_ref": doc.reference_no}).refund(
-		payment_amount
-	)
+	frappe.get_doc("Telr Payment Request", {"telr_order_ref": doc.reference_no}).refund(payment_amount)

@@ -113,13 +113,9 @@ class TelrSettings(Document):
 			if error := output.get("error"):
 				frappe.errprint("Telr Response:")
 				frappe.errprint(output)
-				raise Exception(
-					f'{error.get("message")}: {frappe.bold(error.get("note"))}'
-				)
+				raise Exception(f'{error.get("message")}: {frappe.bold(error.get("note"))}')
 
-			create_telr_request_log(
-				endpoint, data=payload, headers=headers, output=output
-			)
+			create_telr_request_log(endpoint, data=payload, headers=headers, output=output)
 		except Exception as e:
 			create_telr_request_log(endpoint, error=e, headers=headers)
 			raise
@@ -138,9 +134,7 @@ class TelrSettings(Document):
 		headers = {"accept": "application/json", "Content-Type": "application/json"}
 		try:
 			response = make_post_request(endpoint, json=payload, headers=headers)
-			create_telr_request_log(
-				endpoint, data=payload, headers=headers, output=response
-			)
+			create_telr_request_log(endpoint, data=payload, headers=headers, output=response)
 		except Exception as e:
 			create_telr_request_log(endpoint, data=payload, headers=headers, error=e)
 			raise
@@ -177,13 +171,9 @@ class TelrSettings(Document):
 		message = root.find("auth/message").text
 
 		if status == "A":
-			create_telr_request_log(
-				url, data=xml_data, headers=headers, output=response.text
-			)
+			create_telr_request_log(url, data=xml_data, headers=headers, output=response.text)
 		else:
-			create_telr_request_log(
-				url, data=xml_data, headers=headers, output=response.text, error=message
-			)
+			create_telr_request_log(url, data=xml_data, headers=headers, output=response.text, error=message)
 			frappe.throw(frappe._(message))
 
 		return response

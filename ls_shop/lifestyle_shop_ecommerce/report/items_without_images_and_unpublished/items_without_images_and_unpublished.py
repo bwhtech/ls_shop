@@ -65,10 +65,7 @@ def get_data():
 		.left_join(website_slideshow_item)
 		.on(website_slideshow_item.parent == style_attribute_variant.name)
 		.groupby(style_attribute_variant.name)
-		.having(
-			(style_attribute_variant.is_published == 0)
-			| (Count(website_slideshow_item.image) == 0)
-		)
+		.having((style_attribute_variant.is_published == 0) | (Count(website_slideshow_item.image) == 0))
 		.select(
 			style_attribute_variant.name,
 			style_attribute_variant.display_name,

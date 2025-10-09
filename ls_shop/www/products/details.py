@@ -16,9 +16,7 @@ def get_context(context):
 
 	try:
 		# Fetch product variant and related item
-		product_variant = frappe.get_doc(
-			"Style Attribute Variant", {"route": product_route}
-		)
+		product_variant = frappe.get_doc("Style Attribute Variant", {"route": product_route})
 		product = frappe.get_doc("Item", product_variant.item_style)
 
 		# Get available sizes and selected item
@@ -58,23 +56,18 @@ def get_context(context):
 		if product_variant.images
 		else [default_product_image()]
 	)
-	context.product_in_stock = (
-		selected_item.get("stock_detail", {}).get("stock_qty", 0) > 0
-	)
+	context.product_in_stock = selected_item.get("stock_detail", {}).get("stock_qty", 0) > 0
 
 	# Enrich selected item details
 	selected_item_doc = frappe.get_cached_doc("Item", selected_item["item_code"])
 	selected_item.update(
 		{
 			"item_name": selected_item_doc.item_name,
-			"item_name_ar": selected_item_doc.get("custom_item_name_ar")
-			or selected_item_doc.item_name,
+			"item_name_ar": selected_item_doc.get("custom_item_name_ar") or selected_item_doc.item_name,
 			"style_code": selected_item_doc.get("custom_style_code", ""),
 			"material": selected_item_doc.get("custom_material", ""),
 			"description": selected_item_doc.get("description", ""),
-			"description_ar": selected_item_doc.get(
-				"custom_description_ar", selected_item_doc.description
-			),
+			"description_ar": selected_item_doc.get("custom_description_ar", selected_item_doc.description),
 		}
 	)
 
@@ -87,9 +80,7 @@ def get_context(context):
 	context.default_price = price_data["default_price"]
 	context.recommended_items = recommended_items
 	context.other_variants = other_variants
-	context.discount_percent = get_discount_percent(
-		price_data["default_price"], price_data["sale_price"]
-	)
+	context.discount_percent = get_discount_percent(price_data["default_price"], price_data["sale_price"])
 	context.size_chart = get_size_chart(product.brand, product_variant.item_group)
 	context.item_qty = get_available_stock(product.item_code, warehouse)
 	context.breadcrumbs = [

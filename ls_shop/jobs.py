@@ -6,9 +6,7 @@ from frappe.utils import add_to_date, get_url, now_datetime
 
 
 def get_cc_email():
-	return frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "cc_email"
-	)
+	return frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "cc_email")
 
 
 def send_order_success_acknowledgement(doc, method):
@@ -19,19 +17,13 @@ def send_order_success_acknowledgement(doc, method):
 			"Lifestyle Settings",
 			"order_confirmation_email_template",
 		)
-		email_template = frappe.get_doc(
-			"Email Template", order_confirmation_template_name
-		)
+		email_template = frappe.get_doc("Email Template", order_confirmation_template_name)
 		message = frappe.render_template(email_template.response_, doc_args)
 		subject = frappe.render_template(email_template.subject, doc_args)
 
-		emails = frappe.get_all(
-			"Portal User", {"parent": doc.customer}, ["user"], limit=1
-		)
+		emails = frappe.get_all("Portal User", {"parent": doc.customer}, ["user"], limit=1)
 		email = emails[0].get("user", "")
-		frappe.sendmail(
-			recipients=[email], subject=subject, message=message, cc=[get_cc_email()]
-		)
+		frappe.sendmail(recipients=[email], subject=subject, message=message, cc=[get_cc_email()])
 	except Exception as e:
 		create_request_log(
 			data=doc_args,
@@ -49,19 +41,13 @@ def send_order_cancel_acknowledgement(doc, method):
 			"Lifestyle Settings",
 			"order_cancellation_email_template",
 		)
-		email_template = frappe.get_doc(
-			"Email Template", order_confirmation_template_name
-		)
+		email_template = frappe.get_doc("Email Template", order_confirmation_template_name)
 		message = frappe.render_template(email_template.response_, doc_args)
 		subject = frappe.render_template(email_template.subject, doc_args)
 
-		emails = frappe.get_all(
-			"Portal User", {"parent": doc.customer}, ["user"], limit=1
-		)
+		emails = frappe.get_all("Portal User", {"parent": doc.customer}, ["user"], limit=1)
 		email = emails[0].get("user", "")
-		frappe.sendmail(
-			recipients=[email], subject=subject, message=message, cc=[get_cc_email()]
-		)
+		frappe.sendmail(recipients=[email], subject=subject, message=message, cc=[get_cc_email()])
 	except Exception as e:
 		create_request_log(
 			data=doc_args,
@@ -155,9 +141,7 @@ def notify_users_if_item_in_stock(item_code):
 	doc_args = {
 		"item_code": style_attribute_variant.display_name,
 		"company": "Lifestyle",
-		"website_url": get_url(
-			f"{frappe.local.lang}/products/{style_attribute_variant.route}"
-		),
+		"website_url": get_url(f"{frappe.local.lang}/products/{style_attribute_variant.route}"),
 	}
 	message = frappe.render_template(email_template.response_, doc_args)
 	subject = frappe.render_template(email_template.subject, doc_args)
@@ -169,9 +153,7 @@ def notify_users_if_item_in_stock(item_code):
 	)
 	for user in user_subscriptions:
 		try:
-			frappe.sendmail(
-				recipients=[user], subject=subject, message=message, now=True
-			)
+			frappe.sendmail(recipients=[user], subject=subject, message=message, now=True)
 			frappe.db.set_value(
 				"OOS Notify Subscription",
 				{"item": item_code, "user": user},
@@ -207,8 +189,4 @@ def delete_old_draft_quotations():
 		try:
 			frappe.delete_doc("Quotation", quotation)
 		except Exception as e:
-			frappe.log_error(
-				title=frappe._("Error in deleting the quotation {0}: {1}").format(
-					quotation, e
-				)
-			)
+			frappe.log_error(title=frappe._("Error in deleting the quotation {0}: {1}").format(quotation, e))

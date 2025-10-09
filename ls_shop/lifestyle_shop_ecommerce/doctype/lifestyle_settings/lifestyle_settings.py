@@ -49,28 +49,20 @@ class LifestyleSettings(Document):
 
 	def validate(self):
 		if not self.telr_enabled and not self.tabby_enabled and not self.cod_enabled:
-			frappe.throw(
-				frappe._(
-					"At least one payment method (Telr, Tabby, or COD) must be enabled."
-				)
-			)
+			frappe.throw(frappe._("At least one payment method (Telr, Tabby, or COD) must be enabled."))
 
 	def get_default_price_list(self):
 		return (
 			self.default_price_list
 			if self.default_price_list
-			else frappe.get_cached_value(
-				"Webshop Settings", "Webshop Settings", "price_list"
-			)
+			else frappe.get_cached_value("Webshop Settings", "Webshop Settings", "price_list")
 		)
 
 	def get_sale_price_list(self):
 		return (
 			self.sale_price_list
 			if self.sale_price_list
-			else frappe.get_cached_value(
-				"Webshop Settings", "Webshop Settings", "price_list"
-			)
+			else frappe.get_cached_value("Webshop Settings", "Webshop Settings", "price_list")
 		)
 
 	@frappe.whitelist()
@@ -82,9 +74,7 @@ class LifestyleSettings(Document):
 			attribute=attribute,
 			log_name=log.name,
 		)
-		link = get_url_to_form(
-			"Bulk Style Attribute Configurator Creation Log", log.name
-		)
+		link = get_url_to_form("Bulk Style Attribute Configurator Creation Log", log.name)
 
 		return frappe._(f"Creating configurators. <a href='{link}'>View Log</a>")
 
@@ -111,9 +101,7 @@ def generate_configurators_for_all_templates(attribute: str, log_name: str):
 		.where(configurator.item_template.isnull() & item.has_variants)
 	)
 	results = query.run(as_dict=True)
-	configurator_log = frappe.get_doc(
-		"Bulk Style Attribute Configurator Creation Log", log_name
-	)
+	configurator_log = frappe.get_doc("Bulk Style Attribute Configurator Creation Log", log_name)
 	configurator_log.configurators = []
 
 	for row in results:

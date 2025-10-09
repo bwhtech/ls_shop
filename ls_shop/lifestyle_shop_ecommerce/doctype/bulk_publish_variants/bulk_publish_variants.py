@@ -50,32 +50,21 @@ class BulkPublishVariants(Document):
 			.on(item_attr.parent == child_item.name)
 		)
 		if style_attribute_variant_list:
-			query = query.where(
-				style_attribute_variant.name.isin(style_attribute_variant_list)
-			)
+			query = query.where(style_attribute_variant.name.isin(style_attribute_variant_list))
 		if self.vendor_code:
 			query = query.where(
 				(style_item.custom_vendor_code == self.vendor_code)
 				| (child_item.custom_vendor_code == self.vendor_code)
 			)
 		if self.dcs:
-			query = query.where(
-				(style_item.custom_dcs == self.dcs)
-				| (child_item.custom_dcs == self.dcs)
-			)
+			query = query.where((style_item.custom_dcs == self.dcs) | (child_item.custom_dcs == self.dcs))
 		if self.brand:
-			query = query.where(
-				(style_item.brand == self.brand) | (child_item.brand == self.brand)
-			)
+			query = query.where((style_item.brand == self.brand) | (child_item.brand == self.brand))
 		if self.item_code:
-			query = query.where(
-				(style_item.name == self.item_code)
-				| (style_item.name == self.item_code)
-			)
+			query = query.where((style_item.name == self.item_code) | (style_item.name == self.item_code))
 		if self.season_code:
 			query = query.where(
-				(item_attr.attribute == "Season")
-				& (item_attr.attribute_value == self.season_code)
+				(item_attr.attribute == "Season") & (item_attr.attribute_value == self.season_code)
 			)
 
 		query = query.select(style_attribute_variant.name)

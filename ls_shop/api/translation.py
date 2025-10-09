@@ -3,9 +3,7 @@ import frappe
 
 @frappe.whitelist(allow_guest=True)
 def get_translations():
-	translations = frappe.db.get_all(
-		"Translation", fields=["language", "source_text", "translated_text"]
-	)
+	translations = frappe.db.get_all("Translation", fields=["language", "source_text", "translated_text"])
 
 	translation_dict = {}
 
@@ -17,8 +15,6 @@ def get_translations():
 		if lang not in translation_dict:
 			translation_dict[lang] = {}
 		for i in range(min(len(source_texts), len(translated_texts))):
-			translation_dict[lang][source_texts[i].strip()] = translated_texts[
-				i
-			].strip()
+			translation_dict[lang][source_texts[i].strip()] = translated_texts[i].strip()
 
 	return translation_dict

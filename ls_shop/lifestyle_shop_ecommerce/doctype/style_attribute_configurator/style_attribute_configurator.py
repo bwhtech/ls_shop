@@ -82,9 +82,7 @@ class StyleAttributeConfigurator(Document):
 					}
 				result[color_value]["items"].append(item_info)
 		for color, variants in result.items():
-			item_template_name = frappe.get_value(
-				"Item", self.item_template, "item_name"
-			)
+			item_template_name = frappe.get_value("Item", self.item_template, "item_name")
 			if not item_template_name:
 				item_template_name = self.item_template
 			try:

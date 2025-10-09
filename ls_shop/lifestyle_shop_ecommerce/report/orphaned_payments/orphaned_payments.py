@@ -80,14 +80,8 @@ def get_data():
 		)
 		.where(
 			((PaymentEntry.docstatus == 1) & (PaymentEntryReference.name.isnull()))
-			| (
-				(PaymentEntry.docstatus == 2)
-				& (Telr_payment_request.status != "Refunded")
-			)
-			| (
-				(PaymentEntry.docstatus == 2)
-				& (tabby_payment_request.status != "REFUND")
-			)
+			| ((PaymentEntry.docstatus == 2) & (Telr_payment_request.status != "Refunded"))
+			| ((PaymentEntry.docstatus == 2) & (tabby_payment_request.status != "REFUND"))
 		)
 	).run(as_dict=True)
 	for payment in orphaned_payments:
@@ -98,10 +92,7 @@ def get_data():
 				"payment_mode": payment.mode_of_payment,
 				"posting_date": payment.posting_date,
 				"cancelled": payment.docstatus == 2,
-				"refunded": (
-					payment.telr_status == "Refunded"
-					or payment.tabby_status == "REFUND"
-				),
+				"refunded": (payment.telr_status == "Refunded" or payment.tabby_status == "REFUND"),
 			}
 		)
 	return data

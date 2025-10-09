@@ -47,12 +47,8 @@ class StyleAttributeVariant(Document):
 
 	def update_item_group(self):
 		if not self.item_group:
-			self.item_group = frappe.db.get_value(
-				"Item", self.item_style, "item_group", cache=True
-			)
-			item_group_mapping = frappe.get_cached_doc(
-				"Lifestyle Settings"
-			).ecommerce_item_group_mapping
+			self.item_group = frappe.db.get_value("Item", self.item_style, "item_group", cache=True)
+			item_group_mapping = frappe.get_cached_doc("Lifestyle Settings").ecommerce_item_group_mapping
 			for mapping in item_group_mapping:
 				if mapping.original_item_group == self.item_group:
 					self.item_group = mapping.ecommerce_item_group

@@ -22,9 +22,7 @@ class PaymentMode(StrEnum):
 @frappe.whitelist()
 def initiate_checkout_with_mode(payment_mode: PaymentMode):
 	lifestyle_settings = frappe.get_cached_doc("Lifestyle Settings")
-	if payment_mode not in set(PaymentMode) or not lifestyle_settings.get(
-		f"{payment_mode}_enabled"
-	):
+	if payment_mode not in set(PaymentMode) or not lifestyle_settings.get(f"{payment_mode}_enabled"):
 		frappe.throw(frappe._("Please select a valid payment mode."))
 
 	quotation = _get_cart_quotation()
@@ -47,9 +45,7 @@ def initiate_checkout_with_mode(payment_mode: PaymentMode):
 			{
 				"doctype": "Telr Payment Request",
 				"amount": quotation.rounded_total,
-				"currency_code": "SAR"
-				if frappe.conf.developer_mode
-				else quotation.currency,
+				"currency_code": "SAR" if frappe.conf.developer_mode else quotation.currency,
 				"ref_doctype": quotation.doctype,
 				"ref_docname": quotation.name,
 				"customer_ref": quotation.party_name,
@@ -66,9 +62,7 @@ def initiate_checkout_with_mode(payment_mode: PaymentMode):
 			{
 				"doctype": "Tabby Payment Request",
 				"amount": quotation.rounded_total,
-				"currency_code": "SAR"
-				if frappe.conf.developer_mode
-				else quotation.currency,
+				"currency_code": "SAR" if frappe.conf.developer_mode else quotation.currency,
 				"ref_doctype": quotation.doctype,
 				"ref_docname": quotation.name,
 				"customer_ref": quotation.party_name,
@@ -93,9 +87,7 @@ def generate_quotation_for_cart(cart: dict):
 
 def get_quotation_for_cart(cart: dict):
 	unsaved_quotation_doc = _get_cart_quotation()
-	sale_price_list = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "sale_price_list"
-	)
+	sale_price_list = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "sale_price_list")
 	ecommerce_warehouse = frappe.get_cached_value(
 		"Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse"
 	)
@@ -119,9 +111,7 @@ def get_quotation_for_cart(cart: dict):
 
 
 def set_charges(quotation):
-	shipping_rule = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "shipping_rule"
-	)
+	shipping_rule = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "shipping_rule")
 	if shipping_rule:
 		quotation.shipping_rule = shipping_rule
 		quotation.run_method("apply_shipping_rule")
@@ -130,9 +120,7 @@ def set_charges(quotation):
 
 def set_cod_charges(quotation):
 	cod_charges_applicable_below, cod_charge = get_cod_configuration()
-	account_head = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "charge_account_head"
-	)
+	account_head = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "charge_account_head")
 	if not cod_charges_applicable_below or not cod_charge:
 		return
 	if cod_charges_applicable_below < quotation.rounded_total:
@@ -224,23 +212,17 @@ def confirm_payment(payment_mode: PaymentMode, reference_id: str):
 
 		if payment_request.status == "Paid":
 			quote_name = payment_request.ref_docname
-			submit_quotation_and_create_order(
-				quote_name, payment_mode, payment_request.telr_order_ref
-			)
+			submit_quotation_and_create_order(quote_name, payment_mode, payment_request.telr_order_ref)
 		return payment_request
 
 	if payment_mode == PaymentMode.TABBY:
-		payment_request = frappe.get_doc(
-			"Tabby Payment Request", {"tabby_payment_id": reference_id}
-		)
+		payment_request = frappe.get_doc("Tabby Payment Request", {"tabby_payment_id": reference_id})
 		payment_request.sync_status()
 
 		if payment_request.status == "AUTHORIZED":
 			quote_name = payment_request.ref_docname
 			payment_request.capture_payment()
-			submit_quotation_and_create_order(
-				quote_name, payment_mode, payment_request.tabby_order_ref
-			)
+			submit_quotation_and_create_order(quote_name, payment_mode, payment_request.tabby_order_ref)
 
 		return payment_request
 
@@ -257,9 +239,7 @@ def submit_quotation_and_create_order(
 
 	so = _make_sales_order(quote_name, ignore_permissions=True)
 	so.custom_ecommerce_payment_mode = (
-		payment_mode.title()
-		if not payment_mode == payment_mode.COD
-		else payment_mode.upper()
+		payment_mode.title() if not payment_mode == payment_mode.COD else payment_mode.upper()
 	)
 	so.flags.ignore_permissions = True
 	so.insert()
@@ -267,13 +247,9 @@ def submit_quotation_and_create_order(
 	if payment_mode != payment_mode.COD:
 		so.submit()
 		payment_request_doctype = (
-			"Telr Payment Request"
-			if payment_mode == PaymentMode.TELR
-			else "Tabby Payment Request"
+			"Telr Payment Request" if payment_mode == PaymentMode.TELR else "Tabby Payment Request"
 		)
-		payment_order_ref_field = (
-			"telr_order_ref" if payment_mode == PaymentMode.TELR else "tabby_order_ref"
-		)
+		payment_order_ref_field = "telr_order_ref" if payment_mode == PaymentMode.TELR else "tabby_order_ref"
 		payment_request = frappe.get_doc(
 			payment_request_doctype, {payment_order_ref_field: payment_reference}
 		)
@@ -282,9 +258,7 @@ def submit_quotation_and_create_order(
 		payment_request.ref_doctype = "Sales Order"
 		payment_request.save()
 		frappe.set_user("Administrator")
-		pe = get_payment_entry(
-			"Sales Order", so.name, reference_date=frappe.utils.today()
-		)
+		pe = get_payment_entry("Sales Order", so.name, reference_date=frappe.utils.today())
 		pe.flags.ignore_permissions = True
 		pe.mode_of_payment = payment_mode.title()
 		pe.reference_no = payment_reference
@@ -297,9 +271,7 @@ def apply_coupon_code(applied_code):
 	quotation = True
 	if not applied_code:
 		frappe.throw(frappe._("Please enter a coupon code"))
-	coupon_name = frappe.db.get_value(
-		"Coupon Code", {"coupon_code": applied_code}, "name"
-	)
+	coupon_name = frappe.db.get_value("Coupon Code", {"coupon_code": applied_code}, "name")
 	if not coupon_name:
 		frappe.throw(frappe._("Please enter a valid coupon code"))
 	validate_coupon_code(coupon_name)

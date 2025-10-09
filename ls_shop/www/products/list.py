@@ -38,9 +38,7 @@ def get_filter_colors(filters=None):
 	query = get_product_base_query(filter_copy)
 	variant = DocType("Style Attribute Variant")
 
-	query = (
-		query.select(variant.attribute_name).distinct().orderby(variant.attribute_name)
-	)
+	query = query.select(variant.attribute_name).distinct().orderby(variant.attribute_name)
 	colors = query.run(pluck=True)
 	if not colors:
 		return colors
@@ -55,11 +53,7 @@ def get_filter_sizes(filters=None):
 	query = get_product_base_query(filter_copy)
 	color_size_item = DocType("Color Size Item")
 
-	query = (
-		query.select(color_size_item.size)
-		.distinct()
-		.orderby(Cast_(color_size_item.size, "Decimal"))
-	)
+	query = query.select(color_size_item.size).distinct().orderby(Cast_(color_size_item.size, "Decimal"))
 	return query.run(pluck=True)
 
 
@@ -102,17 +96,13 @@ def get_product_filters(selected_filters):
 	# Define DocTypes
 	category = selected_filters.get("category", "")
 	item_price = DocType("Item Price")
-	sale_price_list = frappe.get_cached_value(
-		"Lifestyle Settings", "Lifestyle Settings", "sale_price_list"
-	)
+	sale_price_list = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "sale_price_list")
 	# Get price range (min and max)
 	price_range = (
 		frappe.qb.from_(item_price)
 		.select(
 			Min(item_price.price_list_rate).as_("min_price"),
-			frappe.query_builder.functions.Max(item_price.price_list_rate).as_(
-				"max_price"
-			),
+			frappe.query_builder.functions.Max(item_price.price_list_rate).as_("max_price"),
 		)
 		.where(item_price.price_list == sale_price_list)  # Adjust price list as needed
 	).run(as_dict=True)
@@ -140,15 +130,9 @@ def get_selected_filters():
 		"subcategory": query_params.get("subcategory", "").split(",")
 		if query_params.get("subcategory")
 		else [],
-		"colors": query_params.get("colors", "").split(",")
-		if query_params.get("colors")
-		else [],
-		"sizes": query_params.get("sizes", "").split(",")
-		if query_params.get("sizes")
-		else [],
-		"brands": query_params.get("brands", "").split(",")
-		if query_params.get("brands")
-		else [],
+		"colors": query_params.get("colors", "").split(",") if query_params.get("colors") else [],
+		"sizes": query_params.get("sizes", "").split(",") if query_params.get("sizes") else [],
+		"brands": query_params.get("brands", "").split(",") if query_params.get("brands") else [],
 		"search": query_params.get("search", ""),
 		"category": query_params.get("category", ""),
 		"has_discount": query_params.get("has_discount", "0") == "1",
@@ -187,9 +171,7 @@ def get_context(context):
 	# Pass data to frontend
 	context.products = products
 	context.current_page = page
-	context.total_count = get_total_product_count(
-		filters=selected_filters
-	)  # Adjust for pagination
+	context.total_count = get_total_product_count(filters=selected_filters)  # Adjust for pagination
 	context.filters = filters  # Updated filters
 	context.selected_filters = selected_filters
 	context.price_range = price_range  # Updated price range

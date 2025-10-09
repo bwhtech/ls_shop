@@ -1,0 +1,30 @@
+{
+	"name": "ls_shop",
+	"version": "1.0.0",
+	"description": "ShoeArena Frontend",
+	"main": "index.js",
+	"scripts": {
+		"postinstall": "yarn tailwind:build",
+		"build": "yarn tailwind:build",
+		"tailwind:watch": "npx @tailwindcss/cli -i ./ls_shop/public/css/main.css -o ./ls_shop/public/css/tailwind.css --watch",
+		"tailwind:build": "npx @tailwindcss/cli -i ./ls_shop/public/css/main.css -o ./ls_shop/public/css/tailwind.css"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/BuildWithHussain/ls_shop.git"
+	},
+	"author": "BWH Studios",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/BuildWithHussain/ls_shop/issues"
+	},
+	"homepage": "https://github.com/BuildWithHussain/ls_shop#readme",
+	"dependencies": {
+		"@tailwindcss/cli": "^4.0.14",
+		"tailwindcss": "^4.0.14"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "1.9.4",
+		"@tailwindcss/typography": "^0.5.16"
+	}
+}

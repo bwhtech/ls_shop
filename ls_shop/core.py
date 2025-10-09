@@ -19,6 +19,4 @@ def send_otp(email):
 		print(f"OTP for {email}: {otp}")
 		return
 
-	frappe.sendmail(
-		recipients=email, subject="Your OTP", message=f"Your OTP: {otp}", now=True
-	)
+	frappe.sendmail(recipients=email, subject="Your OTP", message=f"Your OTP: {otp}", now=True)

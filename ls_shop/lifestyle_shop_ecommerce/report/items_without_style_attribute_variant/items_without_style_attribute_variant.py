@@ -25,8 +25,6 @@ def get_columns():
 
 def get_data():
 	items = set(frappe.get_all("Item", {"has_variants": True}, pluck="name"))
-	style_attribute_variants = set(
-		frappe.get_all("Style Attribute Variant", pluck="item_style")
-	)
+	style_attribute_variants = set(frappe.get_all("Style Attribute Variant", pluck="item_style"))
 	unmatched_items = items - style_attribute_variants
 	return [{"item_code": item} for item in unmatched_items]

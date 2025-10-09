@@ -94,15 +94,11 @@ class BulkImageUpload(Document):
 				reference_name=self.name,
 			)
 
-	def import_images_in_variant(
-		self, variant_doc, folder_name: str, zip_file: "zipfile.ZipFile"
-	):
+	def import_images_in_variant(self, variant_doc, folder_name: str, zip_file: "zipfile.ZipFile"):
 		import_count = 0
 		image_files = sorted(zip_file.namelist())
 		for image_file in image_files:
-			if image_file.startswith(folder_name) and image_file.endswith(
-				(".png", ".jpg", ".jpeg", ".webp")
-			):
+			if image_file.startswith(folder_name) and image_file.endswith((".png", ".jpg", ".jpeg", ".webp")):
 				image_data = zip_file.read(image_file)
 				image_data = io.BytesIO(image_data)
 
