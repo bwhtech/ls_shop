@@ -82,8 +82,8 @@ def install_demo_data():
 		print("  - Brake System")
 		print("  - Interior Accessories")
 		print("\n")
-
-		frappe.db.commit()  # nosemgrep: manual commit required for demo data installation completion
+		# nosemgrep: manual commit required for demo data installation completion
+		frappe.db.commit()
 
 	except Exception as e:
 		frappe.db.rollback()
@@ -143,7 +143,8 @@ def ensure_attribute_values(attribute_name, values, numeric=False):
 			}
 		)
 		attr.insert(ignore_permissions=True)
-		frappe.db.commit()  # nosemgrep: manual commit required for attribute creation in demo data
+		# nosemgrep: manual commit required for attribute creation in demo data
+		frappe.db.commit()
 		print(f"    ✓ {attribute_name} attribute created")
 	else:
 		# Attribute exists, just print message

@@ -98,8 +98,8 @@ def publish_all_demo_items():
 		else:
 			frappe.db.set_value("Website Item", wi.name, "route", item_code)
 			routed += 1
-
-	frappe.db.commit()  # nosemgrep: manual commit required for demo item publishing completion
+	# nosemgrep: manual commit required for demo item publishing completion
+	frappe.db.commit()
 	frappe.clear_cache()
 
 	print("\n✅ Complete!")
