@@ -1,7 +1,6 @@
 <!-- LANDING  PAGE -->
 {% extends "templates/layout.html" %}
 {% import "templates/macros/carousel.html" as carousel %}
-{% import "templates/macros/item_carousel.html" as item_carousel %}
 {% from "templates/macros/item_card.html" import item_card %}
 
 {% block head %}
@@ -13,6 +12,7 @@
 {% block uncontained_body %}
 
 <div class="md:pb-22">
+  {% if homepage_details.hero_banner %}
   <div class=" max-w-7xl mx-auto  md:px-10 pt-10 md:pt-20 md:pb-25 ">
 
     {% call carousel.carousel(pagination = 'True') %}
@@ -25,7 +25,9 @@
     {% endfor %}
     {% endcall %}
   </div>
+  {% endif %}
 
+  {% if homepage_details.gif_1 or homepage_details.gif_2 or homepage_details.gif_3 or homepage_details.gif_4 %}
   <div
     class="max-w-7xl mx-auto grid grid-cols-2 gap-6 px-8 py-15 md:grid-cols-4 md:gap-11 md:px-0 md:py-22">
     {% if homepage_details.gif_1 %}
@@ -52,40 +54,73 @@
     </a>
     {% endif %}
   </div>
+  {% endif %}
 
-  <div class="flex flex-col items-center pt-15 pb-4 md:py-22 ">
-    <h1 class="text-3xl font-medium md:text-[2.5rem] md:font-semibold ">
+  {% if new_arrivals %}
+  <div class="flex flex-col items-center pt-15 pb-4 md:py-22">
+    <h1 class="text-3xl font-medium md:text-[2.5rem] md:font-semibold">
       {{ _('New Arrivals') }}
-
     </h1>
 
-    <div class="py-6 md:py-15 flex items-center">
-      <!-- Product Carousel -->
-      {% call item_carousel.item_carousel(items=new_arrivals,navigation = True, pagination = True) %}
-      {% endcall %}
+    <div class="py-6 md:py-15 w-full max-w-7xl mx-auto px-4 md:px-10">
+      <div class="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+        {% for item in new_arrivals %}
+          {% set product_name = item.item_name if frappe.lang == "en" else item.custom_item_name_ar or item.item_name %}
+          <a href="/{{frappe.lang}}/products/{{item.route}}">
+            {{ item_card(
+              image=item.image or "/assets/ls_shop/images/1.jpg",
+              brand=item.brand,
+              product_name=product_name,
+              original_price=item.default_price,
+              formatted_price=item.sale_price,
+              discount=item.discount_percent,
+              size_variant="default",
+              product_obj=item,
+              attribute_value=item.attribute_value
+            ) }}
+          </a>
+        {% endfor %}
+      </div>
     </div>
   </div>
+  {% endif %}
 
+  {% if best_picks %}
   <div class="flex flex-col items-center py-7 md:py-22">
     <h1 class="text-3xl font-medium md:text-[2.5rem] md:font-semibold">
       {{ _('Best Picks') }}
     </h1>
-    <div class="py-5">
-      {% call item_carousel.item_carousel(
-        items=best_picks,
-        navigation=True,
-        pagination=True) %}
 
-      {% endcall %}
+    <div class="py-6 md:py-15 w-full max-w-7xl mx-auto px-4 md:px-10">
+      <div class="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+        {% for item in best_picks %}
+          {% set product_name = item.item_name if frappe.lang == "en" else item.custom_item_name_ar or item.item_name %}
+          <a href="/{{frappe.lang}}/products/{{item.route}}">
+            {{ item_card(
+              image=item.image or "/assets/ls_shop/images/1.jpg",
+              brand=item.brand,
+              product_name=product_name,
+              original_price=item.default_price,
+              formatted_price=item.sale_price,
+              discount=item.discount_percent,
+              size_variant="default",
+              product_obj=item,
+              attribute_value=item.attribute_value
+            ) }}
+          </a>
+        {% endfor %}
+      </div>
     </div>
-
   </div>
+  {% endif %}
 
+  {% if homepage_details.banner_1 %}
   <div class="container mx-auto mt-3 md:my-22">
     <a href="{{homepage_details.banner_url_1 or '/'}}" class="banner-effect block">
       <img src="{{homepage_details.banner_1}}" alt="" class="md:rounded-lg w-full cursor-pointer" />
     </a>
   </div>
+  {% endif %}
 </div>
 <script type="text/javascript">
   const setupDots = (emblaApi, dotsNode) => {

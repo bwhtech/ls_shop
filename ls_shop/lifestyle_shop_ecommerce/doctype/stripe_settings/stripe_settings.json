@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2026-02-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "publishable_key",
+  "column_break_1",
+  "secret_key",
+  "currency",
+  "section_break_2",
+  "test_mode",
+  "column_break_3",
+  "redirection_urls_section",
+  "success_url",
+  "column_break_4",
+  "cancel_url"
+ ],
+ "fields": [
+  {
+   "fieldname": "publishable_key",
+   "fieldtype": "Data",
+   "label": "Publishable Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "secret_key",
+   "fieldtype": "Password",
+   "label": "Secret Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Data",
+   "label": "Currency Code",
+   "default": "SAR"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode?"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "redirection_urls_section",
+   "fieldtype": "Section Break",
+   "label": "Redirection URLs"
+  },
+  {
+   "fieldname": "success_url",
+   "fieldtype": "Data",
+   "label": "Success URL"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cancel_url",
+   "fieldtype": "Data",
+   "label": "Cancel URL"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Lifestyle Shop Ecommerce",
+ "name": "Stripe Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

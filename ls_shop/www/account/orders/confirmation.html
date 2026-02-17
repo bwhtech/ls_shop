@@ -10,13 +10,26 @@
     const urlParams = new URLSearchParams(window.location.search);
     let payment_mode = urlParams.get('payment_mode');
     const payment_id = urlParams.get('payment_id');
+    const session_id = urlParams.get('session_id');
     let reference_id = urlParams.get('reference_id');
+
+    // Handle Stripe redirect (comes back with session_id)
+    if (session_id && !payment_mode) {
+        payment_mode = 'stripe';
+    }
     if (!payment_mode) {
         payment_mode = 'tabby'
     }
-    if(!reference_id){
-        reference_id = payment_id
+
+    // For Stripe, always use session_id as the reference
+    if (payment_mode === 'stripe' && session_id) {
+        reference_id = session_id;
     }
+
+    if (!reference_id) {
+        reference_id = payment_id;
+    }
+
     frappe_call(
         "/api/v2/method/ls_shop.api.payments.confirm_payment",
         { payment_mode, reference_id }

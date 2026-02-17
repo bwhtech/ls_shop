@@ -29,6 +29,7 @@ def get_context(context):
 	context.show_telr = lifestyle_settings.get("telr_enabled", 0)
 	context.show_tabby = lifestyle_settings.get("tabby_enabled", 0)
 	context.show_cod = lifestyle_settings.get("cod_enabled", 0)
+	context.show_stripe = lifestyle_settings.get("stripe_enabled", 0)
 	context.cart_quotation = cart_quotation
 	context.coupon_code = get_coupon_code(cart_quotation)
 	context.country_list = get_country_list()

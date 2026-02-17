@@ -1,4 +1,9 @@
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 
 import frappe
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -17,6 +22,7 @@ class PaymentMode(StrEnum):
 	TELR = "telr"
 	TABBY = "tabby"
 	COD = "cod"
+	STRIPE = "stripe"
 
 
 @frappe.whitelist()
@@ -70,6 +76,24 @@ def initiate_checkout_with_mode(payment_mode: PaymentMode):
 				"customer_name": quotation.customer_name,
 				"customer_email": customer_contact.email_id,
 				"customer_address": quotation.customer_address,
+			}
+		).insert(ignore_permissions=True)
+
+	# Get a valid email for Stripe (contact email may not be valid)
+	stripe_customer_email = customer_contact.email_id
+	if not stripe_customer_email or "@" not in str(stripe_customer_email):
+		stripe_customer_email = frappe.db.get_value("User", frappe.session.user, "email") or frappe.session.user
+
+	if payment_mode == PaymentMode.STRIPE:
+		payment_request = frappe.get_doc(
+			{
+				"doctype": "Stripe Payment Request",
+				"amount": quotation.rounded_total,
+				"currency_code": "SAR" if frappe.conf.developer_mode else quotation.currency,
+				"ref_doctype": quotation.doctype,
+				"ref_docname": quotation.name,
+				"customer_email": stripe_customer_email,
+				"customer_name": quotation.customer_name,
 			}
 		).insert(ignore_permissions=True)
 
@@ -227,6 +251,17 @@ def confirm_payment(payment_mode: PaymentMode, reference_id: str):
 		return payment_request
 
 
+	if payment_mode == PaymentMode.STRIPE:
+		payment_request = frappe.get_doc("Stripe Payment Request", {"stripe_session_id": reference_id})
+		payment_request.sync_status()
+
+		if payment_request.status == "Paid":
+			quote_name = payment_request.ref_docname
+			submit_quotation_and_create_order(quote_name, payment_mode, payment_request.stripe_session_id)
+
+		return payment_request
+
+
 def submit_quotation_and_create_order(
 	quote_name: str, payment_mode: PaymentMode, payment_reference: str = ""
 ):
@@ -246,10 +281,15 @@ def submit_quotation_and_create_order(
 
 	if payment_mode != payment_mode.COD:
 		so.submit()
-		payment_request_doctype = (
-			"Telr Payment Request" if payment_mode == PaymentMode.TELR else "Tabby Payment Request"
-		)
-		payment_order_ref_field = "telr_order_ref" if payment_mode == PaymentMode.TELR else "tabby_order_ref"
+
+		# Map payment mode to doctype and ref field
+		payment_doctype_map = {
+			PaymentMode.TELR: ("Telr Payment Request", "telr_order_ref"),
+			PaymentMode.TABBY: ("Tabby Payment Request", "tabby_order_ref"),
+			PaymentMode.STRIPE: ("Stripe Payment Request", "stripe_session_id"),
+		}
+
+		payment_request_doctype, payment_order_ref_field = payment_doctype_map[payment_mode]
 		payment_request = frappe.get_doc(
 			payment_request_doctype, {payment_order_ref_field: payment_reference}
 		)
