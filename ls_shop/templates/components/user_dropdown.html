@@ -7,7 +7,7 @@
         position="right",
         width="w-40",
         link='account/dashboard',
-
+        skip_mobile_redirect=true if frappe.session.user == 'Guest' else false,
     ) 
 %}
 

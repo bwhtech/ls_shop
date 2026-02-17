@@ -141,7 +141,64 @@ website_route_rules = [
 ```
 
 ### Payment Gateway Integration
-The app supports various payment gateways. For Tabby BNPL integration, check out our companion app: [tabby_frappe](https://github.com/cinnamonlabs/tabby_frappe)
+
+LS Shop supports multiple payment gateways out of the box:
+
+| Gateway | Type | Description |
+|---------|------|-------------|
+| **Telr** | Credit/Debit Card | Iframe-based checkout via Telr payment gateway |
+| **Tabby** | BNPL (Buy Now Pay Later) | Full redirect checkout. Requires [tabby_frappe](https://github.com/cinnamonlabs/tabby_frappe) |
+| **Stripe** | Credit/Debit Card | Stripe Checkout Sessions with full redirect |
+| **COD** | Cash on Delivery | No online payment required |
+
+#### Stripe Setup
+
+After installing ls_shop, follow these steps to enable Stripe:
+
+1. **Run migrations** to create the Stripe DocTypes:
+   ```bash
+   bench --site your-site-name migrate
+   ```
+
+2. **Create Mode of Payment** record:
+   - Go to **Setup > Mode of Payment > + New**
+   - Name: Stripe, Type: Bank
+   - Optionally link a default account under the Accounts table
+
+3. **Add Stripe to Sales Order payment mode options**:
+   - Go to **Customize Form > Sales Order**
+   - Find the custom_ecommerce_payment_mode field
+   - Add Stripe to the Options list (one per line)
+
+4. **Configure Stripe API keys**:
+   - Go to **Stripe Settings** (search in the desk)
+   - Enter your **Publishable Key** (pk_test_... or pk_live_...)
+   - Enter your **Secret Key** (sk_test_... or sk_live_...)
+   - Set **Currency** (default: SAR)
+   - Enable **Test Mode** if using test keys
+
+5. **Enable Stripe in Lifestyle Settings**:
+   - Go to **Lifestyle Settings**
+   - Check **Stripe Enabled**
+
+#### Stripe Test Cards
+
+When using Stripe in test mode, use these [test card numbers](https://docs.stripe.com/testing#cards):
+
+| Card Number | Description |
+|-------------|-------------|
+| 4242 4242 4242 4242 | Successful payment |
+| 4000 0000 0000 3220 | 3D Secure authentication required |
+| 4000 0000 0000 0002 | Declined |
+
+Use any future expiry date, any 3-digit CVC, and any postal code.
+
+#### Stripe Features
+
+- **Checkout Sessions**: Secure, Stripe-hosted payment page
+- **Automatic status sync**: Payment status is synced from Stripe on confirmation
+- **Refunds**: Automatic refund processing when a return Payment Entry (type: Pay) is submitted with Mode of Payment = Stripe
+- **Multi-currency**: Supports any currency configured in Stripe
 
 
 ## 🏢 About BWH Studios

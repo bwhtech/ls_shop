@@ -19,6 +19,7 @@
                 { key: 'telr', enabled: parseInt('{{ show_telr }}') },
                 { key: 'tabby', enabled: parseInt('{{ show_tabby }}') },
                 { key: 'cod', enabled: parseInt('{{ show_cod }}') },
+                { key: 'stripe', enabled: parseInt('{{ show_stripe }}') },
             ]
     }
     document.addEventListener('alpine:init', () => {
@@ -174,6 +175,9 @@
                     return
                 }
                 window.location.href = data["payment_request"]["tabby_order_url"]
+            }
+            if (state.payment_mode === "stripe") {
+                window.location.href = data["payment_request"]["stripe_session_url"]
             }
         }
         catch (err) {
@@ -499,6 +503,21 @@
                             </div>
                             {% endif %}
                             <img src="/assets/ls_shop/images/cod.png" alt="" class="mt-3 -ms-1 h-6 object-contain">
+                        </label>
+                        <label
+                            class="flex flex-col items-start p-3 space-x-3 bg-white border rounded-lg hover:bg-gray-50 border-gray-200/70 cursor-pointer"
+                            x-show="{{show_stripe}}">
+                            <div class="flex items-center">
+                                <input type="radio" name="stripe_radio" value="stripe"
+                                    class="h-5 w-5 accent-gray-900 translate-y-px focus:ring-gray-700 cursor-pointer"
+                                    x-model="payment_mode" />
+                                <span class="text-base ps-3">
+                                    {{ _('Stripe') }}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-3 -ms-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="24" viewBox="0 0 640 480" fill="#635BFF"><path d="M414 230c0-30.1-14.6-53.9-42.5-53.9-28 0-44.9 23.8-44.9 53.7 0 35.5 20 53.3 48.6 53.3 14 0 24.5-3.2 32.5-7.6v-23.5c-8 4-17.2 6.5-28.9 6.5-11.4 0-21.6-4-22.9-17.8h57.7c.1-1.5.4-7.7.4-10.7zm-58.3-11.2c0-13.2 8.1-18.7 15.4-18.7 7.1 0 14.7 5.5 14.7 18.7h-30.1zM296.1 176.1c-11.5 0-18.9 5.4-23 9.2l-1.5-7.3h-26v137.2l29.5-6.3.1-33.3c4.2 3 10.3 7.3 20.5 7.3 20.7 0 39.6-16.7 39.6-53.3-.1-33.6-19.2-53.5-39.2-53.5zm-6.9 82.3c-6.8 0-10.9-2.5-13.7-5.5l-.2-43.3c3-3.4 7.2-5.7 13.9-5.7 10.6 0 18 11.9 18 27.2 0 15.6-7.3 27.3-18 27.3zM228.5 172l29.6-6.3v-23.9l-29.6 6.3v23.9zM228.5 178h29.6v103.7h-29.6V178zM196 187.4l-1.9-9.4h-25.6v103.7h29.5v-70.3c7-9.1 18.8-7.4 22.5-6.1V178c-3.8-1.5-17.8-4.2-24.5 9.4zM138.3 152.8l-28.8 6.1-.1 95c0 17.5 13.2 30.4 30.7 30.4 9.7 0 16.8-1.8 20.7-3.9v-24c-3.8 1.5-22.5 7-22.5-10.5v-42h22.5V178h-22.5l.1-25.2zM63.7 205.5c0-4.5 3.7-6.3 9.8-6.3 8.8 0 19.8 2.6 28.6 7.3v-27.1c-9.6-3.8-19-5.3-28.6-5.3-23.4 0-39 12.2-39 32.6 0 31.8 43.8 26.7 43.8 40.4 0 5.3-4.6 7.1-11.1 7.1-9.6 0-21.9-4-31.6-9.3v27.4c10.7 4.6 21.6 6.6 31.6 6.6 24 0 40.4-11.9 40.4-32.5-.1-34.3-44.1-28.2-43.9-41zM595 230c0-30.1-14.6-53.9-42.5-53.9-28 0-44.9 23.8-44.9 53.7 0 35.5 20 53.3 48.6 53.3 14 0 24.5-3.2 32.5-7.6v-23.5c-8 4-17.2 6.5-28.9 6.5-11.4 0-21.6-4-22.9-17.8H595c0-1.5.3-7.7.3-10.7h-.3zm-58.3-11.2c0-13.2 8.1-18.7 15.4-18.7 7.1 0 14.7 5.5 14.7 18.7h-30.1z"/></svg>
+                            </div>
                         </label>
                     </div>
                     <button @click="payment_mode_confirmed = true"

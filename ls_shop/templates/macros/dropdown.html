@@ -9,14 +9,15 @@
         panel_classes="",
         badge_count=0,
         show_badge=false,
-        link=''
+        link='',
+        skip_mobile_redirect=false
     ) 
 %}
 <div class="flex justify-center {{ custom_classes }}">
     <div x-data="{
             open: false,
             toggle() {
-                if(window.innerWidth < 768) {
+                if(window.innerWidth < 768 && !{{ 'true' if skip_mobile_redirect else 'false' }}) {
                     window.location.href = '/{{frappe.lang}}/{{ link }}'
                     return
                 }

@@ -96,6 +96,7 @@ doc_events = {
 	"Payment Entry": {
 		"on_submit": [
 			"ls_shop.lifestyle_shop_ecommerce.doctype.telr_payment_request.telr_payment_request.refund_payment_for_payment_entry",
+			"ls_shop.lifestyle_shop_ecommerce.doctype.stripe_payment_request.stripe_payment_request.refund_payment_for_payment_entry",
 		],
 	},
 	"Sales Order": {
