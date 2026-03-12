@@ -124,8 +124,7 @@ def create_item_attributes():
 			("L", "L"),
 			("XL", "XL"),
 			("XXL", "XXL"),
-		],
-		numeric=True,
+		]
 	)
 
 
