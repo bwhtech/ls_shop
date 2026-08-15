@@ -567,4 +567,31 @@
     </div>
 </div>
 
+<script>
+    {% set checkout_items = cart_quotation.get("items") or [] %}
+    {% set checkout_value = cart_quotation.grand_total or cart_quotation.net_total or 0 %}
+    {% set checkout_item_codes = checkout_items | map(attribute="item_code") | list %}
+    if (window.fbq) fbq('track', 'InitiateCheckout', {
+        content_ids: {{ checkout_item_codes | tojson }},
+        content_type: 'product',
+        num_items: {{ checkout_items | length }},
+        value: {{ checkout_value | tojson }},
+        currency: window.fb_currency
+    });
+    if (window.gtag) gtag('event', 'begin_checkout', {
+        currency: window.ga4_currency,
+        value: {{ checkout_value | tojson }},
+        items: {{ checkout_item_codes | tojson }}.map(item_code => ({ item_id: item_code }))
+    });
+    if (window.lsAnalytics) lsAnalytics.track('begin_checkout', {
+        value: {{ checkout_value | tojson }},
+        currency: window.ls_currency,
+        qty: {{ checkout_items | length }},
+        items: [
+            {% for row in checkout_items %}
+            { item_code: {{ row.item_code | tojson }}, qty: {{ (row.qty or 0) | tojson }}, price: {{ (row.rate or 0) | tojson }} },
+            {% endfor %}
+        ]
+    });
+</script>
 {% endblock %}

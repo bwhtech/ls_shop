@@ -32,6 +32,29 @@
                         sizes: sizes,
                     });
                 }
+
+                const item_code = variant?.item_code || item.name;
+                const line_value = (parseFloat(price) || 0) * qty;
+
+                if (window.fbq) fbq('track', 'AddToCart', {
+                    content_ids: [item_code],
+                    content_type: 'product',
+                    value: line_value,
+                    currency: window.fb_currency
+                });
+
+                if (window.gtag) gtag('event', 'add_to_cart', {
+                    currency: window.ga4_currency,
+                    value: line_value,
+                    items: [{ item_id: item_code, price: parseFloat(price) || 0, quantity: qty }]
+                });
+
+                if (window.lsAnalytics) lsAnalytics.track('add_to_cart', {
+                    item_code: item_code,
+                    qty: qty,
+                    value: line_value,
+                    currency: window.ls_currency
+                });
             },
             async fetch_detail_for_cart() {
                 try {

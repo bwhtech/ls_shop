@@ -6,6 +6,7 @@ from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
 from erpnext.selling.doctype.quotation.quotation import _make_sales_order
 from frappe.utils import getdate
 
+from ls_shop.analytics.events import log_purchase, set_attribution_fields
 from ls_shop.core import _get_cart_quotation
 from ls_shop.utils import get_cod_configuration
 
@@ -89,6 +90,7 @@ def get_quotation_for_cart(cart: dict):
 		"Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse"
 	)
 	unsaved_quotation_doc.selling_price_list = sale_price_list
+	set_attribution_fields(unsaved_quotation_doc)
 	unsaved_quotation_doc.items = []
 	for item in cart["items"]:
 		unsaved_quotation_doc.append(
@@ -200,28 +202,47 @@ def update_quotation_address(address: dict):
 @frappe.whitelist()
 def confirm_payment(payment_mode: PaymentMode, reference_id: str):
 	if payment_mode == payment_mode.COD:
-		submit_quotation_and_create_order(reference_id, payment_mode)
-		return {"status": "Paid"}
+		sales_order = submit_quotation_and_create_order(reference_id, payment_mode)
+		return {"status": "Paid", **purchase_summary(sales_order)}
 
+	sales_order = None
 	if payment_mode == PaymentMode.TELR:
 		payment_request = frappe.get_doc("Telr Payment Request", int(reference_id))
 		payment_request.sync_status()
 
 		if payment_request.status == "Paid":
 			quote_name = payment_request.ref_docname
-			submit_quotation_and_create_order(quote_name, payment_mode, payment_request.telr_order_ref)
-		return payment_request
+			sales_order = submit_quotation_and_create_order(
+				quote_name, payment_mode, payment_request.telr_order_ref
+			)
 
-	if payment_mode == PaymentMode.TABBY:
+	elif payment_mode == PaymentMode.TABBY:
 		payment_request = frappe.get_doc("Tabby Payment Request", {"tabby_payment_id": reference_id})
 		payment_request.sync_status()
 
 		if payment_request.status == "AUTHORIZED":
 			quote_name = payment_request.ref_docname
 			payment_request.capture_payment()
-			submit_quotation_and_create_order(quote_name, payment_mode, payment_request.tabby_order_ref)
+			sales_order = submit_quotation_and_create_order(
+				quote_name, payment_mode, payment_request.tabby_order_ref
+			)
+	else:
+		return
 
-		return payment_request
+	return {**payment_request.as_dict(), **purchase_summary(sales_order)}
+
+
+def purchase_summary(sales_order):
+	# Totals for the browser-side Purchase pixels. order_name is the Sales Order name so the
+	# Meta eventID matches the order_id that events.log_purchase writes server-side, which is
+	# what lets Meta dedupe the two hits.
+	if not sales_order:
+		return {}
+	return {
+		"order_name": sales_order.name,
+		"grand_total": sales_order.grand_total,
+		"currency": sales_order.currency,
+	}
 
 
 def submit_quotation_and_create_order(
@@ -238,6 +259,7 @@ def submit_quotation_and_create_order(
 	so.custom_ecommerce_payment_mode = (
 		payment_mode.title() if not payment_mode == payment_mode.COD else payment_mode.upper()
 	)
+	set_attribution_fields(so)
 	so.flags.ignore_permissions = True
 	so.insert()
 
@@ -261,6 +283,10 @@ def submit_quotation_and_create_order(
 		pe.reference_no = payment_reference
 		pe.insert().submit()
 	frappe.session.user = session_user
+
+	# COD orders count as purchases even while the Sales Order stays draft.
+	log_purchase(so)
+	return so
 
 
 @frappe.whitelist()

@@ -1,0 +1,13 @@
+{% set analytics_settings = frappe.get_cached_doc("Analytics Settings") %}
+{% if analytics_settings.enable_ga4 and analytics_settings.ga4_measurement_id %}
+<script>
+    window.ga4_currency = "{{ frappe.get_cached_doc('Global Defaults').default_currency or 'USD' }}";
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ analytics_settings.ga4_measurement_id }}"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ analytics_settings.ga4_measurement_id }}');
+</script>
+{% endif %}

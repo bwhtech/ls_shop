@@ -444,4 +444,24 @@
             toast("{{_('You will be notified when item is available')}}", { type: "success" })
     }
 </script>
+<script>
+    {% set analytics_item_code = (selected_item or {}).get("item_code") or product_variant.name %}
+    {% set analytics_value = selected_price or default_price or 0 %}
+    if (window.fbq) fbq('track', 'ViewContent', {
+        content_ids: [{{ analytics_item_code | tojson }}],
+        content_type: 'product',
+        value: {{ analytics_value | tojson }},
+        currency: window.fb_currency
+    });
+    if (window.gtag) gtag('event', 'view_item', {
+        currency: window.ga4_currency,
+        value: {{ analytics_value | tojson }},
+        items: [{ item_id: {{ analytics_item_code | tojson }}, price: {{ analytics_value | tojson }} }]
+    });
+    if (window.lsAnalytics) lsAnalytics.track('view_item', {
+        item_code: {{ analytics_item_code | tojson }},
+        value: {{ analytics_value | tojson }},
+        currency: window.ls_currency
+    });
+</script>
 {% endblock %}

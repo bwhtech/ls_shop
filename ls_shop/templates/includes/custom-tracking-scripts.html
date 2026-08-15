@@ -1,0 +1,6 @@
+{% set analytics_settings = frappe.get_cached_doc("Analytics Settings") %}
+{% for row in analytics_settings.custom_tracking_scripts %}
+{% if row.enabled and row.script %}
+{{ row.script | safe }}
+{% endif %}
+{% endfor %}
