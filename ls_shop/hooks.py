@@ -5,6 +5,8 @@ app_description = "Ecommerce extension for ERPNext"
 app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
+required_apps = ["frappe/erpnext", "frappe/payments", "Rl0007/bwh_payments"]
+
 
 website_redirects = [
 	{"source": "/products", "target": "/en/products"},
@@ -101,10 +103,8 @@ doc_events = {
 	"User": {
 		"before_insert": "ls_shop.utils.prevent_welcome_email",
 	},
-	"Payment Entry": {
-		"on_submit": [
-			"ls_shop.lifestyle_shop_ecommerce.doctype.telr_payment_request.telr_payment_request.refund_payment_for_payment_entry",
-		],
+	"Gateway Payment Request": {
+		"on_update": "ls_shop.api.payment_hooks.on_payment_request_update",
 	},
 	"Sales Order": {
 		"on_submit": [

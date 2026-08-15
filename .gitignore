@@ -58,3 +58,6 @@ jspm_packages/
 .aider*
 
 ls_shop/public/css/tailwind.css
+
+# Local agent config
+.claude/

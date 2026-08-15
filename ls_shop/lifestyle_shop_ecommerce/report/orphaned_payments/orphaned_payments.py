@@ -55,56 +55,38 @@ def get_columns():
 
 
 def get_data():
-	data = []
-	PaymentEntry = DocType("Payment Entry")
-	PaymentEntryReference = DocType("Payment Entry Reference")
-	Telr_payment_request = DocType("Telr Payment Request")
-	tabby_installed = bool(frappe.db.exists("DocType", "Tabby Payment Request"))
+	payment_entry = DocType("Payment Entry")
+	payment_entry_reference = DocType("Payment Entry Reference")
+	gateway_payment_request = DocType("Gateway Payment Request")
 
 	query = (
-		qb.from_(PaymentEntry)
-		.left_join(PaymentEntryReference)
-		.on(PaymentEntryReference.parent == PaymentEntry.name)
-		.left_join(Telr_payment_request)
-		.on(Telr_payment_request.telr_order_ref == PaymentEntry.reference_no)
+		qb.from_(payment_entry)
+		.left_join(payment_entry_reference)
+		.on(payment_entry_reference.parent == payment_entry.name)
+		.left_join(gateway_payment_request)
+		.on(gateway_payment_request.order_ref == payment_entry.reference_no)
 		.select(
-			PaymentEntry.name,
-			PaymentEntry.paid_amount,
-			PaymentEntry.mode_of_payment,
-			PaymentEntry.posting_date,
-			PaymentEntry.docstatus,
-			Telr_payment_request.status.as_("telr_status"),
+			payment_entry.name,
+			payment_entry.paid_amount,
+			payment_entry.mode_of_payment,
+			payment_entry.posting_date,
+			payment_entry.docstatus,
+			gateway_payment_request.status.as_("gateway_status"),
+		)
+		.where(
+			((payment_entry.docstatus == 1) & (payment_entry_reference.name.isnull()))
+			| ((payment_entry.docstatus == 2) & (gateway_payment_request.status != "Refunded"))
 		)
 	)
 
-	if tabby_installed:
-		tabby_payment_request = DocType("Tabby Payment Request")
-		query = (
-			query.left_join(tabby_payment_request)
-			.on(tabby_payment_request.tabby_order_ref == PaymentEntry.reference_no)
-			.select(tabby_payment_request.status.as_("tabby_status"))
-			.where(
-				((PaymentEntry.docstatus == 1) & (PaymentEntryReference.name.isnull()))
-				| ((PaymentEntry.docstatus == 2) & (Telr_payment_request.status != "Refunded"))
-				| ((PaymentEntry.docstatus == 2) & (tabby_payment_request.status != "REFUND"))
-			)
-		)
-	else:
-		query = query.where(
-			((PaymentEntry.docstatus == 1) & (PaymentEntryReference.name.isnull()))
-			| ((PaymentEntry.docstatus == 2) & (Telr_payment_request.status != "Refunded"))
-		)
-
-	for payment in query.run(as_dict=True):
-		tabby_status = payment.get("tabby_status") if tabby_installed else None
-		data.append(
-			{
-				"payment_entry": payment.name,
-				"paid_amount": payment.paid_amount,
-				"payment_mode": payment.mode_of_payment,
-				"posting_date": payment.posting_date,
-				"cancelled": payment.docstatus == 2,
-				"refunded": (payment.telr_status == "Refunded" or tabby_status == "REFUND"),
-			}
-		)
-	return data
+	return [
+		{
+			"payment_entry": payment.name,
+			"paid_amount": payment.paid_amount,
+			"payment_mode": payment.mode_of_payment,
+			"posting_date": payment.posting_date,
+			"cancelled": payment.docstatus == 2,
+			"refunded": payment.gateway_status == "Refunded",
+		}
+		for payment in query.run(as_dict=True)
+	]

@@ -89,7 +89,4 @@
              <span class="font-medium" x-text="checkout_total.toFixed(2)"> </span>
         </div>
     </div>
-    <div x-show="billing_address_filled && payment_mode === 'tabby'" x-transition >
-      {{tabby(selector=tabby_selector,price = cart_quotation.rounded_total)}}
-    </div>
 </div>

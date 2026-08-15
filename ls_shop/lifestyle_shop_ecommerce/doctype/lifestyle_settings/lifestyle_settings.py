@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 
@@ -102,8 +103,6 @@ class LifestyleSettings(Document):
 		snapchat_url: DF.Data | None
 		store_name: DF.Data | None
 		strikethrough_color: DF.Color | None
-		tabby_enabled: DF.Check
-		telr_enabled: DF.Check
 		tiktok_url: DF.Data | None
 		twitter_handle: DF.Data | None
 		twitter_url: DF.Data | None
@@ -114,10 +113,16 @@ class LifestyleSettings(Document):
 	pass
 
 	def validate(self):
-		if not self.telr_enabled and not self.tabby_enabled and not self.cod_enabled:
-			frappe.throw(frappe._("At least one payment method (Telr, Tabby, or COD) must be enabled."))
+		self.validate_a_payment_method_is_available()
 		self.validate_search_content_fields()
 		self.validate_search_result_fields()
+
+	def validate_a_payment_method_is_available(self):
+		if self.cod_enabled or get_available_payment_modes():
+			return
+		frappe.throw(
+			frappe._("Enable cash on delivery or at least one Payment Gateway Profile before saving.")
+		)
 
 	def validate_search_content_fields(self):
 		rows = self.search_content_fields or []
