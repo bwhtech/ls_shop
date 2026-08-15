@@ -455,7 +455,6 @@ def create_item_template(product_data):
 			"variant_based_on": "Item Attribute",
 			"description": product_data["description"],
 			"custom_displayname": product_data["name"],
-			"custom_item_group_display_name": product_data["name"],
 			"attributes": [
 				{"attribute": "Color", "attribute_value": "\n".join(color_values) if color_values else ""},
 				{"attribute": "Size", "attribute_value": "\n".join(size_values) if size_values else ""},
@@ -569,7 +568,6 @@ def create_item_variants(template_name, product_data):
 					"variant_of": template_name,
 					"description": product_data["description"],
 					"custom_displayname": f"{product_data['name']} {color} {size}",
-					"custom_item_group_display_name": f"{product_data['name']} {color} {size}",
 					"attributes": [
 						{"attribute": "Color", "attribute_value": color},
 						{"attribute": "Size", "attribute_value": size},
@@ -790,7 +788,6 @@ def create_ecommerce_group():
 			"is_group": True,
 			"parent_item_group": root_item_group,
 			"custom_displayname": parent,
-			"custom_item_group_display_name": parent,
 		}
 	).insert(ignore_if_duplicate=True)
 
@@ -803,7 +800,6 @@ def create_ecommerce_group():
 				"is_group": True,
 				"parent_item_group": parent,
 				"custom_displayname": display_name,
-				"custom_item_group_display_name": display_name,
 			}
 		).insert(ignore_if_duplicate=True)
 
@@ -828,7 +824,6 @@ def get_root_item_group():
 				"is_group": True,
 				"parent_item_group": "",
 				"custom_displayname": root_name,
-				"custom_item_group_display_name": root_name,
 			}
 		).insert(ignore_permissions=True)
 
