@@ -5,7 +5,7 @@ from typing import ClassVar
 
 import frappe
 from frappe.search.sqlite_search import MAX_EDIT_DISTANCE, MIN_WORD_LENGTH, SQLiteSearch
-from frappe.utils import create_batch
+from frappe.utils import create_batch, flt
 
 from ls_shop.search.engine import empty_result, is_query_too_short
 from ls_shop.search.record_builder import (
@@ -303,27 +303,30 @@ class SqliteProductSearch(SQLiteSearch):
 		if not names:
 			return []
 
-		doc_ids = [f"Style Attribute Variant:{name}" for name in names]
-		placeholders = ", ".join("?" for _ in doc_ids)
-
-		detail_rows = self.sql(
-			f"SELECT * FROM product_detail WHERE doc_id IN ({placeholders})",
-			tuple(doc_ids),
-			read_only=True,
-		)
-		card_by_name = {
-			row["name"]: {key: row[key] for key in row.keys() if key != "doc_id"} for row in detail_rows
-		}
-
+		card_by_name = {}
 		sizes_by_name = {}
-		size_rows = self.sql(
-			f"SELECT doc_id, size, item_code FROM search_size WHERE doc_id IN ({placeholders})",
-			tuple(doc_ids),
-			read_only=True,
-		)
-		for row in size_rows:
-			name = row["doc_id"].split(":", 1)[1]
-			sizes_by_name.setdefault(name, []).append({"size": row["size"], "item_code": row["item_code"]})
+		# Chunked for the same reason remove_docs is: SQLite caps bound parameters per statement, and
+		# nothing in the signature stops a caller passing more names than that cap.
+		for chunk in create_batch(list(names), SQLITE_PARAM_CHUNK_SIZE):
+			doc_ids = tuple(f"Style Attribute Variant:{name}" for name in chunk)
+			placeholders = ", ".join("?" for _ in doc_ids)
+
+			for row in self.sql(
+				f"SELECT * FROM product_detail WHERE doc_id IN ({placeholders})",
+				doc_ids,
+				read_only=True,
+			):
+				card_by_name[row["name"]] = {key: row[key] for key in row.keys() if key != "doc_id"}
+
+			for row in self.sql(
+				f"SELECT doc_id, size, item_code FROM search_size WHERE doc_id IN ({placeholders})",
+				doc_ids,
+				read_only=True,
+			):
+				name = row["doc_id"].split(":", 1)[1]
+				sizes_by_name.setdefault(name, []).append(
+					{"size": row["size"], "item_code": row["item_code"]}
+				)
 
 		cards = []
 		for name in names:
@@ -345,28 +348,37 @@ class SqliteProductSearch(SQLiteSearch):
 	COLUMN_TO_NARROW_KEY: ClassVar = {column: key for key, column in NARROW_KEY_TO_COLUMN.items()}
 
 	def facet_counts(self, fts_query, filters=None):
-		price_sql, price_params = self.price_discount_clause(filters or {})
+		"""Sidebar counts per facet, each narrowed by every OTHER selected filter but not by its own.
+
+		Dropping a facet's own key is what keeps its alternatives clickable — narrowing brand by the
+		selected brand would leave the sidebar offering only what is already ticked. Matches the
+		frappe.qb sidebar (www/products/list.py pops the facet's own key before querying).
+		"""
+		selected = filters or {}
 		counts = {}
 		for column, key in FACET_COLUMN_TO_KEY.items():
+			narrow_sql, narrow_params = self.narrow_clause(selected, self.COLUMN_TO_NARROW_KEY[column])
 			rows = self.sql(
 				f"SELECT {column} AS value, COUNT(*) AS count FROM search_fts "
-				f"WHERE search_fts MATCH ? AND {column} IS NOT NULL AND {column} != ''{price_sql} "
+				f"WHERE search_fts MATCH ? AND {column} IS NOT NULL AND {column} != ''{narrow_sql} "
 				f"GROUP BY {column} ORDER BY count DESC",
-				(fts_query, *price_params),
+				(fts_query, *narrow_params),
 				read_only=True,
 			)
 			counts[key] = {row["value"]: row["count"] for row in rows}
-		counts["size"] = self.size_facet_counts(fts_query, filters)
+		counts["size"] = self.size_facet_counts(fts_query, selected)
 		return counts
 
 	def size_facet_counts(self, fts_query, filters=None):
-		price_sql, price_params = self.price_discount_clause(filters or {})
+		narrow_sql, narrow_params = self.narrow_clause(filters or {}, "sizes")
 		rows = self.sql(
 			"SELECT size, COUNT(DISTINCT doc_id) AS count FROM search_size "
 			"WHERE size != '' AND doc_id IN "
-			f"(SELECT doc_id FROM search_fts WHERE search_fts MATCH ?{price_sql}) "
-			"GROUP BY size ORDER BY count DESC",
-			(fts_query, *price_params),
+			f"(SELECT doc_id FROM search_fts WHERE search_fts MATCH ?{narrow_sql}) "
+			# Numeric size scales (38, 40, 42) must not read as 38, 40, 42, 100 -> matches the
+			# frappe.qb sidebar's Cast_(size, "Decimal"); the label breaks ties for lettered scales.
+			"GROUP BY size ORDER BY CAST(size AS REAL), size",
+			(fts_query, *narrow_params),
 			read_only=True,
 		)
 		return {row["size"]: row["count"] for row in rows}
@@ -399,15 +411,21 @@ class SqliteProductSearch(SQLiteSearch):
 
 		min_price/max_price compare the indexed effective_price; has_discount keys off the precomputed
 		has_discount flag. Shared by the search grid and every facet count so both filter identically.
+
+		The bounds go through flt() because FTS5 content columns carry no type affinity: a bound "50"
+		stays TEXT, and SQLite sorts every REAL below every TEXT, so a string bound silently returns
+		the wrong rows instead of raising.
 		"""
 		clauses = []
 		params = []
-		if filters.get("min_price"):
+		min_price = flt(filters.get("min_price"))
+		max_price = flt(filters.get("max_price"))
+		if min_price:
 			clauses.append(f" AND {prefix}effective_price >= ?")
-			params.append(filters["min_price"])
-		if filters.get("max_price"):
+			params.append(min_price)
+		if max_price:
 			clauses.append(f" AND {prefix}effective_price <= ?")
-			params.append(filters["max_price"])
+			params.append(max_price)
 		if filters.get("has_discount"):
 			clauses.append(f" AND {prefix}has_discount = 1")
 		return "".join(clauses), params
@@ -518,7 +536,20 @@ class SqliteProductSearch(SQLiteSearch):
 		Core only corrects when trigram Jaccard similarity clears its threshold, which short shopping
 		terms ("shae", "shooes") never do. The extra pass is skipped entirely for words that are
 		already in the vocabulary, so a correctly spelled query costs one indexed primary-key lookup.
+
+		Memoized per instance because one request expands the same query twice — once inside core's
+		search(), once again for the facet counts — and a vocabulary miss pays a trigram scan plus a
+		Levenshtein rank every time.
 		"""
+		cache = getattr(self, "expanded_query_cache", None)
+		if cache is None:
+			cache = self.expanded_query_cache = {}
+		if query not in cache:
+			cache[query] = self.expand_query(query)
+		return cache[query]
+
+	def expand_query(self, query):
+		"""Query with each unknown word swapped for its best vocabulary match, plus the corrections map."""
 		expanded_terms = []
 		corrections = {}
 
