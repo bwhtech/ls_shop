@@ -6,6 +6,7 @@ from frappe.utils.caching import redis_cache
 
 from ls_shop import seo
 from ls_shop.search import query as search_query
+from ls_shop.shop_data import get_category_facets
 from ls_shop.utils import (
 	get_current_page,
 	get_nested_links,
@@ -52,40 +53,6 @@ def get_filter_sizes(filters=None):
 	return query.run(pluck=True)
 
 
-def get_category_tree(root_category):
-	"""
-	Recursively builds a tree of Item Groups from root_category using parent_item_group links.
-	"""
-
-	def build_node(category_name):
-		doc = frappe.get_cached_doc("Item Group", category_name)
-
-		# Get direct children of this node
-		children = frappe.get_all(
-			"Item Group",
-			filters={
-				"parent_item_group": category_name,
-				"custom_display_on_website": True,
-			},
-			fields=["name", "is_group", "custom_item_group_display_name"],
-			order_by="custom_item_group_display_name",
-		)
-
-		# Build child nodes recursively
-		child_nodes = []
-		for child in children:
-			child_nodes.append(build_node(child.name))
-
-		return {
-			"name": doc.name,
-			"display_name": doc.custom_item_group_display_name or doc.name,
-			"children": child_nodes,
-			"is_leaf": int(doc.is_group == 0),
-		}
-
-	return build_node(root_category)
-
-
 def get_product_filters(selected_filters):
 	"""Fetches available filters like brand, price range, and sizes."""
 	# Define DocTypes
@@ -102,31 +69,9 @@ def get_product_filters(selected_filters):
 		.where(item_price.price_list == sale_price_list)  # Adjust price list as needed
 	).run(as_dict=True)
 
-	# Get available sizes
-	filters = {}
-
-	# Get dynamic categories from Ecommerce Category doctype
-	ecommerce_categories = frappe.get_all(
-		"Ecommerce Category",
-		filters={"enabled": 1},
-		fields=["name", "category_name", "display_name", "item_group"],
-		order_by="display_order asc, category_name asc",
-	)
-
-	if category:
-		# If a specific category is selected, show its subcategories
-		filters[category] = get_category_tree(category)["children"]
-	else:
-		# Show all enabled categories with their item group trees
-		for ecom_cat in ecommerce_categories:
-			# Use the linked item_group if available, otherwise use category_name
-			item_group_name = ecom_cat.item_group or ecom_cat.category_name
-			if frappe.db.exists("Item Group", item_group_name):
-				try:
-					filters[ecom_cat.display_name] = get_category_tree(item_group_name)["children"]
-				except Exception:
-					# If category tree fails, just skip this category
-					pass
+	# The sidebar's category facets are the menu tree, so the navbar and the sidebar can never
+	# disagree about which subcategories a tab has.
+	filters = get_category_facets(category)
 
 	# When SQLite serves the grid the sidebar must be faceted from the same result set, or a listed
 	# brand/colour/size would filter down to nothing.

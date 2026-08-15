@@ -8,6 +8,8 @@ from frappe.query_builder.functions import Max
 from frappe.utils import cint
 from frappe.utils.nestedset import NestedSet, update_move_node
 
+from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import require_safe_url
+
 # root tab -> mega-menu column -> link. Deeper levels exist in no storefront theme.
 MAX_MENU_DEPTH = 3
 
@@ -91,8 +93,22 @@ class EcommerceCategory(NestedSet):
 
 	def validate(self):
 		self.validate_route_slug()
+		self.validate_link_url()
 		self.validate_depth()
 		self.set_defaults()
+
+	def validate_link_url(self):
+		"""A menu URL is written straight into an href on a public page, and Frappe's Jinja
+		environment has autoescaping off, so a `javascript:` scheme here is stored XSS.
+
+		The navbar editor endpoint already checks this, but a Desk form write, a REST insert or a
+		fixture bypasses that endpoint — the model is the only place that covers every write path.
+		"""
+		if self.link_type != "URL":
+			self.link_url = None
+			return
+
+		self.link_url = require_safe_url(self.link_url, frappe._("URL is required."))
 
 	def validate_route_slug(self):
 		"""Only top-level entries own a storefront URL, so only they need a slug.

@@ -5,6 +5,7 @@
 {% extends "templates/components/core/offcanvas.html" %}
 {% from 'templates/macros/search_bar_modal.html' import search_bar %}
 {% from 'templates/macros/signup_modal.html' import signup_modal %}
+{% from 'templates/macros/navigation_menu.html' import mobile_nav_menu %}
 
 {% block offcanvas_header %}
     <div class="flex items-center justify-between  ">
@@ -33,42 +34,8 @@
             {% include "templates/components/core/language_selector.html" %}
         </div>
         <!-- Mobile navigation accordion -->
-        <div x-data="{ 
-                    active_category: null,
-                    toggle_category(category) {
-                        this.active_category = this.active_category === category ? null : category;
-                        }
-                }" class="mt-10 ">
-            <div x-data="{ 
-                        active_parent: null, 
-                        active_category: null,
-                        active_subcategory: null,
-                        toggle_parent(parent) {
-                        this.active_parent = this.active_parent === parent ? null : parent;
-                        this.active_category = null;
-                        this.active_subcategory = null;
-                        },
-                        toggle_category(category) {
-                        this.active_category = this.active_category === category ? null : category;
-                        this.active_subcategory = null;
-                        },
-                        toggleSubcategory(subcategory) {
-                        this.active_subcategory = this.active_subcategory === subcategory ? null : subcategory;
-                        }
-                    }">
-                <!-- Parent category -->
-                {% for category in parent_categories %}
-                    {% with parent_category = category.name %}
-                        {% include 'templates/components/mobile_header_nav.html' %}
-                    {% endwith %}
-                {% endfor %}
-                <!-- Brands -->
-                {% include 'templates/components/brand_mobile_header_nav.html' %}
-                <!-- Support link -->
-                <!-- <div class="p-4">
-                    <a href="#" class="block text-gray-700">Support</a>
-                </div> -->
-            </div>
+        <div class="mt-10 ">
+            {% block storefront_nav_mobile %}{{ mobile_nav_menu(header_data.navigation_menu) }}{% endblock %}
         </div>
 
         {% if frappe.session.user != 'Guest' %}
