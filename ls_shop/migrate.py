@@ -5,6 +5,11 @@ import frappe
 from ls_shop.search.build import ensure_index_built
 from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
 from ls_shop.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
+from ls_shop.www.llms import DEFAULT_LLMS_TXT
+
+# Marks the robots.txt value as ours. Its absence from a non-blank value means an admin
+# has taken the file over by hand, and we leave it alone from then on.
+ROBOTS_MARKER = "# managed by ls_shop"
 
 
 def after_install():
@@ -22,12 +27,16 @@ def after_install():
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
+	setup_robots_txt()
+	seed_llms_txt()
 
 
 def after_migrate():
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
+	setup_robots_txt()
+	seed_llms_txt()
 
 
 def populate_search_settings():
@@ -165,3 +174,43 @@ Best regards,
 			frappe.errprint(f"Created Email Template: {template_data['name']}")
 		else:
 			frappe.errprint(f"Email Template '{template_data['name']}' already exists")
+
+
+def seed_llms_txt():
+	# Seed rather than serve-only, so admins get an editable starting point instead of a
+	# page they can only replace wholesale.
+	current = frappe.db.get_single_value("Lifestyle Settings", "llms_txt")
+	if not (current and current.strip()):
+		frappe.db.set_single_value("Lifestyle Settings", "llms_txt", DEFAULT_LLMS_TXT)
+
+
+def setup_robots_txt():
+	# Core's frappe/www/robots.py serves this value, so we only write it.
+	current = frappe.db.get_single_value("Website Settings", "robots_txt") or ""
+	if current.strip() and ROBOTS_MARKER not in current:
+		return
+
+	site_url = frappe.utils.get_url().rstrip("/")
+	robots_txt = (
+		f"{ROBOTS_MARKER}\n"
+		"User-agent: *\n"
+		"Allow: /\n"
+		"Disallow: /app\n"
+		"Disallow: /api\n"
+		"Disallow: /private\n"
+		# Faceted/sorted/paged listings are duplicate surfaces of the same catalogue; they
+		# burn crawl budget and dilute signals.
+		"Disallow: /*?search=\n"
+		"Disallow: /*?sort=\n"
+		"Disallow: /*?page=\n"
+		"Disallow: /*?filter=\n"
+		# Disallow is a prefix match, so "/en/cart" already covers "/en/cart/checkout".
+		# The explicit checkout line is kept deliberately — do not "tidy" these away.
+		"Disallow: /en/cart\n"
+		"Disallow: /ar/cart\n"
+		"Disallow: /en/cart/checkout\n"
+		"Disallow: /en/account\n"
+		"Disallow: /ar/account\n\n"
+		f"Sitemap: {site_url}/sitemap.xml\n"
+	)
+	frappe.db.set_single_value("Website Settings", "robots_txt", robots_txt)
