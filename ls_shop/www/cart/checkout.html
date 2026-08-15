@@ -10,25 +10,22 @@
 {% import "templates/macros/search_combo_box.html" as search_combo_box %}
 {% from "templates/macros/icon.html" import icon %}
 {% include "templates/js/form.js.html" %}
-{% from 'templates/macros/tabby-promo.html' import tabby %}
 
 {% block body %}
 <script>
+    const COD_PAYMENT_MODE = "COD";
+
     function get_available_payment_modes(){
-        return [
-                { key: 'telr', enabled: parseInt('{{ show_telr }}') },
-                { key: 'tabby', enabled: parseInt('{{ show_tabby }}') },
-                { key: 'cod', enabled: parseInt('{{ show_cod }}') },
-            ]
+        const payment_gateways = {{ payment_gateways | tojson }};
+        const payment_modes = payment_gateways.map(gateway_name => ({ key: gateway_name, enabled: 1 }));
+        payment_modes.push({ key: COD_PAYMENT_MODE, enabled: parseInt('{{ show_cod }}') });
+        return payment_modes;
     }
     document.addEventListener('alpine:init', () => {
         Alpine.data('checkout_state', () => ({
             billing_address_filled: false,
-            payment_mode: Alpine.$persist("telr").as("payment_mode"),
+            payment_mode: Alpine.$persist(null).as("payment_mode"),
             payment_mode_confirmed: false,
-            telr_frame_loaded: false,
-            telr_order_ref: null,
-            tabby_order_rejected: false,
             address_loading: false,
             payment_gateway_loading:false,
             delivery_option: 'home_delivery',
@@ -39,9 +36,6 @@
 
             init() {
                 this.calculate_checkout_total();
-                if (!this.payment_mode) {
-                    this.payment_mode = "telr";
-                }
                 this.$watch('payment_mode', (value, oldValue) => {
                     if (oldValue && value) {
                         this.payment_mode_confirmed = false;
@@ -53,9 +47,6 @@
                 this.$watch('delivery_option', (value) => {
                     this.calculate_checkout_total();
 
-                })
-                this.$watch('checkout_total', (newTotal) => {
-                    this.update_tabby_promo(newTotal);
                 })
                 this.apply_shipping_rule()
                 this.validate_payment_mode()
@@ -69,7 +60,7 @@
                     }
 
                 }
-                if (this.billing_address_filled && this.payment_mode === 'cod' && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_quotation.rounded_total or 0}}')) {
+                if (this.billing_address_filled && this.payment_mode === COD_PAYMENT_MODE && parseFloat('{{cod_charge_applicable_below or 0}}') > parseFloat('{{cart_quotation.rounded_total or 0}}')) {
                     this.checkout_total += parseFloat('{{cod_charge or 0}}')
                 }
 
@@ -81,33 +72,13 @@
                 this.delivery_charge = parseFloat(data.data[0])
                 this.delivery_charge_applicable_below = parseFloat(data.data[1])
             },
-            // Update Tabby price on delivery charge update
-            update_tabby_promo(total) {
-                if (this.payment_mode !== 'tabby') return;
-                const tabby_element_ids = ['tabby-promo-mobile', 'tabby-promo-desktop'];
-                tabby_element_ids.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.innerHTML = '';
-                        new TabbyPromo({
-                            selector: `#${id}`,
-                            currency: 'SAR',
-                            price: total.toFixed(2),
-                            lang: '{{ frappe.lang }}',
-                            source: 'product',
-                            productType: 'installments'
-                        });
-                    }
-                });
-            },
             validate_payment_mode() {
                 const payment_modes = get_available_payment_modes()
 
-                const current = payment_modes.find(m => m.key === this.payment_mode);
-                // If current mode is disabled or not found
-                if (!current || !current.enabled) {
-                    const fallback = payment_modes.find(m => m.enabled);
-                    this.payment_mode = fallback ? fallback.key : null;
+                const selected_mode = payment_modes.find(payment_mode => payment_mode.key === this.payment_mode);
+                if (!selected_mode || !selected_mode.enabled) {
+                    const fallback_mode = payment_modes.find(payment_mode => payment_mode.enabled);
+                    this.payment_mode = fallback_mode ? fallback_mode.key : null;
                 }
             }
         }))
@@ -129,13 +100,11 @@
 
 <script defer>
     async function fetch_payment_details(payment_mode_confirmed, state) {
-        state.tabby_order_rejected = false;
-        // Check if selected payment mode is available and enabled
-        payment_modes = get_available_payment_modes()
-        const selected_mode = payment_modes.find(m => m.key === state.payment_mode);
-        
+        const payment_modes = get_available_payment_modes()
+        const selected_mode = payment_modes.find(payment_mode => payment_mode.key === state.payment_mode);
+
         if (!selected_mode || !selected_mode.enabled) {
-             toast(`Payment method '${state.payment_mode.toUpperCase()}' is not available or disabled`, { type: "danger" })
+             toast(`Payment method '${state.payment_mode}' is not available or disabled`, { type: "danger" })
              return
         }
         if (!payment_mode_confirmed) {
@@ -148,33 +117,11 @@
         btn.disabled = true;
         spinner.classList.remove("hidden");
         try {
-            let response = await frappe_call(
+            const response = await frappe_call(
                 "/api/v2/method/ls_shop.api.payments.initiate_checkout_with_mode",
                 { payment_mode: state.payment_mode }
             )
-            const data = response.data;
-
-            if (state.payment_mode === 'cod') {
-                window.location.href = "/{{frappe.lang}}/account/orders/confirmation?payment_mode=cod&reference_id=" + "{{cart_quotation.name}}"
-            }
-            if (state.payment_mode === "telr") {
-                state.telr_order_ref = data["payment_request"]["telr_order_ref"]
-                const element = document.getElementById('telr_frame_container');
-                const elementTop = element.offsetTop;
-                window.scrollTo({
-                    top: elementTop,
-                    behavior: 'smooth'
-                });
-
-            }
-
-            if (state.payment_mode === "tabby") {
-                if (data?.payment_request?.status === "REJECTED") {
-                    state.tabby_order_rejected = true;
-                    return
-                }
-                window.location.href = data["payment_request"]["tabby_order_url"]
-            }
+            window.location.href = response.data.order_url
         }
         catch (err) {
             btn.disabled = false;
@@ -345,9 +292,7 @@
             {% call modal.modal(button_text='View Items',button_classes='text-sm text-accent font-semibold ms-2',
             modal_header='Your Cart') %}
             <div class="p-6">
-                {% with tabby_selector="tabby-promo-mobile" %}
                 {% include 'templates/components/checkout_product_details.html' %}
-                {% endwith %}
             </div>
             {% endcall %}
         </div>
@@ -446,42 +391,25 @@
                 <div class="space-y-10">
                     <h2 class="text-lg font-semibold text-secondary-accent border-b border-gray-200 pb-4 my-5">{{ _("Payment method") }}</h2>
                     <div class="space-y-3">
+                        {% for gateway_name in payment_gateways %}
                         <label
-                            class="flex items-start flex-col p-3 space-x-3 bg-white border rounded-lg hover:bg-gray-50 border-gray-200/70 cursor-pointer"
-                            x-show="{{show_telr}}">
+                            class="flex items-start flex-col p-3 space-x-3 bg-white border rounded-lg hover:bg-gray-50 border-gray-200/70 cursor-pointer">
                             <div class="flex items-center">
-                                <input type="radio" name="telr_radio" value="telr"
+                                <input type="radio" name="payment_mode_radio" value="{{ gateway_name }}"
                                     class="h-5 w-5 accent-gray-900 translate-y-px focus:ring-gray-700 cursor-pointer"
                                     x-model="payment_mode" />
                                 <span class="text-base ps-3">
-                                    {{ _('Credit Card') }}
+                                    {{ _(gateway_name) }}
                                 </span>
                             </div>
                        {% include "templates/components/payment_svg.html" %}
                         </label>
-                        <label
-                            class="flex flex-col items-start p-3 space-x-3 bg-white border rounded-lg hover:bg-gray-50 border-gray-200/70 cursor-pointer"
-                            x-show="{{show_tabby}}">
-                            <div class="flex items-center">
-                                <input type="radio" name="tabby_radio" value="tabby"
-                                    class="h-5 w-5 accent-gray-900 translate-y-px focus:ring-gray-700 cursor-pointer"
-                                    x-model="payment_mode" />
-                                <span class="text-base ps-3">
-                                    {{ _('Tabby') }}
-                                </span>
-                            </div>
-                            <img src="/assets/ls_shop/images/tabby.png" alt="" class="mt-3 -ms-1 h-6 object-contain">
-                            <div x-show="tabby_order_rejected"
-                                class="bg-red-100 border border-red-400 text-accent px-4 py-3 rounded-lg relative mt-4"
-                                x-cloak x-transition.origin.top>
-                                <p class="text-sm">{{_('Sorry, Tabby is unable to approve this purchase. Please use an alternative payment method for your order.')}}</p>
-                            </div>
-                        </label>
+                        {% endfor %}
                         <label
                             class="flex flex-col items-start p-3 space-x-3 bg-white border rounded-lg hover:bg-gray-50 border-gray-200/70 cursor-pointer"
                             x-show="{{show_cod}}">
                             <div class="flex items-center">
-                                <input type="radio" name="cod_radio" value="cod"
+                                <input type="radio" name="payment_mode_radio" value="COD"
                                     class="h-5 w-5 accent-gray-900 translate-y-px focus:ring-gray-700 cursor-pointer"
                                     x-model="payment_mode" />
                                 <span class="text-base ps-3">
@@ -512,47 +440,6 @@
                     </button>
                 </div>
             </template>
-            <template x-if="billing_address_filled && payment_mode_confirmed && payment_mode === 'telr'">
-                <div class="mt-10">
-                    <template x-if="!telr_frame_loaded" x-cloak x-transition>
-                        <!-- <span>Loading telr...</span> -->
-                        <div class="relative w-full overflow-hidden rounded-lg border border-green-500 bg-surface text-on-surface mb-5"
-                            role="alert">
-                            <div class="flex w-full items-center gap-2 bg-green-500/10 p-4">
-                                <div class="bg-green-500/15 text-green-500 rounded-full p-1" aria-hidden="true">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"
-                                        class="size-5 fill-green-500 motion-safe:animate-spin ">
-                                        <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"
-                                            opacity=".25" />
-                                        <path
-                                            d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z" />
-                                    </svg>
-                                </div>
-                                <div class="flex w-full flex-col items-center justify-between gap-2 ml-2 sm:flex-row">
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-green-500 capitalize">loading payment gateway</h3>
-                                        <p class="text-xs font-medium sm:text-sm">Please wait while we load the payment gateway...
-                                        </p>
-                                    </div>
-            
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                    <div id="telr_frame_container">
-                        <template x-if="telr_order_ref">
-                            <div>
-                                <iframe
-                                    sandbox="allow-forms allow-modals allow-popups-to-escape-sandbox allow-popups allow-scripts allow-top-navigation allow-same-origin"
-                                    class="h-200 desktop:h-376 w-full"
-                                    x-bind:src="`https://secure.telr.com/gateway/process_framed_full.html?o=${telr_order_ref}`"
-                                    id="telr_frame" name="telr_frame" style="width:100%;height:450px !important;border:0;margin:0;"
-                                    frameborder="0" x-on:load="telr_frame_loaded = true"></iframe>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
         </div>
         <!-- Cart Summary -->
         <div class="hidden rounded-lg border border-gray-300 md:block md:w-[40%] p-6 h-fit">
@@ -560,9 +447,7 @@
                 <h3 class="text-lg font-medium capitalize">{{ _('your cart') }}</h3>
                 {% include 'templates/components/promo_code_component.html' %}
             </div>
-            {% with tabby_selector="tabby-promo-desktop" %}
             {% include 'templates/components/checkout_product_details.html' %}
-            {% endwith %}
         </div>
     </div>
 </div>

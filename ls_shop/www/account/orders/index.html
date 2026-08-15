@@ -82,7 +82,7 @@
             <h3 class="text-sm text-secondary-accent font-medium capitalize">{{_('payment method')}}</h3>
             <h3 class="text-sm font-normal mt-3 ">
                 {% if order.custom_ecommerce_payment_mode %}
-                {% if order.custom_ecommerce_payment_mode == "Telr" %}
+                {% if order.custom_ecommerce_payment_mode != "COD" %}
                 {{_('Card')}}
                 {% else %}
                 {{_(order.custom_ecommerce_payment_mode)}}

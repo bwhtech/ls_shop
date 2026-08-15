@@ -1,4 +1,5 @@
 import frappe
+from bwh_payments.bwh_payments.utils import get_available_payment_modes
 from frappe.query_builder import DocType
 from frappe.utils.caching import site_cache
 
@@ -26,8 +27,7 @@ def get_context(context):
 		frappe.redirect(f"/{frappe.local.lang}/cart")
 	lifestyle_settings = frappe.get_cached_doc("Lifestyle Settings")
 	default_price_list = lifestyle_settings.get("default_price_list")
-	context.show_telr = lifestyle_settings.get("telr_enabled", 0)
-	context.show_tabby = lifestyle_settings.get("tabby_enabled", 0)
+	context.payment_gateways = get_available_payment_modes()
 	context.show_cod = lifestyle_settings.get("cod_enabled", 0)
 	context.cart_quotation = cart_quotation
 	context.coupon_code = get_coupon_code(cart_quotation)

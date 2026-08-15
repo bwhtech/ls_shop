@@ -1,7 +1,9 @@
 import traceback
 
 import frappe
+from bwh_payments.bwh_payments.utils import get_available_payment_modes
 
+from ls_shop.api.payments import COD_PAYMENT_MODE
 from ls_shop.search.build import ensure_index_built
 from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
 from ls_shop.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
@@ -32,6 +34,7 @@ def after_install():
 
 
 def after_migrate():
+	create_payment_modes()
 	register_optional_doctype_links()
 	populate_search_settings()
 	ensure_storefront_search_index()
@@ -104,17 +107,42 @@ def add_sales_order_link_if_doctype_exists(link_doctype: str, link_fieldname: st
 
 
 def create_payment_modes():
-	modes = {"Telr"}
+	"""Every gateway needs a Mode of Payment of the same name for its Payment Entries to post."""
+	payment_modes = dict.fromkeys(get_available_payment_modes(), "Bank")
+	payment_modes[COD_PAYMENT_MODE] = "Cash"
+	for mode_of_payment, payment_type in payment_modes.items():
+		add_payment_mode(mode_of_payment, payment_type)
 
-	for mode in modes:
+
+def add_payment_mode(mode_of_payment: str, payment_type: str):
+	if not frappe.db.exists("Mode of Payment", mode_of_payment):
 		frappe.get_doc(
 			{
 				"doctype": "Mode of Payment",
-				"mode_of_payment": mode,
+				"mode_of_payment": mode_of_payment,
 				"enabled": True,
-				"type": "Bank",
+				"type": payment_type,
 			}
 		).insert(ignore_if_duplicate=True)
+
+	# ERPNext refuses to post a Payment Entry for a Mode of Payment that has no account for the company,
+	# so a gateway seeded without one silently blocks every online order it is used for.
+	company = get_shop_company()
+	default_cash_account = company and frappe.get_cached_value("Company", company, "default_cash_account")
+	if not default_cash_account:
+		return
+
+	payment_mode = frappe.get_doc("Mode of Payment", mode_of_payment)
+	if any(row.company == company for row in payment_mode.accounts):
+		return
+	payment_mode.append("accounts", {"company": company, "default_account": default_cash_account})
+	payment_mode.save(ignore_permissions=True)
+
+
+def get_shop_company() -> str | None:
+	return frappe.db.get_single_value("Lifestyle Settings", "company") or frappe.get_cached_value(
+		"Global Defaults", "Global Defaults", "default_company"
+	)
 
 
 def create_default_email_templates():
