@@ -3,6 +3,7 @@
 {% set settings = frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings") %}
 {% set brand_logo = settings.brand_logo or "/assets/ls_shop/icons/lifestyle.svg" %}
 {% set store_name = settings.store_name or "Lifestyle" %}
+{% set card_fields = get_search_result_fields() %}
 <div x-data="{
     is_open: false,
     products :[],
@@ -71,6 +72,16 @@
                                         {% endif %}
                                     </h3>
                                 </div>
+                                {% if "brand" in card_fields or "item_group" in card_fields %}
+                                <div class="flex flex-wrap gap-2 mb-1 text-xs text-gray-500">
+                                    {% if "brand" in card_fields %}
+                                    <span x-show="product.brand" x-text="product.brand"></span>
+                                    {% endif %}
+                                    {% if "item_group" in card_fields %}
+                                    <span x-show="product.item_group" x-text="product.item_group"></span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                                 <div class="flex gap-1">
                                     <template x-if="product.default_price && product.discount_percent">
                                         <p class="text-base font-medium line-through text-accent me-2 flex">
@@ -80,6 +91,13 @@
                                     <h3 class="text-base font-medium flex">{{get_currency_symbol()}}<span x-text="(product.sale_price || 0).toFixed(2)"></span>
                                         </span> </h3>
                                 </div>
+                                {% if "sizes" in card_fields %}
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    <template x-for="(size_option, size_index) in (product.sizes || [])" :key="size_index">
+                                        <span class="text-xs border border-gray-300 rounded px-1.5 py-0.5" x-text="size_option.size"></span>
+                                    </template>
+                                </div>
+                                {% endif %}
                             </div>
                         </a>
                     </template>

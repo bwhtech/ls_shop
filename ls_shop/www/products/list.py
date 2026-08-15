@@ -3,6 +3,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import Cast_, Min
 from frappe.utils.caching import redis_cache
 
+from ls_shop.search import query as search_query
 from ls_shop.utils import (
 	get_current_page,
 	get_nested_links,
@@ -132,9 +133,15 @@ def get_product_filters(selected_filters):
 					# If category tree fails, just skip this category
 					pass
 
-	filters["brands"] = get_filter_brands(selected_filters)
-	filters["sizes"] = get_filter_sizes(selected_filters)
-	filters["colors"] = get_filter_colors(selected_filters)
+	# When SQLite serves the grid the sidebar must be faceted from the same result set, or a listed
+	# brand/colour/size would filter down to nothing.
+	facets = search_query.listing_facets(selected_filters)
+	if facets:
+		filters.update(facets)
+	else:
+		filters["brands"] = get_filter_brands(selected_filters)
+		filters["sizes"] = get_filter_sizes(selected_filters)
+		filters["colors"] = get_filter_colors(selected_filters)
 
 	return filters, price_range[0] if price_range else {"min_price": 0, "max_price": 0}
 
@@ -165,10 +172,8 @@ def get_selected_filters():
 	return filters
 
 
-def get_sort_by():
-	query_params = frappe.form_dict
-	sort_by = query_params.get("sort_by", "new_arrival")
-	return sort_by
+def get_sort_by(default_sort):
+	return frappe.form_dict.get("sort_by") or default_sort
 
 
 def get_context(context):
@@ -178,7 +183,8 @@ def get_context(context):
 	filters, price_range = get_product_filters(selected_filters)
 	# Fetch filtered product list
 	context.page_length = 30
-	context.sort_by = get_sort_by()
+	context.show_relevance_sort = search_query.relevance_sort_available(selected_filters)
+	context.sort_by = get_sort_by("default" if context.show_relevance_sort else "new_arrival")
 	products = get_product_list(
 		filters=selected_filters,
 		page=page,
