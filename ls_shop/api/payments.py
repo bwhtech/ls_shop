@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import frappe
 from bwh_payments.bwh_payments.utils import resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
@@ -26,6 +28,36 @@ def get_charge_amount(quotation) -> float:
 	return flt(quotation.rounded_total) or flt(quotation.grand_total)
 
 
+def get_open_gateway_payment_request(quotation_name: str) -> str | None:
+	"""The Gateway Payment Request still holding this cart, if the shopper has a checkout in flight."""
+	return frappe.db.get_value(
+		"Gateway Payment Request",
+		{
+			"ref_doctype": "Quotation",
+			"ref_docname": quotation_name,
+			"status": ["in", ("Pending", "Paid")],
+		},
+		"name",
+	)
+
+
+def validate_cart_is_not_in_checkout(quotation_name: str):
+	"""Refuse to edit a cart that a gateway session is already priced against.
+
+	The session freezes an amount but keeps pointing at this draft Quotation, so every edit that lands
+	while it is open widens the gap between what ships and what was paid.
+	"""
+	# ponytail: an abandoned checkout keeps the cart locked until the gateway expires the session and a
+	# status sync moves it off Pending; give the shopper a "cancel this payment" action if that bites.
+	if not quotation_name or not get_open_gateway_payment_request(quotation_name):
+		return
+
+	frappe.throw(
+		_("A payment is already in progress for this order. Finish or cancel it before changing your cart."),
+		title=_("Checkout In Progress"),
+	)
+
+
 def get_confirmation_url(reference_id: str, payment_mode: str | None = None) -> str:
 	url = f"/{frappe.local.lang}/account/orders/confirmation?reference_id={reference_id}"
 	if payment_mode:
@@ -36,6 +68,7 @@ def get_confirmation_url(reference_id: str, payment_mode: str | None = None) -> 
 @frappe.whitelist()
 def initiate_checkout_with_mode(payment_mode: str):
 	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
 	update_delivery_charges(quotation)
 
 	if is_cod(payment_mode):
@@ -90,23 +123,44 @@ def gateway_mode_of_payment(gateway: str) -> str:
 	return mode_of_payment
 
 
+@contextmanager
+def system_user_session():
+	"""Place the accounting documents as Administrator, then hand the session back.
+
+	confirm_payment is whitelisted, so this runs as the shopper, who holds no accounting roles. ERPNext
+	resolves the receivable account through get_party_account, whose account_perm_check calls
+	frappe.has_permission directly (accounts/party.py) — no ignore_permissions flag reaches it, only the
+	user identity does. bwh_payments' webhook switches the same way before applying a gateway status.
+	"""
+	session_user = frappe.session.user
+	try:
+		frappe.set_user("Administrator")
+		yield
+	finally:
+		frappe.set_user(session_user)
+
+
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
-	fix_payment_schedule_dates(quotation)
-	quotation.flags.ignore_permissions = True
-	quotation.submit()
+	with system_user_session():
+		fix_payment_schedule_dates(quotation)
+		quotation.flags.ignore_permissions = True
+		quotation.submit()
 
-	sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
-	sales_order.custom_ecommerce_payment_mode = payment_mode
-	fix_payment_schedule_dates(sales_order)
-	set_attribution_fields(sales_order)
-	sales_order.flags.ignore_permissions = True
-	sales_order.insert()
-	sales_order.submit()
+		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
+		sales_order.custom_ecommerce_payment_mode = payment_mode
+		fix_payment_schedule_dates(sales_order)
+		set_attribution_fields(sales_order)
+		sales_order.flags.ignore_permissions = True
+		sales_order.insert()
+		sales_order.submit()
+
+		if flt(gateway_amount) > 0:
+			create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
+
+	# Outside the switch: log_purchase stamps frappe.session.user as the visitor, so running it as
+	# Administrator would attribute every storefront purchase to Administrator.
 	log_purchase(sales_order)
-
-	if flt(gateway_amount) > 0:
-		create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
 	return sales_order
 
 
@@ -124,10 +178,6 @@ def create_payment_entry(sales_invoice, payment_mode: str, paid_amount: float, r
 	allocated = min(flt(paid_amount), flt(sales_invoice.outstanding_amount))
 	if allocated <= 0:
 		return None
-
-	# The storefront customer has no accounting roles, so the receivable/bank accounts on the entry
-	# cannot be permission-checked against them.
-	frappe.flags.ignore_account_permission = True
 
 	payment_entry = get_payment_entry("Sales Invoice", sales_invoice.name, party_amount=allocated)
 	payment_entry.mode_of_payment = gateway_mode_of_payment(payment_mode)
@@ -159,14 +209,15 @@ def fix_payment_schedule_dates(doc):
 @frappe.whitelist()
 def generate_quotation_for_cart(cart: dict):
 	if len(cart.get("items", [])) < 1:
-		frappe.throw(frappe._("Can't checkout with empty cart"))
-	cart_quotation = get_quotation_for_cart(cart)
+		frappe.throw(_("Can't checkout with empty cart"))
+	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
+	cart_quotation = get_quotation_for_cart(cart, quotation)
 	remove_coupon_code()
 	return cart_quotation
 
 
-def get_quotation_for_cart(cart: dict):
-	unsaved_quotation_doc = _get_cart_quotation()
+def get_quotation_for_cart(cart: dict, unsaved_quotation_doc):
 	sale_price_list = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "sale_price_list")
 	ecommerce_warehouse = frappe.get_cached_value(
 		"Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse"
@@ -215,6 +266,11 @@ def set_cod_charges(quotation):
 		"charge_type": "Actual",
 		"account_head": account_head,
 		"tax_amount": cod_charge,
+		# ERPNext refuses an inclusive Actual charge outright (accounts/services/taxes.py
+		# validate_inclusive_tax), so pinning this to 0 is what keeps the row from inheriting a site-level
+		# default of 1 and failing the shopper's checkout. iVend set exactly that default, which is why
+		# v15 needed a before_validate hook to scrub the flag; stock ERPNext defaults it to 0.
+		"included_in_print_rate": 0,
 	}
 	quotation.append("taxes", cod_charge)
 	quotation.calculate_taxes_and_totals()
@@ -225,6 +281,7 @@ def set_cod_charges(quotation):
 @frappe.whitelist()
 def update_quotation_address(address: dict):
 	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
 	update_quotation_payment_terms_due_date(quotation)
 	# Handle Store Pickup
 	if address.get("is_store_pickup", False):
@@ -232,10 +289,7 @@ def update_quotation_address(address: dict):
 		quotation.custom_is_store_pickup = True
 		quotation.save(ignore_permissions=True)
 
-		return {
-			"message": "Addresses updated successfully",
-			"success": True,
-		}
+		return {"message": _("Addresses updated successfully")}
 	quotation.custom_is_store_pickup = False
 	quotation.custom_store = ""
 
@@ -275,10 +329,7 @@ def update_quotation_address(address: dict):
 	contact.save(ignore_permissions=True)
 	quotation.save(ignore_permissions=True)
 
-	return {
-		"message": "Addresses updated successfully",
-		"success": True,
-	}
+	return {"message": _("Addresses updated successfully")}
 
 
 @frappe.whitelist()
@@ -292,6 +343,11 @@ def confirm_payment(reference_id: str, payment_mode: str | None = None):
 	payment_request = get_gateway_payment_request(reference_id)
 	if payment_request:
 		validate_reference_owner(payment_request.ref_doctype, payment_request.ref_docname)
+		if is_cod(payment_mode):
+			# payment_mode comes straight off the query string. Without this a shopper appends
+			# &payment_mode=COD, takes the cash-on-delivery branch on a cart that already has money
+			# moving through a gateway, and ends up charged once and holding a COD order as well.
+			frappe.throw(_("A card payment is already in progress for this order."))
 		if payment_request.status == "Pending":
 			payment_request.sync_status()
 		return {"status": payment_request.status, **purchase_summary(payment_request)}
@@ -311,9 +367,14 @@ def confirm_payment(reference_id: str, payment_mode: str | None = None):
 
 def get_gateway_payment_request(reference_id: str):
 	"""Look a request up by gateway session id, falling back to our own name for gateways that cannot
-	echo their session id back on the return URL."""
+	echo their session id back on the return URL, and finally to the Quotation it was opened against.
+
+	The last lookup is what stops the cash-on-delivery branch from running on a cart that already has a
+	live gateway session: `reference_id` is the Quotation there, which neither of the other two match.
+	"""
 	name = frappe.db.get_value("Gateway Payment Request", {"order_ref": reference_id}, "name")
 	name = name or frappe.db.get_value("Gateway Payment Request", reference_id, "name")
+	name = name or get_open_gateway_payment_request(reference_id)
 	return frappe.get_doc("Gateway Payment Request", name) if name else None
 
 
@@ -359,16 +420,17 @@ def quotation_purchase_summary(quotation_name: str):
 
 
 def place_cod_order(quotation_name: str):
-	quotation = frappe.get_doc("Quotation", quotation_name)
-	set_cod_charges(quotation)
-	quotation.flags.ignore_permissions = True
-	quotation.submit()
+	with system_user_session():
+		quotation = frappe.get_doc("Quotation", quotation_name)
+		set_cod_charges(quotation)
+		quotation.flags.ignore_permissions = True
+		quotation.submit()
 
-	sales_order = _make_sales_order(quotation_name, ignore_permissions=True)
-	sales_order.custom_ecommerce_payment_mode = COD_PAYMENT_MODE
-	set_attribution_fields(sales_order)
-	sales_order.flags.ignore_permissions = True
-	sales_order.insert()
+		sales_order = _make_sales_order(quotation_name, ignore_permissions=True)
+		sales_order.custom_ecommerce_payment_mode = COD_PAYMENT_MODE
+		set_attribution_fields(sales_order)
+		sales_order.flags.ignore_permissions = True
+		sales_order.insert()
 
 	# COD orders count as purchases even while the Sales Order stays draft.
 	log_purchase(sales_order)
@@ -377,23 +439,24 @@ def place_cod_order(quotation_name: str):
 
 @frappe.whitelist()
 def apply_coupon_code(applied_code):
-	quotation = True
 	if not applied_code:
-		frappe.throw(frappe._("Please enter a coupon code"))
+		frappe.throw(_("Please enter a coupon code"))
 	coupon_name = frappe.db.get_value("Coupon Code", {"coupon_code": applied_code}, "name")
 	if not coupon_name:
-		frappe.throw(frappe._("Please enter a valid coupon code"))
+		frappe.throw(_("Please enter a valid coupon code"))
 	validate_coupon_code(coupon_name)
 	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
 	quotation.coupon_code = coupon_name
 	quotation.flags.ignore_permissions = True
 	quotation.save()
-	return {"success": True, "message": frappe._("Coupon code applied successfully")}
+	return {"message": _("Coupon code applied successfully")}
 
 
 @frappe.whitelist()
 def remove_coupon_code():
 	quotation = _get_cart_quotation()
+	validate_cart_is_not_in_checkout(quotation.name)
 	_remove_coupon_code(quotation)
 
 

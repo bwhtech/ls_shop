@@ -8,13 +8,16 @@ import frappe
 from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_payment_request import (
 	GATEWAY,
 	configure_stripe_gateway,
+	remove_stripe_gateway,
 )
 from bwh_payments.bwh_payments.doctype.stripe_gateway_settings import stripe_gateway_settings
 from bwh_payments.tests.fake_stripe import FakeStripeClient
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_year_ending, get_year_start, getdate
+from frappe.utils.data import flt
 
 from ls_shop.api.payment_hooks import on_payment_request_update
+from ls_shop.api.payments import confirm_payment
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
@@ -38,8 +41,21 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		cls.ensure_price_list()
 		cls.ensure_fiscal_year()
 
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		# The fixtures above run outside the per-test rollback, so without this the dev site keeps an
+		# enabled gateway backed by a fake key and the storefront offers it to real shoppers.
+		frappe.db.rollback()
+		remove_stripe_gateway()
+		frappe.delete_doc(
+			"Mode of Payment", GATEWAY, ignore_missing=True, ignore_permissions=True, force=True
+		)
+		frappe.db.commit()
+
 	def setUp(self):
 		FakeStripeClient.reset()
+		self.addCleanup(frappe.set_user, frappe.session.user)
 		# The gateway transport is the only true external boundary here; everything else is real.
 		stripe_client_patch = patch.object(stripe_gateway_settings.stripe, "StripeClient", FakeStripeClient)
 		stripe_client_patch.start()
@@ -50,6 +66,7 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		self.contact_email = self.create_contact(self.customer)
 		self.quotation = self.create_cart_quotation()
 		self.payment_request = self.create_paid_payment_request(self.quotation)
+		self.shopper = self.create_shopper_user(self.contact_email)
 
 	# -- fixtures ---------------------------------------------------------------------------------
 
@@ -169,6 +186,38 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		quotation.insert()
 		return quotation
 
+	def create_shopper_user(self, email_id):
+		"""A real storefront login, so the checkout path can be driven under the shopper's own session."""
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email_id,
+				"first_name": "ZZ Payhook Shopper",
+				"user_type": "Website User",
+				"send_welcome_email": 0,
+			}
+		)
+		user.flags.ignore_permissions = True
+		user.insert()
+		return user.name
+
+	def create_pending_payment_request(self, quotation, amount=None):
+		payment_request = frappe.get_doc(
+			{
+				"doctype": "Gateway Payment Request",
+				"gateway": GATEWAY,
+				"amount": quotation.grand_total if amount is None else amount,
+				"currency_code": quotation.currency,
+				"company": COMPANY,
+				"ref_doctype": "Quotation",
+				"ref_docname": quotation.name,
+				"customer_ref": quotation.party_name,
+				"customer_email": self.contact_email,
+			}
+		).insert(ignore_permissions=True)
+		FakeStripeClient.register_paid_session(payment_request.order_ref, CURRENCY.lower())
+		return payment_request
+
 	def create_paid_payment_request(self, quotation):
 		payment_request = frappe.get_doc(
 			{
@@ -285,6 +334,136 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 		self.assertEqual(len(self.submitted_sales_orders()), 1)
 		self.assertEqual(payment_request.ref_doctype, "Sales Order")
+
+	# -- refund Payment Entry mirroring ----------------------------------------------------------------
+
+	def create_refund_payment_entry(self, amount, mode_of_payment=GATEWAY):
+		"""The outgoing entry a finance user raises to give the shopper their money back."""
+		payment_entry = frappe.new_doc("Payment Entry")
+		payment_entry.update(
+			{
+				"payment_type": "Pay",
+				"company": COMPANY,
+				"party_type": "Customer",
+				"party": self.customer,
+				"paid_from": DEFAULT_CASH_ACCOUNT,
+				"paid_to": frappe.get_cached_value("Company", COMPANY, "default_receivable_account"),
+				"paid_amount": amount,
+				"received_amount": amount,
+				"source_exchange_rate": 1,
+				"target_exchange_rate": 1,
+				"mode_of_payment": mode_of_payment,
+				"reference_no": self.payment_request.order_ref,
+				"reference_date": getdate(),
+			}
+		)
+		payment_entry.flags.ignore_permissions = True
+		payment_entry.insert()
+		payment_entry.submit()
+		return payment_entry
+
+	def test_an_amended_refund_payment_entry_does_not_refund_a_second_time(self):
+		"""Cancel+amend re-issues the entry as `<name>-1`, which the doc.name dedupe key never matched."""
+		on_payment_request_update(self.payment_request)
+		FakeStripeClient.created_refunds.clear()
+
+		payment_entry = self.create_refund_payment_entry(50)
+		self.assertEqual(len(FakeStripeClient.created_refunds), 1)
+
+		payment_entry.cancel()
+		amended = frappe.copy_doc(payment_entry)
+		amended.amended_from = payment_entry.name
+		amended.docstatus = 0
+		amended.flags.ignore_permissions = True
+		amended.insert()
+		amended.submit()
+
+		self.assertNotEqual(amended.name, payment_entry.name)
+		self.assertEqual(len(FakeStripeClient.created_refunds), 1)
+		self.assertEqual(
+			flt(frappe.db.get_value("Gateway Payment Request", self.payment_request.name, "refund_amount")),
+			50.0,
+		)
+
+	def test_a_payment_entry_with_no_mode_of_payment_never_reaches_the_gateway(self):
+		"""A blank mode plus a coincidentally matching reference_no used to refund real money."""
+		on_payment_request_update(self.payment_request)
+		FakeStripeClient.created_refunds.clear()
+
+		self.create_refund_payment_entry(50, mode_of_payment=None)
+
+		self.assertEqual(FakeStripeClient.created_refunds, [])
+		self.assertEqual(
+			flt(frappe.db.get_value("Gateway Payment Request", self.payment_request.name, "refund_amount")),
+			0.0,
+		)
+
+	# -- the shopper's own session --------------------------------------------------------------------
+
+	def test_a_shopper_confirming_their_own_payment_gets_a_sales_order_and_invoice(self):
+		"""confirm_payment is whitelisted, so it runs as the shopper, who holds no accounting roles.
+
+		Every test above drives the hook as Administrator, which is exactly why the missing
+		ignore_account_permission flag survived: get_party_account's account_perm_check rejected the
+		Quotation submit, the shopper's money was captured and no order existed.
+		"""
+		payment_request = self.create_pending_payment_request(self.quotation)
+
+		frappe.set_user(self.shopper)
+		result = confirm_payment(payment_request.name)
+
+		self.assertEqual(result["status"], "Paid")
+		sales_orders = self.submitted_sales_orders()
+		self.assertEqual(len(sales_orders), 1)
+		self.assertEqual(result["order_name"], sales_orders[0])
+
+		sales_invoices = self.submitted_sales_invoices(sales_orders[0])
+		self.assertEqual(len(sales_invoices), 1)
+		self.assertEqual(len(self.submitted_payment_entries(sales_invoices[0])), 1)
+
+	def test_a_shopper_cannot_confirm_a_payment_that_is_not_theirs(self):
+		payment_request = self.create_pending_payment_request(self.quotation)
+		intruder = self.create_shopper_user(f"zz_intruder_{frappe.generate_hash(length=8)}@example.com")
+
+		frappe.set_user(intruder)
+
+		with self.assertRaises(frappe.PermissionError):
+			confirm_payment(payment_request.name)
+
+		self.assertEqual(self.submitted_sales_orders(), [])
+
+	def test_a_cart_edited_after_the_session_opened_is_refused_not_shipped(self):
+		"""ref_docname points at the live draft cart, so the shopper can keep editing it while paying."""
+		payment_request = self.create_pending_payment_request(self.quotation)
+		charged = payment_request.amount
+
+		self.quotation.items[0].qty = 20
+		self.quotation.flags.ignore_permissions = True
+		self.quotation.save()
+		self.assertGreater(self.quotation.grand_total, charged)
+
+		frappe.set_user(self.shopper)
+
+		with self.assertRaises(frappe.ValidationError):
+			confirm_payment(payment_request.name)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self.submitted_sales_orders(), [])
+		self.assertEqual(frappe.db.get_value("Quotation", self.quotation.name, "docstatus"), 0)
+
+	def test_a_cod_confirmation_is_refused_while_a_gateway_session_is_open(self):
+		"""payment_mode is a query-string parameter, so it is the shopper who chooses this branch."""
+		self.create_pending_payment_request(self.quotation)
+		frappe.db.set_single_value("Lifestyle Settings", "cod_enabled", 1)
+
+		frappe.set_user(self.shopper)
+
+		with self.assertRaises(frappe.ValidationError):
+			confirm_payment(self.quotation.name, payment_mode="COD")
+
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Quotation", self.quotation.name, "docstatus"), 0)
+		self.assertEqual(frappe.db.count("Sales Order", {"customer": self.customer}), 0)
 
 	def test_the_payment_request_is_repointed_at_the_sales_order(self):
 		on_payment_request_update(self.payment_request)
