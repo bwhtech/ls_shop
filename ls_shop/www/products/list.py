@@ -1,6 +1,7 @@
 import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Cast_, Min
+from frappe.utils import flt
 from frappe.utils.caching import redis_cache
 
 from ls_shop.search import query as search_query
@@ -23,12 +24,9 @@ def get_filter_brands(filters=None):
 	item = DocType("Item")
 
 	query = query.select(item.brand).distinct().orderby(item.brand)
-	brands = query.run(pluck=True)
-	if not brands:
-		return []
-	# Filter out None or empty brand values
-	brands = [b.title() for b in brands if b]
-	return brands
+	# Values are returned raw: they round-trip through the checkbox value and the URL into a
+	# case-sensitive SQLite IN on the index, and the template already display-cases them.
+	return [brand for brand in query.run(pluck=True) if brand]
 
 
 def get_filter_colors(filters=None):
@@ -39,11 +37,7 @@ def get_filter_colors(filters=None):
 	variant = DocType("Style Attribute Variant")
 
 	query = query.select(variant.attribute_name).distinct().orderby(variant.attribute_name)
-	colors = query.run(pluck=True)
-	if not colors:
-		return colors
-	colors = [c.title() for c in colors]
-	return colors
+	return [color for color in query.run(pluck=True) if color]
 
 
 def get_filter_sizes(filters=None):
@@ -164,11 +158,11 @@ def get_selected_filters():
 	min_price = query_params.get("min")
 	max_price = query_params.get("max")
 
-	# Convert to float if provided
+	# flt, not int: the price slider posts decimals (?min=74.5), which int() rejects with a 500.
 	if min_price:
-		filters["min_price"] = int(min_price)
+		filters["min_price"] = flt(min_price)
 	if max_price:
-		filters["max_price"] = int(max_price)
+		filters["max_price"] = flt(max_price)
 	return filters
 
 
