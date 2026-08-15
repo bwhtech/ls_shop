@@ -1,0 +1,48 @@
+import frappe
+from frappe.rate_limiter import rate_limit
+
+from ls_shop.search.sqlite_product_search import SqliteProductSearch
+
+SEARCH_CLASS_PATH = "ls_shop.search.sqlite_product_search.SqliteProductSearch"
+CORE_BUILD_INDEX = "frappe.search.sqlite_search.build_index"
+BUILD_TIMEOUT = 2 * 60 * 60 + 10 * 60
+
+
+def enqueue_full_rebuild():
+	"""Enqueue a full rebuild on the long queue. Returns the enqueue payload."""
+	return frappe.enqueue(
+		CORE_BUILD_INDEX,
+		queue="long",
+		timeout=BUILD_TIMEOUT,
+		search_class_path=SEARCH_CLASS_PATH,
+		force=True,
+	)
+
+
+@frappe.whitelist()
+@rate_limit(limit=5, seconds=60 * 60)
+def rebuild_index():
+	"""Manual entry: enqueue a full rebuild, restricted to System Manager and rate-limited."""
+	frappe.only_for("System Manager")
+	return enqueue_full_rebuild()
+
+
+def rebuild_index_nightly():
+	"""Nightly reconciler: full rebuild for bulk/related edits that bypass the per-doc sync events."""
+	return enqueue_full_rebuild()
+
+
+def ensure_index_built():
+	if SqliteProductSearch().index_exists():
+		return None
+	if not frappe.db.exists("Style Attribute Variant", {"is_published": 1}):
+		return None
+	return frappe.enqueue(
+		CORE_BUILD_INDEX,
+		queue="long",
+		timeout=BUILD_TIMEOUT,
+		job_id=SEARCH_CLASS_PATH,
+		deduplicate=True,
+		search_class_path=SEARCH_CLASS_PATH,
+		force=False,
+	)
