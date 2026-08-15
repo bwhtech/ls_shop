@@ -52,15 +52,13 @@
             'applied_code': coupon_code
         }
         try {
-            const data = await frappe_call('/api/v2/method/ls_shop.api.payments.apply_coupon_code', args)
-            if (data?.data?.success) {
-                confetti({
-                    particleCount: 100,
-                    spread: 70,
-                    origin: { y: 0.6 }
-                });
-                window.location.reload()
-            }
+            await frappe_call('/api/v2/method/ls_shop.api.payments.apply_coupon_code', args)
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+            window.location.reload()
         }
         catch (err) {
 

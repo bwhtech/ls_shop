@@ -148,14 +148,9 @@
             const data = await frappe_call(
                 "/api/v2/method/ls_shop.api.payments.update_quotation_address", { address: payload }
             )
-            if (data.data.success) {
-                toast(data.data.message, { type: "success" })
-                state.show_pickup_state = false;
-                state.billing_address_filled = true;
-            }
-            else {
-                toast("Something went wrong!", { type: "danger" })
-            }
+            toast(data.data.message, { type: "success" })
+            state.show_pickup_state = false;
+            state.billing_address_filled = true;
         }
         catch (err) {
         }
@@ -239,14 +234,9 @@
             const response_data = await frappe_call(
                 "/api/v2/method/ls_shop.api.payments.update_quotation_address", { address: payload }
             )
-            if (response_data.data.success) {
-                toast(response_data.data.message, { type: "success" })
-                state.show_billing_state = false;
-                state.billing_address_filled = true;
-            }
-            else {
-                toast("Something went wrong!", { type: "danger" })
-            }
+            toast(response_data.data.message, { type: "success" })
+            state.show_billing_state = false;
+            state.billing_address_filled = true;
         }
         catch (err) {
 
