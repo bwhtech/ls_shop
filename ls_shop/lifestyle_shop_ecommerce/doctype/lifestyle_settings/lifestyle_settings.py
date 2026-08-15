@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 
+from ls_shop.search.build import enqueue_full_rebuild
+from ls_shop.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
 from ls_shop.search.result_card import (
 	MANDATORY_RESULT_FIELDS,
 	MAX_RESULT_FIELDS,
@@ -148,6 +150,22 @@ class LifestyleSettings(Document):
 		"""Newline-joined catalog keys for the Search Result Field grid Select."""
 		return "\n".join(RESULT_CARD_CATALOG)
 
+	@frappe.whitelist()
+	def get_content_field_options(self, search_doctype):
+		"""Newline-joined indexable field names of `search_doctype` for the Search Content Field Select.
+
+		Served from Python so the grid offers exactly what the index will accept — duplicating the
+		fieldtype allowlist in the client let the two drift and offered fields the build then dropped.
+		"""
+		if search_doctype not in ALLOWED_CONTENT_DOCTYPES:
+			return ""
+		fields = [
+			field.fieldname
+			for field in frappe.get_meta(search_doctype).fields
+			if field.fieldname and is_indexable_content_field(search_doctype, field.fieldname)
+		]
+		return "\n".join(["", *fields])
+
 	def on_update(self):
 		"""Enqueue a background index rebuild only when the indexed field list changes."""
 		if frappe.flags.in_install or frappe.flags.in_migrate:
@@ -158,12 +176,7 @@ class LifestyleSettings(Document):
 		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]
 		new_pairs = [(row.search_doctype, row.field) for row in (self.search_content_fields or [])]
 		if old_pairs != new_pairs:
-			frappe.enqueue(
-				"ls_shop.search.build.enqueue_full_rebuild",
-				queue="long",
-				job_id="ls_shop.search.build.enqueue_full_rebuild",
-				deduplicate=True,
-			)
+			enqueue_full_rebuild(deduplicate=True)
 
 	def get_default_price_list(self):
 		return self.default_price_list

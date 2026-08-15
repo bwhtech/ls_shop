@@ -134,10 +134,9 @@ jinja = {
 }
 
 # Deliberately NOT registered as frappe's `sqlite_search` hook. Registering enlists core's global
-# doc_events update_doc_index/delete_doc_index (a synchronous index write plus an index_exists()
-# probe on every save of every doctype site-wide) and the 5-minute index_docs_in_queue cron, which
-# re-reads queued docs without the record overlay and would blank their product_detail/search_size
-# rows. search/sync.py owns incremental writes; search/build.py owns build + nightly reconcile.
+# `*` doc_events update_doc_index/delete_doc_index, which fires an index_exists() probe on every save
+# of every doctype site-wide. search/sync.py owns incremental writes; search/build.py owns the build,
+# the nightly reconcile, and (via ensure_index_built) resuming an interrupted build.
 
 
 ignore_links_on_delete = [
