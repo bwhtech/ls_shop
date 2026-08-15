@@ -8,7 +8,7 @@ from frappe.translate import get_all_translations
 from frappe.utils import cstr
 
 from ls_shop.search import query as search_query
-from ls_shop.utils import get_product_list
+from ls_shop.utils import get_available_stocks, get_product_list
 
 
 def auth_required(func):
@@ -118,3 +118,15 @@ def notify_user_product(item):
 @frappe.whitelist(allow_guest=True)
 def get_translations(lang="ar"):
 	return get_all_translations(lang=lang)
+
+
+@frappe.whitelist()
+def get_stock_for_items(item_codes: list[str] | str):
+	frappe.has_permission("Bin", throw=True)
+
+	if isinstance(item_codes, str):
+		item_codes = frappe.parse_json(item_codes)
+
+	warehouse = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
+	stocks = get_available_stocks(item_codes, warehouse)
+	return {item_code: data["stock_qty"] for item_code, data in stocks.items()}
