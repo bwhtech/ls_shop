@@ -1,10 +1,39 @@
 // Copyright (c) 2025, company@bwhstudios.com and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on('Lifestyle Settings', {
-	// refresh(frm) {
+const INDEXABLE_FIELDTYPES = [
+	'Data',
+	'Select',
+	'Small Text',
+	'Text',
+	'Long Text',
+	'Link',
+	'Read Only',
+];
 
-	// },
+frappe.ui.form.on('Lifestyle Settings', {
+	async refresh(frm) {
+		const response = await frm.call('get_result_card_field_options');
+		if (response.message) {
+			frm.fields_dict.search_result_fields.grid.update_docfield_property(
+				'field',
+				'options',
+				response.message,
+			);
+		}
+	},
+	rebuild_search_index(frm) {
+		frappe.confirm(
+			__('Rebuild the product search index in the background?'),
+			async () => {
+				await frappe.call('ls_shop.search.build.rebuild_index');
+				frappe.show_alert({
+					message: __('Search index rebuild queued'),
+					indicator: 'green',
+				});
+			},
+		);
+	},
 	publish_variants_for_all_templates(frm) {
 		if (!frm.doc.based_on_attribute) {
 			frappe.throw(__('Please set attribute variant to generate variants!'));
@@ -86,6 +115,30 @@ frappe.ui.form.on('Lifestyle Settings', {
 						}
 					});
 			},
+		);
+	},
+});
+
+frappe.ui.form.on('Search Content Field', {
+	async search_doctype(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		await frappe.model.set_value(cdt, cdn, 'field', '');
+		if (!row.search_doctype) {
+			return;
+		}
+		await frappe.model.with_doctype(row.search_doctype);
+		const options = frappe
+			.get_meta(row.search_doctype)
+			.fields.filter(
+				(df) => df.fieldname && INDEXABLE_FIELDTYPES.includes(df.fieldtype),
+			)
+			.map((df) => df.fieldname);
+		// update_docfield_property sets options grid-wide — the core-sanctioned pattern that survives
+		// a grid refresh, unlike the per-row trick which gets wiped.
+		frm.fields_dict.search_content_fields.grid.update_docfield_property(
+			'field',
+			'options',
+			[''].concat(options),
 		);
 	},
 });
