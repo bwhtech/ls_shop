@@ -2,6 +2,7 @@
 # See license.txt
 
 import copy
+import os
 from unittest.mock import patch
 
 import frappe
@@ -18,8 +19,12 @@ SEARCH_TOKEN = "zzwidget"
 ARABIC_TERM = "قميص"
 SHORT_TERM = "abc"
 
-BRAND = "ZZ Test Search Brand"
+# Deliberately not title-stable ("ZZ TestSearch Brand".title() != itself): the sidebar used to
+# title-case its values, which then no longer matched the case-sensitive SQLite index.
+BRAND = "ZZ TestSearch Brand"
 ITEM_GROUP = "ZZ Test Search Group"
+# A second group so the facet cross-filter tests have two variants that differ on a facet column.
+ITEM_GROUP_BLUE = "ZZ Test Search Group Blue"
 STYLE_ITEM = "ZZ-TEST-STYLE"
 ITEM_ATTRIBUTE = "Zz Test Color"
 CATEGORY_NAME = "Zz Test Category"
@@ -74,7 +79,7 @@ class TestStorefrontSearch(IntegrationTestCase):
 			("Style Attribute Configurator", {"item_template": STYLE_ITEM}),
 			("Ecommerce Category", {"category_name": CATEGORY_NAME}),
 			("Item", {"item_group": ITEM_GROUP}),
-			("Item Group", {"name": ITEM_GROUP}),
+			("Item Group", {"name": ("in", [ITEM_GROUP, ITEM_GROUP_BLUE])}),
 			("Item Attribute", {"name": ITEM_ATTRIBUTE}),
 			("Brand", {"name": BRAND}),
 		):
@@ -101,18 +106,21 @@ class TestStorefrontSearch(IntegrationTestCase):
 			}
 		).insert(ignore_permissions=True)
 
-		# red: discounted + cheapest; blue: pricier, no discount. Both indexed.
+		# red: discounted + cheapest; blue: pricier, no discount. Both indexed. They deliberately differ
+		# on item_group AND size so the facet cross-filter assertions have something to narrow by.
+		# Numeric sizes, because that is where the sidebar's ordering can go wrong (10 before 8).
 		cls.red = cls.make_variant(
 			configurator.name,
 			color="Zzred",
 			display_name="Zzwidget Premium Red",
-			sizes=[("ZS", "ZZ-RED-S", 100, 80), ("ZM", "ZZ-RED-M", 120, 90)],
+			sizes=[("8", "ZZ-RED-S", 100, 80), ("10", "ZZ-RED-M", 120, 90)],
 		)
 		cls.blue = cls.make_variant(
 			configurator.name,
 			color="Zzblue",
 			display_name="Zzwidget Premium Blue",
-			sizes=[("ZS", "ZZ-BLUE-S", 200, None), ("ZM", "ZZ-BLUE-M", 220, None)],
+			sizes=[("38", "ZZ-BLUE-S", 200, None), ("40", "ZZ-BLUE-M", 220, None)],
+			item_group=ITEM_GROUP_BLUE,
 		)
 		# green: published but deliberately left OUT of the index scope, so a name that exists in
 		# MariaDB but not in the index never leaks into an FTS result.
@@ -147,7 +155,7 @@ class TestStorefrontSearch(IntegrationTestCase):
 		SqliteProductSearch.INDEXABLE_DOCTYPES = scoped
 
 	@classmethod
-	def make_variant(cls, configurator, color, display_name, sizes):
+	def make_variant(cls, configurator, color, display_name, sizes, item_group=ITEM_GROUP):
 		"""Create one published Style Attribute Variant + its size SKUs + Item Prices."""
 		for _label, item_code, default_rate, sale_rate in sizes:
 			cls.ensure_item(item_code, f"{display_name} {item_code}")
@@ -161,9 +169,12 @@ class TestStorefrontSearch(IntegrationTestCase):
 				"configurator": configurator,
 				"item_style": STYLE_ITEM,
 				"attribute_value": color,
-				"attribute_name": color,
+				# Real catalogues put the attribute's LABEL here ("Color"), not its value, and the
+				# storefront's colour filter compares against this column — a fixture that stored the
+				# colour here would make the colour assertions pass for the wrong reason.
+				"attribute_name": "Color",
 				"display_name": display_name,
-				"item_group": ITEM_GROUP,
+				"item_group": item_group,
 				"is_published": 1,
 				"images": [{"image": "/files/zz-a.png"}, {"image": "/files/zz-b.png"}],
 				"sizes": [{"size": label, "item_code": item_code} for label, item_code, _d, _s in sizes],
@@ -201,16 +212,18 @@ class TestStorefrontSearch(IntegrationTestCase):
 
 	@classmethod
 	def ensure_item_group(cls):
-		if not frappe.db.exists("Item Group", ITEM_GROUP):
+		for item_group in (ITEM_GROUP, ITEM_GROUP_BLUE):
+			if frappe.db.exists("Item Group", item_group):
+				continue
 			frappe.get_doc(
 				{
 					"doctype": "Item Group",
-					"item_group_name": ITEM_GROUP,
+					"item_group_name": item_group,
 					"is_group": 0,
 					"parent_item_group": "All Item Groups",
 					# ls_shop customises Item Group with two mandatory storefront display names.
-					"custom_displayname": ITEM_GROUP,
-					"custom_item_group_display_name": ITEM_GROUP,
+					"custom_displayname": item_group,
+					"custom_item_group_display_name": item_group,
 				}
 			).insert(ignore_permissions=True)
 
@@ -284,13 +297,43 @@ class TestStorefrontSearch(IntegrationTestCase):
 	def test_facets_reflect_indexed_catalogue(self):
 		facets = SqliteProductSearch().search(SEARCH_TOKEN)["facets"]
 		self.assertEqual(facets["brand"].get(BRAND), 2)
-		self.assertEqual(set(facets["color"]), {"Zzred", "Zzblue"})
-		self.assertEqual(facets["size"].get("ZS"), 2)
-		self.assertEqual(facets["size"].get("ZM"), 2)
+		self.assertEqual(set(facets["category"]), {ITEM_GROUP, ITEM_GROUP_BLUE})
+		# The colour facet is built from attribute_name, which real data fills with the attribute's
+		# label, so both variants land under one value. Tracked separately as a storefront parity bug.
+		self.assertEqual(facets["color"], {"Color": 2})
+		self.assertEqual(facets["size"], {"8": 1, "10": 1, "38": 1, "40": 1})
 
 		sidebar = search_query.listing_facets({"search": SEARCH_TOKEN})
 		self.assertIn(BRAND, sidebar["brands"])
-		self.assertEqual(set(sidebar["colors"]), {"Zzred", "Zzblue"})
+		self.assertEqual(sidebar["colors"], ["Color"])
+
+	def test_size_facet_is_ordered_numerically(self):
+		# Ordered by count the sidebar would render 8, 10, 38, 40 in an arbitrary order; ordered as
+		# text it would render 10 before 8. Both are wrong for a numeric size scale.
+		facets = SqliteProductSearch().search(SEARCH_TOKEN)["facets"]
+		self.assertEqual(list(facets["size"]), ["8", "10", "38", "40"])
+
+	def test_facets_narrow_by_the_other_selected_filters(self):
+		engine = SqliteProductSearch()
+
+		# Only red carries size 8, so every other facet collapses to red's values...
+		narrowed = engine.search(SEARCH_TOKEN, facet_filters={"sizes": ["8"]})["facets"]
+		self.assertEqual(set(narrowed["category"]), {ITEM_GROUP})
+		self.assertEqual(narrowed["brand"], {BRAND: 1})
+		# ...but the size facet must not narrow by itself, or the sidebar would offer only the
+		# already-ticked size and the shopper could never widen the selection again.
+		self.assertEqual(list(narrowed["size"]), ["8", "10", "38", "40"])
+
+		# Symmetrically: picking blue's category leaves only blue's sizes, and every category listed.
+		by_category = engine.search(SEARCH_TOKEN, facet_filters={"subcategory": [ITEM_GROUP_BLUE]})["facets"]
+		self.assertEqual(list(by_category["size"]), ["38", "40"])
+		self.assertEqual(set(by_category["category"]), {ITEM_GROUP, ITEM_GROUP_BLUE})
+
+	def test_sidebar_facets_agree_with_the_narrowed_grid(self):
+		# The sidebar must not offer a size that the grid it sits next to cannot show.
+		filters = {"search": SEARCH_TOKEN, "subcategory": [ITEM_GROUP_BLUE]}
+		self.assertEqual(SqliteProductSearch().search_products(filters), [self.blue])
+		self.assertEqual(search_query.listing_facets(filters)["sizes"], ["38", "40"])
 
 	# -- filter / sort / pagination / count parity -----------------------------------------------
 
@@ -301,6 +344,23 @@ class TestStorefrontSearch(IntegrationTestCase):
 		self.assertEqual(engine.search_products({"search": SEARCH_TOKEN, "max_price": 100}), [self.red])
 		self.assertEqual(engine.search_products({"search": SEARCH_TOKEN, "has_discount": 1}), [self.red])
 		self.assertEqual(engine.search_count({"search": SEARCH_TOKEN, "min_price": 150}), 1)
+
+		# The bounds arrive from the URL as strings. FTS5 content columns have no type affinity, so a
+		# TEXT bound sorts above every REAL price and silently returns the wrong rows.
+		self.assertEqual(engine.search_products({"search": SEARCH_TOKEN, "min_price": "150"}), [self.blue])
+		self.assertEqual(engine.search_products({"search": SEARCH_TOKEN, "max_price": "100"}), [self.red])
+		self.assertEqual(engine.search_count({"search": SEARCH_TOKEN, "min_price": "150"}), 1)
+		# A decimal bound must survive the round trip too (the price slider posts them).
+		self.assertEqual(engine.search_products({"search": SEARCH_TOKEN, "min_price": "80.5"}), [self.blue])
+
+	def test_price_params_accept_decimals(self):
+		# The price slider posts decimals; int() raised a 500 on them before they ever reached SQLite.
+		from ls_shop.www.products import list as product_list_page
+
+		with patch.dict(frappe.form_dict, {"min": "74.5", "max": "120.25"}):
+			filters = product_list_page.get_selected_filters()
+		self.assertEqual(filters["min_price"], 74.5)
+		self.assertEqual(filters["max_price"], 120.25)
 
 	def test_sort_pagination_and_count_parity(self):
 		engine = SqliteProductSearch()
@@ -342,6 +402,48 @@ class TestStorefrontSearch(IntegrationTestCase):
 		card = search_query.build_product_cards([self.red])[0]
 		self.assertEqual(card["sale_price"], 50)
 		self.assertEqual(card["default_price"], 100)
+
+	# -- one card shape across both grids ---------------------------------------------------------
+
+	def test_both_grids_return_the_same_card_shape(self):
+		# The type-ahead modal is served by the index on one keystroke and by frappe.qb on the next,
+		# so a key set that differs between them makes the same product render differently.
+		index_card = search_query.build_product_cards([self.red])[0]
+		qb_card = utils.get_product_list_qb(product_list=[self.red])[0]
+		self.assertEqual(set(index_card), set(qb_card))
+
+		# attribute_value is the shopper-facing colour on both, not the attribute's label.
+		self.assertEqual(index_card["attribute_value"], "Zzred")
+		self.assertEqual(qb_card["attribute_value"], "Zzred")
+		self.assertEqual(qb_card["item_group"], ITEM_GROUP)
+		self.assertEqual([size["size"] for size in qb_card["sizes"]], ["8", "10"])
+		self.assertEqual(qb_card["effective_price"], index_card["effective_price"])
+
+	def test_search_endpoint_shape_survives_the_grid_switch(self):
+		from ls_shop.api.utils import get_search_results
+
+		# SEARCH_TOKEN is served by the index; the short term falls back to frappe.qb.
+		indexed = get_search_results(SEARCH_TOKEN)
+		# Below the FTS floor, so this one is served by the retained frappe.qb LIKE grid.
+		fallback = get_search_results("Zzr")
+		self.assertTrue(indexed)
+		self.assertTrue(fallback)
+		self.assertEqual(set(indexed[0]), set(fallback[0]))
+
+	# -- sidebar values must round-trip back through the filter -----------------------------------
+
+	def test_sidebar_brand_round_trips_through_both_grids(self):
+		# The sidebar value lands verbatim in the checkbox and the URL, and SQLite compares it with a
+		# BINARY-collated IN. Title-casing it on the way out returned zero rows on the way back in.
+		from ls_shop.www.products import list as product_list_page
+
+		brands = product_list_page.get_filter_brands({"search": SEARCH_TOKEN})
+		self.assertIn(BRAND, brands)
+		self.assertNotIn(BRAND.title(), brands)
+		for brand in brands:
+			filters = {"search": SEARCH_TOKEN, "brands": [brand]}
+			self.assertTrue(SqliteProductSearch().search_products(filters))
+			self.assertTrue(utils.get_product_list_qb(filters))
 
 	# -- gotcha: unpublishing must REMOVE, not merely skip ----------------------------------------
 
@@ -477,6 +579,22 @@ class TestStorefrontSearch(IntegrationTestCase):
 		self.assertIs(kwargs["force"], False)
 		self.assertEqual(kwargs["job_id"], build.SEARCH_CLASS_PATH)
 		self.assertTrue(kwargs["deduplicate"])
+
+	def test_ensure_index_built_resumes_an_interrupted_build(self):
+		# A leftover temp DB is the only trace of a build that died part-way. Without resuming it, a
+		# large catalogue would restart from zero on the next nightly rebuild.
+		engine = SqliteProductSearch()
+		temp_db_path = engine._get_db_path(is_temp=True)
+		open(temp_db_path, "a").close()
+		self.addCleanup(os.remove, temp_db_path)
+
+		with patch("frappe.enqueue") as enqueue:
+			build.ensure_index_built()
+		enqueue.assert_called_once()
+		_args, kwargs = enqueue.call_args
+		self.assertIs(kwargs["is_continuation"], True)
+		self.assertIs(kwargs["force"], True)
+		self.assertEqual(kwargs["job_id"], f"{build.SEARCH_CLASS_PATH}_continuation")
 
 	def test_ensure_index_built_noop_on_empty_catalogue(self):
 		SqliteProductSearch().drop_index()
