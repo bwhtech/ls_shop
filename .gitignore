@@ -34,6 +34,9 @@ venv.bak/
 
 # Dependency directories
 node_modules/
+# bench symlinks public/node_modules to the app root; the trailing-slash rule above
+# only matches real directories, so the symlink needs its own line.
+node_modules
 jspm_packages/
 
 # IDEs and editors

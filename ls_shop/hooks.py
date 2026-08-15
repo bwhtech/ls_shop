@@ -76,6 +76,11 @@ website_route_rules = [
 	},
 	{"from_route": "/ar/account/wishlist", "to_route": "/account/wishlist.html"},
 	{"from_route": "/ar/account/address", "to_route": "/account/address.html"},
+	# ------------
+	# Crawl infrastructure (language-agnostic)
+	# ------------
+	{"from_route": "/sitemap-<seg_type>-<page>.xml", "to_route": "sitemap_segment.xml"},
+	{"from_route": "/og-image/<path:route>", "to_route": "/og_image_render"},
 ]
 
 before_request = ["ls_shop.utils.before_request"]
@@ -83,6 +88,9 @@ before_request = ["ls_shop.utils.before_request"]
 doctype_js = {
 	"Item": "public/js/extends/item.js",
 	"Sales Order": "public/js/extends/sales_order.js",
+	"Style Attribute Variant": "public/js/extends/seo_listing.js",
+	"Ecommerce Category": "public/js/extends/seo_listing.js",
+	"Lifestyle Settings": "public/js/extends/seo_listing.js",
 }
 
 after_install = "ls_shop.migrate.after_install"
@@ -130,8 +138,21 @@ jinja = {
 		"ls_shop.utils.format_theme_css",
 		"ls_shop.utils.get_currency_symbol",
 		"ls_shop.search.result_card.get_search_result_fields",
+		"ls_shop.seo_jinja",
 	],
 }
+
+update_website_context = "ls_shop.website_context.update_website_context"
+
+# GDPR erasure: the event log stores the signed-in email as plain Data (guests have none),
+# so core's data-deletion flow needs to be told which column to redact.
+user_data_fields = [
+	{
+		"doctype": "Storefront Analytics Event",
+		"filter_by": "visitor_user",
+		"redact_fields": ["visitor_user"],
+	},
+]
 
 # Deliberately NOT registered as frappe's `sqlite_search` hook. Registering enlists core's global
 # `*` doc_events update_doc_index/delete_doc_index, which fires an index_exists() probe on every save
@@ -398,5 +419,6 @@ scheduler_events = {
 		"ls_shop.jobs.delete_notified_oos",
 		"ls_shop.jobs.delete_old_draft_quotations",
 		"ls_shop.search.build.rebuild_index_nightly",
+		"ls_shop.og.generator.clear_old_cards",
 	],
 }

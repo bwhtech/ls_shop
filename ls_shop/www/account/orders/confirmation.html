@@ -17,15 +17,42 @@
     if(!reference_id){
         reference_id = payment_id
     }
-    frappe_call(
-        "/api/v2/method/ls_shop.api.payments.confirm_payment",
-        { payment_mode, reference_id }
-    ).then(({ data }) => {
+    function track_purchase(data, order_name) {
+        // The first-party `purchase` event is logged server-side at order creation; the
+        // capture endpoint rejects it from the client, so only the pixels fire here.
+        const dedup_key = 'fb_purchase_' + order_name;
+        if (sessionStorage.getItem(dedup_key)) return;
+        sessionStorage.setItem(dedup_key, '1');
+
+        const order_value = parseFloat(data.grand_total || data.amount || 0) || 0;
+
+        // eventID lets Meta dedupe this browser hit against a future server-side Purchase.
+        if (window.fbq) fbq('track', 'Purchase',
+            { value: order_value, currency: data.currency || window.fb_currency },
+            { eventID: order_name });
+
+        if (window.gtag) gtag('event', 'purchase', {
+            transaction_id: order_name,
+            value: order_value,
+            currency: data.currency || window.ga4_currency
+        });
+    }
+
+    async function confirm_payment() {
         // TODO: handle errors, unpaid, etc.
-        if (data.status === "Paid" || data.status === "CLOSED") {
-            Alpine.store("cart").remove_selected();
-            window.location.href = `/{{frappe.lang}}/account/orders`;
-        }
-    })
+        const { data } = await frappe_call(
+            "/api/v2/method/ls_shop.api.payments.confirm_payment",
+            { payment_mode, reference_id }
+        );
+        if (data.status !== "Paid" && data.status !== "CLOSED") return;
+
+        const order_name = data.order_name || data.ref_docname || reference_id;
+        if (order_name) track_purchase(data, order_name);
+
+        Alpine.store("cart").remove_selected();
+        window.location.href = `/{{frappe.lang}}/account/orders`;
+    }
+
+    confirm_payment();
 </script>
 {% endblock %}

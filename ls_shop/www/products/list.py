@@ -4,6 +4,7 @@ from frappe.query_builder.functions import Cast_, Min
 from frappe.utils import flt
 from frappe.utils.caching import redis_cache
 
+from ls_shop import seo
 from ls_shop.search import query as search_query
 from ls_shop.utils import (
 	get_current_page,
@@ -199,3 +200,15 @@ def get_context(context):
 		}
 	]
 	context.category = selected_filters.get("category", "")
+
+	category_doc = seo.get_category_seo_overrides(context.category)
+	context.seo = seo.build_collection_seo(
+		context.category,
+		context.breadcrumbs,
+		total_count=context.total_count,
+		category_doc=category_doc,
+	)
+	context.json_ld = [
+		seo.build_collection_json_ld(context.category, context.breadcrumbs, context.total_count),
+		seo.build_breadcrumb_json_ld(context.breadcrumbs),
+	]

@@ -21,7 +21,15 @@
 		"column_break_meci",
 		"images",
 		"section_break_hjed",
-		"sizes"
+		"sizes",
+		"seo_section",
+		"seo_preview",
+		"meta_title",
+		"meta_description",
+		"meta_keywords",
+		"og_image",
+		"noindex",
+		"json_ld"
 	],
 	"fields": [
 		{
@@ -108,6 +116,53 @@
 			"fieldname": "attribute_name",
 			"fieldtype": "Data",
 			"label": "Attribute Name"
+		},
+		{
+			"collapsible": 1,
+			"fieldname": "seo_section",
+			"fieldtype": "Section Break",
+			"label": "Search Engine Listing"
+		},
+		{
+			"fieldname": "seo_preview",
+			"fieldtype": "HTML"
+		},
+		{
+			"description": "Overrides the page title. Defaults to display name + store name.",
+			"fieldname": "meta_title",
+			"fieldtype": "Data",
+			"label": "Meta Title"
+		},
+		{
+			"description": "Used as the meta description / OG description (truncated to 160 chars).",
+			"fieldname": "meta_description",
+			"fieldtype": "Small Text",
+			"label": "Meta Description"
+		},
+		{
+			"fieldname": "meta_keywords",
+			"fieldtype": "Data",
+			"label": "Meta Keywords"
+		},
+		{
+			"description": "Overrides the auto-generated social share image.",
+			"fieldname": "og_image",
+			"fieldtype": "Attach Image",
+			"label": "OG Image"
+		},
+		{
+			"default": "0",
+			"description": "Emit <meta name=\"robots\" content=\"noindex\"> and drop this product from the XML sitemap.",
+			"fieldname": "noindex",
+			"fieldtype": "Check",
+			"label": "No Index"
+		},
+		{
+			"description": "schema.org Product JSON-LD for this product. Leave blank to auto-generate from product data.",
+			"fieldname": "json_ld",
+			"fieldtype": "Code",
+			"label": "JSON-LD (Structured Data)",
+			"options": "JSON"
 		}
 	],
 	"grid_page_length": 50,

@@ -56,7 +56,9 @@ class LifestyleSettings(Document):
 		contact_phone: DF.Data | None
 		copyright_text: DF.Data | None
 		create_variants_automatically_on_configurator_creation: DF.Check
+		default_meta_description: DF.SmallText | None
 		default_price_list: DF.Link | None
+		default_share_image: DF.AttachImage | None
 		ecommerce_item_group_mapping: DF.Table[ItemGroupMap]
 		ecommerce_warehouse: DF.Link | None
 		facebook_url: DF.Data | None
@@ -68,10 +70,14 @@ class LifestyleSettings(Document):
 		footer_text_color: DF.Color | None
 		form_accent_color: DF.Color | None
 		heading_accent_color: DF.Color | None
+		homepage_meta_description: DF.SmallText | None
+		homepage_meta_title: DF.Data | None
+		homepage_og_image: DF.AttachImage | None
 		instagram_url: DF.Data | None
 		item_in_stock_email_template: DF.Link
 		link_color: DF.Color | None
 		link_hover_color: DF.Color | None
+		llms_txt: DF.Code | None
 		logo_url: DF.Data | None
 		newsletter_description: DF.Text | None
 		newsletter_title: DF.Data | None
@@ -81,19 +87,25 @@ class LifestyleSettings(Document):
 		primary_color: DF.Color | None
 		primary_hover_color: DF.Color | None
 		print_format: DF.Link | None
+		product_list_meta_description: DF.SmallText | None
+		product_list_meta_title: DF.Data | None
+		product_list_og_image: DF.AttachImage | None
 		reason_for_return: DF.Table[ReturnReason]
 		return_period: DF.Int
 		sale_price_list: DF.Link | None
 		search_content_fields: DF.Table[SearchContentField]
 		search_result_fields: DF.Table[SearchResultField]
 		secondary_accent_color: DF.Color | None
+		seo_title_template: DF.Data | None
 		shipping_rule: DF.Link | None
+		sitemap_urls_per_page: DF.Int
 		snapchat_url: DF.Data | None
 		store_name: DF.Data | None
 		strikethrough_color: DF.Color | None
 		tabby_enabled: DF.Check
 		telr_enabled: DF.Check
 		tiktok_url: DF.Data | None
+		twitter_handle: DF.Data | None
 		twitter_url: DF.Data | None
 		vat_certificate_image: DF.AttachImage | None
 		working_hours: DF.Data | None

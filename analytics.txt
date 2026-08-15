@@ -1,0 +1,147 @@
+STOREFRONT ANALYTICS — METRIC FORMULA SHEET
+============================================
+Dashboard: /app/ecommerce-analytics  ·  PR #32  ·  2026-07-22
+
+Data sources
+------------
+- Event log:  Storefront Analytics Event doctype (first-party; page_view, view_item,
+  add_to_cart, begin_checkout, purchase; session_id, item, value, device, utm_*)
+- Orders:     Sales Order, order_type "Shopping Cart", not cancelled (drafts count —
+  purchase fires at placement, COD may stay draft)
+- Carts:      draft Quotations, order_type "Shopping Cart"
+- Read-backs: GA4 Data API, Meta /stats (display-only cards; no local math)
+
+Session definition (Shopify): distinct browser session_id, rolling 30-minute
+inactivity timeout. Stored in localStorage/cookie iv_sid.
+
+Every tile compares against the previous equal-length window (Shopify/WooCommerce
+"vs previous period"). Deltas: % for money/counts, pp for rates.
+"pp" = percentage points: conversion 4.7% -> 4.9% shows +0.2 pp (plain difference),
+not +4.3% (relative change), which would overstate the move.
+
+
+KPI TILES
+---------
+Total Sales        = SUM(base_grand_total) of webshop Sales Orders in range
+                     [Shopify / WooCommerce "Total sales" — gross incl. tax+shipping;
+                      returns not netted (Woo subtracts refunds; future refinement)]
+
+Orders             = COUNT of those Sales Orders
+                     [universal — every platform]
+
+Sessions           = COUNT(DISTINCT session_id) of events in range
+                     [Shopify session definition, 30-min inactivity]
+
+Conversion Rate    = sessions containing a purchase event / all sessions x 100
+                     [Shopify "Online store conversion rate" / "Sessions converted"]
+
+Avg Order Value    = Total Sales / Orders
+                     [WooCommerce AOV — Woo uses net sales; we use total, consistent
+                      with the Total Sales tile]
+
+Returning          = distinct customers ordering in range with >=1 webshop order
+Customers          BEFORE the range / distinct customers ordering in range x 100
+                     [Shopify "Returning customer rate"; measures buyers, not visitors]
+
+
+FUNNEL
+------
+Stages (distinct sessions per stage):
+  Sessions -> Viewed Product (view_item) -> Added to Cart (add_to_cart)
+  -> Reached Checkout (begin_checkout) -> Purchased (purchase)
+Shown as % of all sessions          [Shopify conversion-rate breakdown]
+Step drop-off % between stages      [GA4 Purchase Journey "abandonment rate"]
+Stage set                           [BigCommerce Purchase Funnel / Wix funnel]
+Device filter (All/Desktop/Mobile/Tablet)   [Wix / GA4 device segmentation]
+
+
+LIVE VIEW  [Shopify Live View]
+------------------------------
+Visitors now   = distinct sessions with any event in the last 5 minutes
+Active carts   = sessions with add_to_cart in last 10 min minus those that purchased
+Checking out   = sessions with begin_checkout in last 10 min minus purchased
+Today          = sessions / orders / sales since midnight
+Auto-refresh: 30s.
+
+
+ABANDONED CARTS
+---------------
+Cart session   = session with >=1 add_to_cart in range
+Abandoned      = cart session, no purchase, last event older than 1 hour
+                 [1-hour idle threshold: BigCommerce]
+Rate           = abandoned / cart sessions x 100
+Value          = SUM of the session's add_to_cart values
+Count/value/rate headline trio               [BigCommerce]
+Recoverable    = abandoned + contact known (logged-in user or draft Quotation
+                 with contact_email, matched via custom_analytics_session_id)
+Recovered      = the session later purchased
+Recoverable/Recovered staging                [Wix abandoned-cart funnel]
+Per-row recovery status + open link          [Shopify abandoned checkouts]
+
+
+TOP PRODUCTS
+------------
+Units   = SUM(qty)     from webshop Sales Order Items in range
+Revenue = SUM(amount)  from webshop Sales Order Items in range
+Revenue <-> Units toggle   [Shopify/WooCommerce are units-first,
+                            BigCommerce/Wix revenue-first — toggle covers both]
+
+
+PRODUCT ENGAGEMENT   [GA4 Ecommerce purchases report + BigCommerce Merchandising]
+---------------------------------------------------------------------------------
+Per item:
+  Views                = count of view_item events
+  Adds                 = count of add_to_cart events
+  Purchases            = units sold (Sales Order Items)
+  Cart-to-view rate    = adds / views x 100        [GA4 metric name]
+  Purchase-to-view     = purchases / views x 100   [GA4 metric name]
+"Low conv" flag: views > 50 and purchase-to-view < 1%.
+
+
+TRAFFIC SOURCES   [Shopify sessions-by-referrer + WooCommerce Order Attribution]
+--------------------------------------------------------------------------------
+Grouped by the session's utm_source / utm_medium (empty = "Direct"):
+  Sessions        = distinct sessions
+  Orders          = distinct purchasing sessions
+  Revenue         = SUM of purchase event values
+  Conversion      = orders / sessions x 100
+Bounded to top 30 groups by sessions.
+
+UTM lifecycle: captured on any utm_* landing; persisted in localStorage + cookie
+(last-touch — a new campaign landing overwrites); survives search/browse/checkout;
+NOT cleared on purchase (repeat orders keep crediting the campaign, GA4-style);
+expires after 30 days on both cookie and localStorage; stamped on every event and
+on Quotation + Sales Order custom_utm_* fields.
+
+
+DEVICES & LANDING PAGES
+-----------------------
+Devices        = sessions + conversion % grouped by device (user-agent parsed
+                 server-side: Desktop/Mobile/Tablet)   [Shopify sessions-by-device]
+Landing pages  = first page_view of each session -> sessions + conversion % per path
+                 [Shopify sessions-by-landing-page]
+
+
+SALES HEATMAP   [Amazon Seller Central sales-by-hour, extended to a 7x24 grid]
+------------------------------------------------------------------------------
+Webshop order count per weekday (Mon-Sun) x hour of order creation.
+
+
+TRACKING HEALTH   [Meta Events Manager diagnostics pattern]
+-----------------------------------------------------------
+Compares purchases (30d): first-party event log vs GA4 "purchase" vs Meta "Purchase",
+plus per-provider credential status with actionable error text
+(e.g. GA4 service account lacking property access; Meta pixel stats denied).
+NOTE (this install): Meta /stats requires the pixel to be connected to an ad
+account AND that ad account assigned to the token's system user — dataset-only
+assignment lets the token read the pixel node but never its stats. Without an
+ad account the Meta read-back card stays in its warning state by design; pixel
+event SENDING (fbq) is unaffected and visible in Events Manager -> Test Events.
+Purpose: catch silently-broken pixels — the #1 unnoticed failure for small stores.
+
+
+GA4 / META CARDS
+----------------
+Straight display of the provider read-backs (totals + daily trend when available):
+GA4 Data API runReport (sessions, activeUsers, event counts, daily sessions);
+Meta Graph /stats aggregation=event (event totals, daily PageViews). 5-min cache.

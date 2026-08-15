@@ -1,12 +1,8 @@
 import frappe
 from frappe import _
 
+from ls_shop.product_detail import get_available_sizes, get_price, get_selected_item
 from ls_shop.utils import get_available_stock
-from ls_shop.www.products.details import (
-	get_available_sizes,
-	get_price_data,
-	get_selected_item,
-)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -69,7 +65,7 @@ def validate_cart_stock(items):
 
 		if requested_qty > stock_qty.get("stock_qty", 0):
 			errors.append(
-				f"{item_name} - Requested: {requested_qty}, In Stock: {stock_qty.get('stock_qty',0)}"
+				f"{item_name} - Requested: {requested_qty}, In Stock: {stock_qty.get('stock_qty', 0)}"
 			)
 
 	if errors:
@@ -90,8 +86,8 @@ def update_variant(product_name, size):
 	default_price_list = lifestyle_settings.get_default_price_list()
 	sale_price_list = lifestyle_settings.get_sale_price_list()
 
-	default_price = get_price_data(selected_item, default_price_list)
-	sale_price = get_price_data(selected_item, sale_price_list)
+	default_price = get_price(selected_item, default_price_list)
+	sale_price = get_price(selected_item, sale_price_list)
 
 	return {
 		"variant": selected_item,

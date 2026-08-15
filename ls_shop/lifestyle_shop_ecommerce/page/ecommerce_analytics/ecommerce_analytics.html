@@ -1,0 +1,1001 @@
+<div class="iv-analytics">
+	<style>
+		.iv-analytics {
+			--iv-primary: #4f46e5;
+			--iv-cat-1: #4f46e5;
+			--iv-cat-2: #0891b2;
+			--iv-cat-3: #d97706;
+			--iv-cat-4: #db2777;
+			--iv-cat-5: #7c3aed;
+			--iv-cat-6: #059669;
+			--iv-cat-7: #2563eb;
+			--iv-cat-8: #0d9488;
+			--iv-funnel-1: #99a8fb;
+			--iv-funnel-2: #7b87f8;
+			--iv-funnel-3: #6366f1;
+			--iv-funnel-4: #4f46e5;
+			--iv-funnel-5: #3730a3;
+			--iv-funnel-ink-1: #272d52;
+			--iv-funnel-ink-2: #272d52;
+			--iv-funnel-ink-3: #ffffff;
+			--iv-funnel-ink-4: #ffffff;
+			--iv-funnel-ink-5: #ffffff;
+			--iv-success: #059669;
+			--iv-warning: #d97706;
+			--iv-danger: #dc2626;
+			--iv-info: #0891b2;
+			--iv-border: #ededed;
+			max-width: 1280px;
+			margin: 0 auto;
+			padding: 4px 8px 64px;
+			color: var(--text-color);
+		}
+		[data-theme="dark"] .iv-analytics {
+			--iv-primary: #6366f1;
+			--iv-cat-1: #6366f1;
+			--iv-cat-2: #0aa2c0;
+			--iv-cat-3: #d97706;
+			--iv-cat-4: #ec4899;
+			--iv-cat-5: #8b5cf6;
+			--iv-cat-6: #0aa877;
+			--iv-cat-7: #3b82f6;
+			--iv-cat-8: #12a99b;
+			--iv-funnel-1: #c7d2fe;
+			--iv-funnel-2: #a5b4fc;
+			--iv-funnel-3: #818cf8;
+			--iv-funnel-4: #6366f1;
+			--iv-funnel-5: #4f46e5;
+			--iv-funnel-ink-1: #1b1f38;
+			--iv-funnel-ink-2: #1b1f38;
+			--iv-funnel-ink-3: #1b1f38;
+			--iv-funnel-ink-4: #ffffff;
+			--iv-funnel-ink-5: #ffffff;
+			--iv-success: #0aa877;
+			--iv-warning: #d97706;
+			--iv-danger: #ef4444;
+			--iv-info: #0aa2c0;
+			--iv-border: #383838;
+		}
+
+		.iv-analytics .iv-card {
+			background: var(--card-bg);
+			border: 1px solid var(--iv-border);
+			border-radius: 12px;
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+			padding: 16px;
+			margin-bottom: 16px;
+			min-width: 0;
+		}
+		.iv-analytics .iv-card-head {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-bottom: 12px;
+		}
+		.iv-analytics .iv-card-title {
+			font-size: 13px;
+			font-weight: 600;
+			color: var(--text-color);
+		}
+		.iv-analytics .iv-card-sub {
+			font-size: 11.5px;
+			color: var(--text-muted);
+			margin-top: 2px;
+		}
+		.iv-analytics .iv-micro {
+			font-size: 11px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-muted);
+		}
+
+		.iv-analytics .iv-toolbar {
+			position: sticky;
+			top: calc(var(--navbar-height, 60px) - 12px);
+			z-index: 5;
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 10px 12px;
+			margin-bottom: 16px;
+			background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+			backdrop-filter: blur(8px);
+			border: 1px solid var(--iv-border);
+			border-radius: 12px;
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+		}
+		.iv-analytics .iv-toolbar-caption {
+			font-size: 12px;
+			color: var(--text-muted);
+			flex: 1;
+		}
+		.iv-analytics .iv-seg {
+			display: inline-flex;
+			background: var(--bg-color);
+			border: 1px solid var(--iv-border);
+			border-radius: 8px;
+			padding: 2px;
+			gap: 2px;
+		}
+		.iv-analytics .iv-seg-btn {
+			border: 0;
+			background: transparent;
+			padding: 4px 12px;
+			border-radius: 6px;
+			font-size: 12px;
+			font-weight: 500;
+			color: var(--text-muted);
+			cursor: pointer;
+			white-space: nowrap;
+		}
+		.iv-analytics .iv-seg-btn:hover:not(.active) {
+			color: var(--text-color);
+		}
+		.iv-analytics .iv-seg-btn.active {
+			background: var(--card-bg);
+			color: var(--text-color);
+			font-weight: 600;
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+		}
+		.iv-analytics .iv-refresh-btn {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			border: 1px solid var(--iv-border);
+			background: var(--card-bg);
+			color: var(--text-color);
+			font-size: 12px;
+			font-weight: 500;
+			padding: 5px 12px;
+			border-radius: 8px;
+			cursor: pointer;
+		}
+		.iv-analytics .iv-refresh-btn:hover {
+			border-color: var(--iv-primary);
+			color: var(--iv-primary);
+		}
+		.iv-analytics .iv-refresh-btn.spinning svg {
+			animation: iv-spin 0.8s linear infinite;
+		}
+		@media (max-width: 560px) {
+			.iv-analytics .iv-toolbar {
+				flex-wrap: wrap;
+			}
+			.iv-analytics .iv-toolbar-caption {
+				display: none;
+			}
+			.iv-analytics .iv-seg[data-role="range-control"] {
+				flex: 1;
+				display: flex;
+			}
+			.iv-analytics .iv-seg[data-role="range-control"] .iv-seg-btn {
+				flex: 1;
+			}
+		}
+
+		.iv-analytics .iv-live-head {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+		.iv-analytics .iv-live-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 10.5px;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			color: var(--iv-success);
+		}
+		.iv-analytics .iv-live-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: var(--iv-success);
+			position: relative;
+		}
+		.iv-analytics .iv-live-dot::after {
+			content: "";
+			position: absolute;
+			inset: -4px;
+			border-radius: 50%;
+			border: 2px solid var(--iv-success);
+			animation: iv-pulse 2s ease-out infinite;
+		}
+		.iv-analytics .iv-live-row {
+			display: flex;
+			align-items: center;
+			gap: 20px;
+			flex-wrap: wrap;
+		}
+		.iv-analytics .iv-live-number {
+			font-size: 30px;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+			line-height: 1;
+		}
+		.iv-analytics .iv-chip {
+			display: inline-flex;
+			align-items: baseline;
+			gap: 6px;
+			padding: 6px 12px;
+			border: 1px solid var(--iv-border);
+			border-radius: 999px;
+			font-size: 12px;
+			background: var(--bg-color);
+		}
+		.iv-analytics .iv-chip strong {
+			font-size: 13px;
+			font-weight: 650;
+			color: var(--text-color);
+		}
+		.iv-analytics .iv-chip span {
+			color: var(--text-muted);
+			font-size: 11px;
+		}
+
+		.iv-analytics .iv-kpi-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+		.iv-analytics .iv-kpi {
+			background: var(--card-bg);
+			border: 1px solid var(--iv-border);
+			border-radius: 12px;
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+			padding: 14px 16px;
+			min-width: 0;
+		}
+		.iv-analytics .iv-kpi-value {
+			font-size: 24px;
+			font-weight: 650;
+			letter-spacing: -0.02em;
+			margin: 6px 0;
+			line-height: 1.1;
+		}
+		.iv-analytics .iv-delta,
+		.iv-analytics .iv-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 11px;
+			font-weight: 600;
+			padding: 2px 8px;
+			border-radius: 999px;
+			white-space: nowrap;
+		}
+		.iv-analytics .iv-delta.up {
+			color: var(--iv-success);
+			background: color-mix(in srgb, var(--iv-success) 12%, transparent);
+		}
+		.iv-analytics .iv-delta.down {
+			color: var(--iv-danger);
+			background: color-mix(in srgb, var(--iv-danger) 10%, transparent);
+		}
+		.iv-analytics .iv-delta.flat {
+			color: var(--text-muted);
+			background: color-mix(in srgb, var(--iv-border) 45%, transparent);
+		}
+		.iv-analytics .iv-pill.green {
+			color: var(--iv-success);
+			background: color-mix(in srgb, var(--iv-success) 12%, transparent);
+		}
+		.iv-analytics .iv-pill.amber {
+			color: var(--iv-warning);
+			background: color-mix(in srgb, var(--iv-warning) 14%, transparent);
+		}
+		.iv-analytics .iv-pill.red {
+			color: var(--iv-danger);
+			background: color-mix(in srgb, var(--iv-danger) 10%, transparent);
+		}
+		.iv-analytics .iv-pill.muted {
+			color: var(--text-muted);
+			background: color-mix(in srgb, var(--iv-border) 45%, transparent);
+		}
+
+		.iv-analytics .iv-grid-2 {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 16px;
+		}
+		.iv-analytics .iv-grid-3 {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 16px;
+			align-items: start;
+		}
+		.iv-analytics .iv-grid-2 > *,
+		.iv-analytics .iv-grid-3 > * {
+			min-width: 0;
+		}
+		@media (max-width: 960px) {
+			.iv-analytics .iv-grid-2,
+			.iv-analytics .iv-grid-3 {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.iv-analytics .iv-chart-box {
+			height: 300px;
+			position: relative;
+		}
+		.iv-analytics .iv-donut-box {
+			height: 180px;
+			position: relative;
+			margin-bottom: 12px;
+		}
+		.iv-analytics .iv-donut-center {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			pointer-events: none;
+		}
+		.iv-analytics .iv-donut-center strong {
+			font-size: 20px;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+		}
+		.iv-analytics .iv-spark-box {
+			height: 46px;
+			position: relative;
+			margin-top: 10px;
+		}
+
+		.iv-analytics .iv-funnel-drop {
+			text-align: center;
+			font-size: 10.5px;
+			color: var(--text-muted);
+			margin: 14px 0 10px;
+		}
+		.iv-analytics .iv-funnel-stage-caption {
+			text-align: center;
+			font-size: 11.5px;
+			margin-top: 6px;
+		}
+		.iv-analytics .iv-funnel-stage-caption .stage-name {
+			font-weight: 600;
+		}
+		.iv-analytics .iv-funnel-stage-caption .stage-value {
+			color: var(--text-muted);
+		}
+		.iv-analytics .iv-funnel-wrap {
+			display: flex;
+			justify-content: center;
+		}
+		.iv-analytics .iv-funnel-stage {
+			height: 42px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			font-size: 13px;
+			font-weight: 600;
+			min-width: 56px;
+			white-space: nowrap;
+			transition: width 0.4s ease;
+		}
+		.iv-analytics .iv-funnel-stage[data-step="1"] { background: var(--iv-funnel-1); color: var(--iv-funnel-ink-1); }
+		.iv-analytics .iv-funnel-stage[data-step="2"] { background: var(--iv-funnel-2); color: var(--iv-funnel-ink-2); }
+		.iv-analytics .iv-funnel-stage[data-step="3"] { background: var(--iv-funnel-3); color: var(--iv-funnel-ink-3); }
+		.iv-analytics .iv-funnel-stage[data-step="4"] { background: var(--iv-funnel-4); color: var(--iv-funnel-ink-4); }
+		.iv-analytics .iv-funnel-stage[data-step="5"] { background: var(--iv-funnel-5); color: var(--iv-funnel-ink-5); }
+
+		.iv-analytics .iv-scroll-x {
+			overflow-x: auto;
+		}
+		.iv-analytics .iv-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 12.5px;
+		}
+		.iv-analytics .iv-table th {
+			text-align: left;
+			font-size: 10.5px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-muted);
+			padding: 6px 8px;
+			border-bottom: 1px solid var(--iv-border);
+		}
+		.iv-analytics .iv-table td {
+			padding: 9px 8px;
+			border-bottom: 1px solid color-mix(in srgb, var(--iv-border) 55%, transparent);
+			vertical-align: middle;
+		}
+		.iv-analytics .iv-table tbody tr:last-child td {
+			border-bottom: 0;
+		}
+		.iv-analytics .iv-table tbody tr:hover {
+			background: color-mix(in srgb, var(--iv-primary) 4%, transparent);
+		}
+		.iv-analytics .iv-table .num {
+			text-align: right;
+			font-variant-numeric: tabular-nums;
+		}
+		.iv-analytics .iv-td-stretch {
+			width: 100%;
+			max-width: 0;
+		}
+		.iv-analytics .iv-table-note {
+			font-size: 11px;
+			color: var(--text-muted);
+			margin-top: 8px;
+			text-align: right;
+		}
+		.iv-analytics .iv-cell-main {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			min-width: 0;
+		}
+		.iv-analytics .iv-cell-name {
+			display: block;
+			font-weight: 500;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.iv-analytics .iv-prod-img {
+			width: 32px;
+			height: 32px;
+			border-radius: 8px;
+			object-fit: cover;
+			border: 1px solid var(--iv-border);
+			flex-shrink: 0;
+		}
+		.iv-analytics .iv-avatar {
+			width: 32px;
+			height: 32px;
+			border-radius: 8px;
+			background: color-mix(in srgb, var(--iv-primary) 12%, transparent);
+			color: var(--iv-primary);
+			display: none;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 13px;
+			flex-shrink: 0;
+		}
+		.iv-analytics .iv-avatar.show {
+			display: flex;
+		}
+		.iv-analytics .iv-bar-track {
+			height: 4px;
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--iv-primary) 10%, transparent);
+			min-width: 60px;
+		}
+		.iv-analytics .iv-bar-fill {
+			height: 100%;
+			border-radius: 999px;
+			background: var(--iv-primary);
+		}
+
+		.iv-analytics .iv-stat-chips {
+			display: flex;
+			gap: 12px;
+			flex-wrap: wrap;
+			margin-bottom: 14px;
+		}
+		.iv-analytics .iv-stat-chip {
+			flex: 1;
+			min-width: 140px;
+			border: 1px solid var(--iv-border);
+			border-radius: 10px;
+			padding: 10px 14px;
+			background: var(--bg-color);
+		}
+		.iv-analytics .iv-stat-chip strong {
+			display: block;
+			font-size: 18px;
+			font-weight: 650;
+			letter-spacing: -0.01em;
+			margin-top: 2px;
+		}
+
+		.iv-analytics .iv-heatmap {
+			display: grid;
+			grid-template-columns: 36px repeat(24, minmax(16px, 1fr));
+			gap: 3px;
+			align-items: center;
+			min-width: 680px;
+		}
+		.iv-analytics .iv-heat-hour {
+			font-size: 10px;
+			color: var(--text-muted);
+			text-align: center;
+			overflow: visible;
+			white-space: nowrap;
+		}
+		.iv-analytics .iv-heat-day {
+			font-size: 10.5px;
+			font-weight: 600;
+			color: var(--text-muted);
+		}
+		.iv-analytics .iv-heat-cell {
+			height: 20px;
+			border-radius: 4px;
+			background: color-mix(in srgb, var(--iv-border) 35%, transparent);
+		}
+		.iv-analytics .iv-heat-cell:hover {
+			outline: 1.5px solid var(--iv-primary);
+			outline-offset: 1px;
+		}
+		.iv-analytics .iv-heat-legend {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 12px;
+			font-size: 10.5px;
+			color: var(--text-muted);
+		}
+		.iv-analytics .iv-heat-scale {
+			width: 120px;
+			height: 8px;
+			border-radius: 999px;
+			background: linear-gradient(90deg, color-mix(in srgb, var(--iv-primary) 8%, transparent), var(--iv-primary));
+		}
+
+		.iv-analytics .iv-warnrow {
+			display: flex;
+			gap: 8px;
+			align-items: flex-start;
+			padding: 10px 12px;
+			border-radius: 8px;
+			font-size: 12px;
+			line-height: 1.45;
+			color: var(--text-color);
+			background: color-mix(in srgb, var(--iv-warning) 10%, transparent);
+			border: 1px solid color-mix(in srgb, var(--iv-warning) 35%, transparent);
+			word-break: break-word;
+		}
+		.iv-analytics .iv-warnrow svg {
+			flex-shrink: 0;
+			margin-top: 1px;
+			color: var(--iv-warning);
+		}
+		.iv-analytics .iv-int-stats {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 8px 14px;
+		}
+		.iv-analytics .iv-int-stat strong {
+			display: block;
+			font-size: 16px;
+			font-weight: 650;
+			margin-top: 1px;
+		}
+		.iv-analytics .iv-int-stat span {
+			font-size: 10.5px;
+			color: var(--text-muted);
+			text-transform: capitalize;
+		}
+
+		.iv-analytics .iv-shortcuts {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+			gap: 12px;
+		}
+		.iv-analytics .iv-shortcut {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			padding: 12px 14px;
+			border: 1px solid var(--iv-border);
+			border-radius: 10px;
+			background: var(--card-bg);
+			color: var(--text-color);
+			font-size: 13px;
+			font-weight: 500;
+			text-decoration: none;
+			transition: border-color 0.15s ease, color 0.15s ease;
+		}
+		.iv-analytics .iv-shortcut:hover {
+			border-color: var(--iv-primary);
+			color: var(--iv-primary);
+			text-decoration: none;
+		}
+		.iv-analytics .iv-shortcut svg {
+			color: var(--iv-primary);
+			flex-shrink: 0;
+		}
+
+		.iv-analytics .iv-empty,
+		.iv-analytics .iv-error {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
+			padding: 28px 16px;
+			color: var(--text-muted);
+			font-size: 12.5px;
+			text-align: center;
+		}
+		.iv-analytics .iv-error a,
+		.iv-analytics .iv-empty a {
+			color: var(--iv-primary);
+			font-weight: 600;
+			cursor: pointer;
+		}
+		.iv-analytics .iv-empty a {
+			font-size: 12px;
+		}
+		.iv-analytics .iv-legend {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+		.iv-analytics .iv-legend-row {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 12px;
+		}
+		.iv-analytics .iv-legend-row .swatch {
+			width: 10px;
+			height: 10px;
+			border-radius: 3px;
+			flex-shrink: 0;
+		}
+		.iv-analytics .iv-legend-row .grow {
+			flex: 1;
+			font-weight: 500;
+		}
+		.iv-analytics .iv-legend-row .muted {
+			color: var(--text-muted);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.iv-analytics .iv-row-click {
+			cursor: pointer;
+		}
+		.iv-analytics.iv-in-dialog {
+			max-width: none;
+			padding: 0;
+		}
+		.iv-analytics .iv-item-caption {
+			font-size: 11.5px;
+			color: var(--text-muted);
+			margin-bottom: 12px;
+		}
+		.iv-analytics .iv-item-avg {
+			display: block;
+			font-size: 10.5px;
+			font-weight: 600;
+			margin-top: 3px;
+		}
+		.iv-analytics .iv-item-avg.up {
+			color: var(--iv-success);
+		}
+		.iv-analytics .iv-item-avg.down {
+			color: var(--iv-danger);
+		}
+
+		.iv-analytics .iv-dim {
+			opacity: 0.55;
+			transition: opacity 0.2s ease;
+		}
+		.iv-analytics .iv-fade {
+			animation: iv-fade-in 0.25s ease;
+		}
+		.iv-analytics .iv-skel {
+			background: linear-gradient(90deg, color-mix(in srgb, var(--iv-border) 40%, transparent) 25%, color-mix(in srgb, var(--iv-border) 75%, transparent) 50%, color-mix(in srgb, var(--iv-border) 40%, transparent) 75%);
+			background-size: 200% 100%;
+			animation: iv-shimmer 1.4s linear infinite;
+			border-radius: 6px;
+		}
+		.iv-analytics .iv-skel-micro { width: 90px; height: 10px; }
+		.iv-analytics .iv-skel-value { width: 120px; height: 26px; margin: 10px 0 8px; }
+		.iv-analytics .iv-skel-chipsm { width: 64px; height: 16px; border-radius: 999px; }
+		.iv-analytics .iv-skel-chip { width: 130px; height: 30px; border-radius: 999px; }
+		.iv-analytics .iv-skel-chart { height: 280px; border-radius: 10px; }
+		.iv-analytics .iv-skel-row { height: 34px; margin-bottom: 8px; }
+		.iv-analytics .iv-skel-line { height: 12px; width: 60%; }
+		.iv-analytics .iv-skel-chips {
+			display: flex;
+			gap: 12px;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		@keyframes iv-shimmer {
+			from { background-position: 200% 0; }
+			to { background-position: -200% 0; }
+		}
+		@keyframes iv-pulse {
+			0% { transform: scale(0.5); opacity: 0.6; }
+			100% { transform: scale(1.5); opacity: 0; }
+		}
+		@keyframes iv-fade-in {
+			from { opacity: 0; transform: translateY(4px); }
+			to { opacity: 1; transform: none; }
+		}
+		@keyframes iv-spin {
+			to { transform: rotate(360deg); }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.iv-analytics *,
+			.iv-analytics *::after {
+				animation: none !important;
+				transition: none !important;
+			}
+		}
+	</style>
+
+	<div class="iv-toolbar">
+		<div class="iv-seg" data-role="range-control">
+			<button type="button" class="iv-seg-btn" data-range="today">Today</button>
+			<button type="button" class="iv-seg-btn" data-range="7">7D</button>
+			<button type="button" class="iv-seg-btn active" data-range="30">30D</button>
+			<button type="button" class="iv-seg-btn" data-range="90">90D</button>
+		</div>
+		<div class="iv-toolbar-caption" data-role="range-caption"></div>
+		<button type="button" class="iv-refresh-btn" data-role="refresh">
+			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+			Refresh
+		</button>
+	</div>
+
+	<section class="iv-card" data-widget="live">
+		<div class="iv-card-head" style="margin-bottom: 10px;">
+			<div class="iv-live-head">
+				<span class="iv-live-badge"><span class="iv-live-dot"></span>LIVE</span>
+				<span class="iv-card-sub">Right now on your store · updates every 30s</span>
+			</div>
+		</div>
+		<div data-body>
+			<div class="iv-skel-chips">
+				<div class="iv-skel iv-skel-chip"></div>
+				<div class="iv-skel iv-skel-chip"></div>
+				<div class="iv-skel iv-skel-chip"></div>
+				<div class="iv-skel iv-skel-chip"></div>
+			</div>
+		</div>
+	</section>
+
+	<section data-widget="kpis">
+		<div class="iv-kpi-grid" data-body>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+			<div class="iv-kpi"><div class="iv-skel iv-skel-micro"></div><div class="iv-skel iv-skel-value"></div><div class="iv-skel iv-skel-chipsm"></div></div>
+		</div>
+	</section>
+
+	<section class="iv-card" data-widget="sales">
+		<div class="iv-card-head">
+			<div>
+				<div class="iv-card-title">Sales over time</div>
+				<div class="iv-card-sub">Revenue and order volume across the selected period</div>
+			</div>
+		</div>
+		<div data-body>
+			<div class="iv-skel iv-skel-chart"></div>
+		</div>
+	</section>
+
+	<section class="iv-card" data-widget="funnel">
+		<div class="iv-card-head">
+			<div>
+				<div class="iv-card-title">Conversion funnel</div>
+				<div class="iv-card-sub">From session to purchase</div>
+			</div>
+			<div class="iv-seg" data-role="device-control">
+				<button type="button" class="iv-seg-btn active" data-device="">All</button>
+				<button type="button" class="iv-seg-btn" data-device="desktop">Desktop</button>
+				<button type="button" class="iv-seg-btn" data-device="mobile">Mobile</button>
+				<button type="button" class="iv-seg-btn" data-device="tablet">Tablet</button>
+			</div>
+		</div>
+		<div data-body>
+			<div class="iv-skel iv-skel-row" style="width: 100%;"></div>
+			<div class="iv-skel iv-skel-row" style="width: 78%; margin-left: 11%;"></div>
+			<div class="iv-skel iv-skel-row" style="width: 56%; margin-left: 22%;"></div>
+			<div class="iv-skel iv-skel-row" style="width: 36%; margin-left: 32%;"></div>
+			<div class="iv-skel iv-skel-row" style="width: 20%; margin-left: 40%;"></div>
+		</div>
+	</section>
+
+	<div class="iv-grid-2">
+		<section class="iv-card" data-widget="top_products">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Top products</div>
+					<div class="iv-card-sub">Best sellers in the selected period</div>
+				</div>
+				<div class="iv-seg" data-role="product-sort-control">
+					<button type="button" class="iv-seg-btn active" data-sort="revenue">Revenue</button>
+					<button type="button" class="iv-seg-btn" data-sort="units">Units</button>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+
+		<section class="iv-card" data-widget="engagement">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Product engagement</div>
+					<div class="iv-card-sub">Views to purchases, product by product</div>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+	</div>
+
+	<div class="iv-grid-2">
+		<section class="iv-card" data-widget="traffic">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Traffic sources</div>
+					<div class="iv-card-sub">Where sessions and revenue come from</div>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+
+		<section class="iv-card">
+			<div data-widget="devices">
+				<div class="iv-card-head">
+					<div>
+						<div class="iv-card-title">Devices</div>
+						<div class="iv-card-sub">Sessions and conversion by device</div>
+					</div>
+				</div>
+				<div data-body>
+					<div class="iv-skel" style="height: 180px; border-radius: 50%; width: 180px; margin: 0 auto 12px;"></div>
+				</div>
+			</div>
+			<div data-widget="landing" style="margin-top: 16px;">
+				<div class="iv-micro" style="margin-bottom: 8px;">Top landing pages</div>
+				<div data-body>
+					<div class="iv-skel iv-skel-row"></div>
+					<div class="iv-skel iv-skel-row"></div>
+					<div class="iv-skel iv-skel-row"></div>
+				</div>
+			</div>
+		</section>
+	</div>
+
+	<section class="iv-card" data-widget="abandoned">
+		<div class="iv-card-head">
+			<div>
+				<div class="iv-card-title">Abandoned carts</div>
+				<div class="iv-card-sub">Carts left behind — and what they are worth</div>
+			</div>
+		</div>
+		<div data-body>
+			<div class="iv-skel-chips" style="margin-bottom: 12px;">
+				<div class="iv-skel iv-skel-chip"></div>
+				<div class="iv-skel iv-skel-chip"></div>
+				<div class="iv-skel iv-skel-chip"></div>
+			</div>
+			<div class="iv-skel iv-skel-row"></div>
+			<div class="iv-skel iv-skel-row"></div>
+			<div class="iv-skel iv-skel-row"></div>
+		</div>
+	</section>
+
+	<section class="iv-card" data-widget="heatmap">
+		<div class="iv-card-head">
+			<div>
+				<div class="iv-card-title">Sales by hour</div>
+				<div class="iv-card-sub">When your customers order, across the week</div>
+			</div>
+		</div>
+		<div data-body>
+			<div class="iv-skel iv-skel-row"></div>
+			<div class="iv-skel iv-skel-row"></div>
+			<div class="iv-skel iv-skel-row"></div>
+			<div class="iv-skel iv-skel-row"></div>
+		</div>
+	</section>
+
+	<div class="iv-grid-3">
+		<section class="iv-card" data-widget="ga4">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Google Analytics 4</div>
+					<div class="iv-card-sub">Last 30 days, from the GA4 API</div>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+
+		<section class="iv-card" data-widget="meta">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Meta Pixel</div>
+					<div class="iv-card-sub">Last 30 days, from the Meta API</div>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+
+		<section class="iv-card" data-widget="health">
+			<div class="iv-card-head">
+				<div>
+					<div class="iv-card-title">Tracking health</div>
+					<div class="iv-card-sub">Do all your trackers agree?</div>
+				</div>
+			</div>
+			<div data-body>
+				<div class="iv-skel iv-skel-row"></div>
+				<div class="iv-skel iv-skel-row"></div>
+			</div>
+		</section>
+	</div>
+
+	<section class="iv-card">
+		<div class="iv-card-head">
+			<div>
+				<div class="iv-card-title">Shortcuts</div>
+				<div class="iv-card-sub">Jump to the records behind these numbers</div>
+			</div>
+		</div>
+		<div class="iv-shortcuts">
+			<a class="iv-shortcut" href="/app/dashboard-view/Storefront Analytics">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+				Storefront Analytics
+			</a>
+			<a class="iv-shortcut" href="/app/sales-order?order_type=Shopping%20Cart">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+				Sales Orders
+			</a>
+			<a class="iv-shortcut" href="/app/quotation?order_type=Shopping%20Cart&docstatus=0">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+				Draft Carts
+			</a>
+			<a class="iv-shortcut" href="/app/analytics-settings">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+				Analytics Settings
+			</a>
+			<a class="iv-shortcut" href="/app/storefront-analytics-event">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+				Storefront Events
+			</a>
+			<a class="iv-shortcut" href="/app/query-report/Top Selling Products">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+				Top Selling Products
+			</a>
+			<a class="iv-shortcut" href="/app/query-report/Product Conversion">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+				Product Conversion
+			</a>
+		</div>
+	</section>
+</div>

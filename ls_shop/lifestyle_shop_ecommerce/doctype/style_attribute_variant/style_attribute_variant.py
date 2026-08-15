@@ -30,6 +30,12 @@ class StyleAttributeVariant(Document):
 		is_published: DF.Check
 		item_group: DF.Link | None
 		item_style: DF.Link
+		json_ld: DF.Code | None
+		meta_description: DF.SmallText | None
+		meta_keywords: DF.Data | None
+		meta_title: DF.Data | None
+		noindex: DF.Check
+		og_image: DF.AttachImage | None
 		route: DF.Data | None
 		sizes: DF.Table[ColorSizeItem]
 

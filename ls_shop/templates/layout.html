@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+{% from "templates/macros/seo.html" import seo_meta, json_ld_block %}
 {% set settings = frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings") %}
 {% set store_name = settings.store_name or "Lifestyle" %}
 {% set favicon = settings.favicon or "/assets/ls_shop/images/meta/favicon-32x32.png" %}
@@ -7,7 +8,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ _(store_name) }}</title>
+
+    {# Kept as overridable blocks: a theme that replaces this layout must be able to
+       restate the SEO head without re-deriving it, and must not silently drop it. #}
+    {% block seo %}{{ seo_meta(seo if seo is defined and seo else seo_page_meta()) }}{% endblock %}
+    {% block json_ld %}{{ json_ld_block(json_ld if json_ld is defined and json_ld else seo_org_jsonld()) }}{% endblock %}
+
+    {% block analytics_head %}
+    {% include "templates/includes/ga4.html" %}
+    {% include "templates/includes/meta-pixel.html" %}
+    {% include "templates/includes/custom-tracking-scripts.html" %}
+    {% endblock %}
 
     <!-- meta -->
     <link rel="apple-touch-icon" sizes="180x180" href="{{ favicon }}">
@@ -83,6 +94,7 @@
     </main>
 
     {% include "templates/includes/footer.html" %}
+    {% block analytics_events %}{% include "templates/includes/analytics-events.html" %}{% endblock %}
 </body>
 {% block script %} {% endblock %}
 </html>
