@@ -7,10 +7,9 @@ from frappe.query_builder import DocType
 from frappe.utils import create_batch
 
 from ls_shop.search.sync import enqueue_upsert_many
+from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
 PRODUCT_DOCTYPE = "Style Attribute Variant"
-
-IN_CLAUSE_CHUNK_SIZE = 1000
 
 
 def chunked(values):

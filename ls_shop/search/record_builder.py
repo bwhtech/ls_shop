@@ -2,8 +2,7 @@ import frappe
 from frappe.utils import cint, create_batch, cstr
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
-
-IN_CLAUSE_CHUNK_SIZE = 1000
+from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
 ALLOWED_CONTENT_DOCTYPES = ("Item", "Style Attribute Variant", "Style Attribute Configurator")

@@ -23,8 +23,7 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input im
 	require_value,
 )
 from ls_shop.search.sync import enqueue_upsert, enqueue_upsert_many
-
-IN_CLAUSE_CHUNK_SIZE = 1000
+from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
 ITEM_GROUP_RANGE_CHUNK_SIZE = 100
 
