@@ -1,16 +1,6 @@
 // Copyright (c) 2025, company@bwhstudios.com and contributors
 // For license information, please see license.txt
 
-const INDEXABLE_FIELDTYPES = [
-	'Data',
-	'Select',
-	'Small Text',
-	'Text',
-	'Long Text',
-	'Link',
-	'Read Only',
-];
-
 frappe.ui.form.on('Lifestyle Settings', {
 	async refresh(frm) {
 		const response = await frm.call('get_result_card_field_options');
@@ -126,19 +116,15 @@ frappe.ui.form.on('Search Content Field', {
 		if (!row.search_doctype) {
 			return;
 		}
-		await frappe.model.with_doctype(row.search_doctype);
-		const options = frappe
-			.get_meta(row.search_doctype)
-			.fields.filter(
-				(df) => df.fieldname && INDEXABLE_FIELDTYPES.includes(df.fieldtype),
-			)
-			.map((df) => df.fieldname);
+		const response = await frm.call('get_content_field_options', {
+			search_doctype: row.search_doctype,
+		});
 		// update_docfield_property sets options grid-wide — the core-sanctioned pattern that survives
 		// a grid refresh, unlike the per-row trick which gets wiped.
 		frm.fields_dict.search_content_fields.grid.update_docfield_property(
 			'field',
 			'options',
-			[''].concat(options),
+			response.message || '',
 		);
 	},
 });
