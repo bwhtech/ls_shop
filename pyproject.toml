@@ -4,7 +4,7 @@ authors = [
     { name = "hussain@buildwithhussain.com", email = "rahul@buildwithhussain.com"}
 ]
 description = "Ecommerce extension for ERPNext"
-requires-python = ">=3.10"
+requires-python = ">=3.14,<3.15"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
