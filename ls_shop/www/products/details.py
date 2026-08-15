@@ -1,64 +1,27 @@
 import frappe
-from frappe.utils.caching import site_cache
 
+from ls_shop import seo
+from ls_shop.product_detail import get_product_detail
 from ls_shop.utils import get_available_stock, get_discount_percent, get_product_list
 
 
 def get_context(context):
-	# Get route and size from URL
 	product_route = frappe.form_dict.get("route")
-	selected_size = frappe.form_dict.get("size")
-	size_selected = selected_size
+	size_selected = frappe.form_dict.get("size")
 
-	# Get settings
-	lifestyle_settings = frappe.get_cached_doc("Lifestyle Settings")
-	warehouse = lifestyle_settings.ecommerce_warehouse
-
-	try:
-		# Fetch product variant and related item
-		product_variant = frappe.get_doc("Style Attribute Variant", {"route": product_route})
-		product = frappe.get_doc("Item", product_variant.item_style)
-
-		# Get available sizes and selected item
-		available_sizes = get_available_sizes(product_variant, warehouse)
-		selected_item = get_selected_item(available_sizes, selected_size)
-		if not selected_item:
-			selected_item = available_sizes[0] if available_sizes else None
-
-		# Default to first size if none selected
-		if not selected_size:
-			selected_size = selected_item["size"]
-
-		# Get prices
-		default_price_list = lifestyle_settings.get_default_price_list()
-		sale_price_list = lifestyle_settings.get_sale_price_list()
-		price_data = {
-			"default_price": get_price_data(selected_item, default_price_list),
-			"sale_price": get_price_data(selected_item, sale_price_list),
-		}
-
-		recommended_items = get_recommended_products(product_variant)
-
-	except frappe.exceptions.DoesNotExistError:
+	detail = get_product_detail(product_route, size_selected)
+	if not detail:
 		raise frappe.PageDoesNotExistError()
 
-	if not product_variant.is_published:
-		raise frappe.PageDoesNotExistError()
+	product_variant = detail["product_variant"]
+	product = detail["product"]
+	selected_item = detail["selected_item"]
 
-	# Get other variants
-	other_variants = get_other_variants(product_variant)
-
-	# Basic context setup
 	context.product_variant = product_variant
 	context.product = product
-	context.images = (
-		[image.image for image in product_variant.images]
-		if product_variant.images
-		else [default_product_image()]
-	)
-	context.product_in_stock = selected_item.get("stock_detail", {}).get("stock_qty", 0) > 0
+	context.images = detail["images"]
+	context.product_in_stock = detail["in_stock"]
 
-	# Enrich selected item details
 	selected_item_doc = frappe.get_cached_doc("Item", selected_item["item_code"])
 	selected_item.update(
 		{
@@ -71,26 +34,47 @@ def get_context(context):
 		}
 	)
 
-	# Set final context values
-	context.available_sizes = available_sizes
-	context.selected_size = selected_size
+	context.available_sizes = detail["available_sizes"]
+	context.selected_size = detail["selected_size"]
 	context.size_selected = size_selected
 	context.selected_item = selected_item
-	context.selected_price = price_data["sale_price"]
-	context.default_price = price_data["default_price"]
-	context.recommended_items = recommended_items
-	context.other_variants = other_variants
-	context.discount_percent = get_discount_percent(price_data["default_price"], price_data["sale_price"])
+	context.selected_price = detail["sale_price"]
+	context.default_price = detail["default_price"]
+	context.recommended_items = get_recommended_products(product_variant)
+	context.other_variants = get_other_variants(product_variant)
+	context.discount_percent = get_discount_percent(detail["default_price"], detail["sale_price"])
 	context.size_chart = get_size_chart(product.brand, product_variant.item_group)
-	context.item_qty = get_available_stock(product.item_code, warehouse)
+	context.item_qty = get_available_stock(product.item_code, detail["warehouse"])
 	context.breadcrumbs = [
 		{"label": "Products", "href": f"/{frappe.local.lang}/products/"},
 		{"label": product_variant.display_name, "href": ""},
 	]
 
+	add_seo(context, detail)
 
-def default_product_image():
-	return "/assets/ls_shop/images/1.jpg"
+
+def add_seo(context, detail):
+	product_variant = detail["product_variant"]
+	price = detail["sale_price"] or detail["default_price"]
+	availability = "InStock" if detail["in_stock"] else "OutOfStock"
+
+	context.seo = seo.build_product_seo(
+		product_variant,
+		detail["product"],
+		image_url=f"/og-image/{product_variant.route}.png",
+		price=price,
+		availability=availability,
+	)
+	context.json_ld = [
+		seo.build_product_json_ld(
+			product_variant,
+			detail["product"],
+			images=detail["images"],
+			price=price,
+			availability=availability,
+		),
+		seo.build_breadcrumb_json_ld(context.breadcrumbs),
+	]
 
 
 def get_recommended_products(product_variant):
@@ -108,83 +92,22 @@ def get_recommended_products(product_variant):
 	return get_product_list(product_list=style_attribute_variants)
 
 
-def get_available_sizes(product_variant, warehouse):
-	size_order_list = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
-
-	sizes = [
-		{
-			"item_code": size.item_code,
-			"size": size.size,
-			"stock_detail": get_available_stock(size.item_code, warehouse),
-		}
-		for size in product_variant.sizes
-	]
-
-	first_size = sizes[0]["size"]
-	is_numeric = False
-	try:
-		float(first_size)
-		is_numeric = True
-	except ValueError:
-		pass
-
-	if is_numeric:
-		sorted_sizes = sorted(sizes, key=lambda x: float(x["size"]))
-	else:
-		sorted_sizes = sorted(
-			sizes,
-			key=lambda x: size_order_list.index(x["size"].upper())
-			if x["size"].upper() in size_order_list
-			else 999,
-		)
-
-	return sorted_sizes
-
-
-def get_price_data(selected_item, price_list):
-	price = frappe.get_cached_value(
-		"Item Price",
-		{
-			"item_code": selected_item["item_code"],
-			"price_list": price_list,
-		},
-		"price_list_rate",
-	)
-	if price is None:
-		price = 0.0
-	return price
-
-
 def get_other_variants(product_variant):
-	variants = frappe.db.get_all(
+	variants = frappe.get_all(
 		"Style Attribute Variant",
 		filters={
 			"configurator": product_variant.configurator,
 			"name": ("!=", product_variant.name),
 			"is_published": True,
 		},
-		fields=["name"],
+		pluck="name",
 	)
-	variants = [variant["name"] for variant in variants]
 	if not variants:
 		return []
-	other_variants = get_product_list(product_list=variants)
-	return other_variants
-
-
-def get_selected_item(available_sizes, selected_size):
-	return next(
-		(s for s in available_sizes if s["size"] == selected_size),
-		next(
-			(s for s in available_sizes if s["stock_detail"].get("in_stock") == 1),
-			None,  # fallback if none are in stock
-		),
-	)
+	return get_product_list(product_list=variants)
 
 
 def get_size_chart(brand, item_group):
-	size_chart = frappe.get_cached_value(
+	return frappe.get_cached_value(
 		"Size Chart", {"brand": brand, "item_group": item_group}, "size_chart_json"
 	)
-
-	return size_chart

@@ -4,6 +4,7 @@ no_cache = True
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Min
 
+from ls_shop import seo
 from ls_shop.utils import get_product_list
 
 
@@ -20,6 +21,16 @@ def get_context(context):
 	context["best_picks"] = best_picks
 
 	context.show_breadcrumb = False
+
+	settings = seo.get_seo_settings()
+	context.seo = seo.build_page_seo(
+		{
+			"meta_title": settings.get("homepage_meta_title"),
+			"meta_description": settings.get("homepage_meta_description"),
+			"og_image": settings.get("homepage_og_image"),
+		}
+	)
+	context.json_ld = seo.org_website_json_ld()
 
 
 def get_homepage_details():
