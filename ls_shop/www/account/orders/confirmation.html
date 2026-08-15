@@ -28,13 +28,13 @@
 
         // eventID lets Meta dedupe this browser hit against a future server-side Purchase.
         if (window.fbq) fbq('track', 'Purchase',
-            { value: order_value, currency: data.currency_code || window.fb_currency },
+            { value: order_value, currency: data.currency || window.fb_currency },
             { eventID: order_name });
 
         if (window.gtag) gtag('event', 'purchase', {
             transaction_id: order_name,
             value: order_value,
-            currency: data.currency_code || window.ga4_currency
+            currency: data.currency || window.ga4_currency
         });
     }
 

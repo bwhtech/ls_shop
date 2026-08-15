@@ -185,7 +185,7 @@ def build_product_json_ld(product_variant, product, images, price=None, availabi
 
 
 @frappe.whitelist()
-def generate_product_json_ld(variant: str):
+def generate_product_json_ld(variant: str | int):
 	# Deferred import: product_detail pulls in utils, which imports from seo at module top.
 	from ls_shop.product_detail import get_product_detail
 
