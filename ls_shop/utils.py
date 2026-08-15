@@ -7,7 +7,7 @@ from erpnext.selling.doctype.customer.customer import (
 from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
-from frappe.utils import add_days, flt, get_datetime, now_datetime
+from frappe.utils import add_days, cstr, flt, get_datetime, now_datetime
 from pypika import Order
 
 from ls_shop.core import get_address_docs, get_party
@@ -94,9 +94,13 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 			style_attribute_variant.route,
 			style_attribute_variant.item_style,
 			style_attribute_variant.display_name,
-			style_attribute_variant.attribute_name.as_("attribute_value"),
+			style_attribute_variant.attribute_value,
+			style_attribute_variant.attribute_name.as_("color"),
+			style_attribute_variant.item_group,
+			style_attribute_variant.modified,
 			item.brand,
 			item.item_name,
+			item.is_stock_item,
 			color_size_item.item_code.as_("variant_item_code"),
 			Min(item_price_default.price_list_rate).as_("default_price"),
 			Min(item_price_sale.price_list_rate).as_("sale_price"),
@@ -123,8 +127,44 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	else:
 		query = query.orderby("name", order=Order.asc)
 	# Execute Query
-	variants = query.run(as_dict=True)
-	return variants
+	return shape_product_cards(query.run(as_dict=True))
+
+
+def shape_product_cards(cards):
+	"""Give every product card the one storefront card shape, whichever grid built it.
+
+	The search modal is served by the index on one keystroke and by frappe.qb on the next, so a card
+	whose key set changes between the two makes the same product render differently. The index's
+	product_detail snapshot is the canonical shape; keys the frappe.qb select cannot reach are
+	derived from what it did select.
+	"""
+	from ls_shop.search.record_builder import sizes_for_variants
+	from ls_shop.search.sqlite_product_search import SqliteProductSearch
+
+	if not cards:
+		return cards
+
+	unsized = [card["name"] for card in cards if card.get("sizes") is None]
+	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
+
+	for card in cards:
+		if card.get("sizes") is None:
+			card["sizes"] = sizes_by_variant.get(card["name"], [])
+		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
+			if column != "doc_id":
+				card.setdefault(column, None)
+		# Mirrors record_builder.aggregate_prices so a price a card was filtered or sorted by means
+		# the same thing on both grids.
+		if card["effective_price"] is None:
+			card["effective_price"] = (
+				card["sale_price"] if card["sale_price"] is not None else (card["default_price"] or 0)
+			)
+		if card["has_discount"] is None:
+			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
+		# frappe.qb hands back a datetime where the index snapshot holds a string, and the card is
+		# json.dumps'd straight into the wishlist attribute in item_card.html.
+		card["modified"] = cstr(card["modified"]) if card["modified"] else None
+	return cards
 
 
 def attach_live_prices(cards):

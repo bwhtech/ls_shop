@@ -43,11 +43,11 @@ def storefront_search(query, limit=20, facet_filters=None):
 
 def build_product_cards(product_names):
 	"""Hydrate ranked variant names into product cards from the index, preserving rank order."""
-	from ls_shop.utils import attach_live_prices
+	from ls_shop.utils import attach_live_prices, shape_product_cards
 
 	if not product_names:
 		return []
-	return attach_live_prices(get_search_engine().hydrate_cards(product_names))
+	return shape_product_cards(attach_live_prices(get_search_engine().hydrate_cards(product_names)))
 
 
 def listing_facets(selected_filters):
