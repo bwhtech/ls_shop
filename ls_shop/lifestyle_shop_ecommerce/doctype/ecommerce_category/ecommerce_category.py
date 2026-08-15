@@ -7,6 +7,28 @@ from frappe.utils import cstr
 
 
 class EcommerceCategory(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		category_name: DF.Data
+		display_name: DF.Data
+		display_order: DF.Int
+		enabled: DF.Check
+		icon: DF.Data | None
+		image: DF.AttachImage | None
+		item_group: DF.Link | None
+		meta_description: DF.SmallText | None
+		meta_title: DF.Data | None
+		noindex: DF.Check
+		og_image: DF.AttachImage | None
+		route_slug: DF.Data | None
+
+	# end: auto-generated types
 	def validate(self):
 		"""Validate before saving"""
 		self.validate_route_slug()

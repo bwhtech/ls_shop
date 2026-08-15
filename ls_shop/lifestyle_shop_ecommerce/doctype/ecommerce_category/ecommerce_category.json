@@ -16,7 +16,13 @@
 		"item_group",
 		"section_break_3",
 		"icon",
-		"image"
+		"image",
+		"seo_section",
+		"seo_preview",
+		"meta_title",
+		"meta_description",
+		"og_image",
+		"noindex"
 	],
 	"fields": [
 		{
@@ -85,6 +91,41 @@
 			"fieldname": "image",
 			"fieldtype": "Attach Image",
 			"label": "Image"
+		},
+		{
+			"collapsible": 1,
+			"fieldname": "seo_section",
+			"fieldtype": "Section Break",
+			"label": "Search Engine Listing"
+		},
+		{
+			"fieldname": "seo_preview",
+			"fieldtype": "HTML"
+		},
+		{
+			"description": "Overrides the page title. Defaults to display name + store name.",
+			"fieldname": "meta_title",
+			"fieldtype": "Data",
+			"label": "Meta Title"
+		},
+		{
+			"description": "Used as the meta description / OG description (truncated to 160 chars).",
+			"fieldname": "meta_description",
+			"fieldtype": "Small Text",
+			"label": "Meta Description"
+		},
+		{
+			"description": "Overrides the auto-generated social share image.",
+			"fieldname": "og_image",
+			"fieldtype": "Attach Image",
+			"label": "OG Image"
+		},
+		{
+			"default": "0",
+			"description": "Tell crawlers not to index this page.",
+			"fieldname": "noindex",
+			"fieldtype": "Check",
+			"label": "No Index"
 		}
 	],
 	"index_web_pages_for_search": 1,

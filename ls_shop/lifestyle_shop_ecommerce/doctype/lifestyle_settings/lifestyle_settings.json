@@ -68,6 +68,24 @@
   "snapchat_url",
   "column_break_social2",
   "tiktok_url",
+  "seo_tab",
+  "seo_global_defaults_section",
+  "seo_title_template",
+  "default_meta_description",
+  "default_share_image",
+  "seo_homepage_section",
+  "homepage_meta_title",
+  "homepage_meta_description",
+  "homepage_og_image",
+  "seo_product_list_section",
+  "product_list_meta_title",
+  "product_list_meta_description",
+  "product_list_og_image",
+  "seo_social_section",
+  "twitter_handle",
+  "seo_crawlers_section",
+  "sitemap_urls_per_page",
+  "llms_txt",
   "footer_customization_tab",
   "newsletter_title",
   "column_break_newsletter",
@@ -694,6 +712,106 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "fieldname": "seo_tab",
+   "fieldtype": "Tab Break",
+   "label": "SEO"
+  },
+  {
+   "fieldname": "seo_global_defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Global Defaults"
+  },
+  {
+   "default": "{title} | {store}",
+   "description": "Template for browser/meta titles. Placeholders: {title} (page title) and {store} (store name).",
+   "fieldname": "seo_title_template",
+   "fieldtype": "Data",
+   "label": "SEO Title Template"
+  },
+  {
+   "description": "Fallback meta description used when a page sets none.",
+   "fieldname": "default_meta_description",
+   "fieldtype": "Small Text",
+   "label": "Default Meta Description"
+  },
+  {
+   "description": "Fallback Open Graph / Twitter share image (1200x630 recommended).",
+   "fieldname": "default_share_image",
+   "fieldtype": "Attach Image",
+   "label": "Default Share Image"
+  },
+  {
+   "fieldname": "seo_homepage_section",
+   "fieldtype": "Section Break",
+   "label": "Homepage"
+  },
+  {
+   "fieldname": "homepage_meta_title",
+   "fieldtype": "Data",
+   "label": "Homepage Meta Title"
+  },
+  {
+   "fieldname": "homepage_meta_description",
+   "fieldtype": "Small Text",
+   "label": "Homepage Meta Description"
+  },
+  {
+   "description": "Open Graph image for the homepage (1200x630 recommended).",
+   "fieldname": "homepage_og_image",
+   "fieldtype": "Attach Image",
+   "label": "Homepage OG Image"
+  },
+  {
+   "fieldname": "seo_product_list_section",
+   "fieldtype": "Section Break",
+   "label": "Product Listing"
+  },
+  {
+   "fieldname": "product_list_meta_title",
+   "fieldtype": "Data",
+   "label": "Product List Meta Title"
+  },
+  {
+   "fieldname": "product_list_meta_description",
+   "fieldtype": "Small Text",
+   "label": "Product List Meta Description"
+  },
+  {
+   "description": "Open Graph image for the all-products listing page (1200x630 recommended).",
+   "fieldname": "product_list_og_image",
+   "fieldtype": "Attach Image",
+   "label": "Product List OG Image"
+  },
+  {
+   "fieldname": "seo_social_section",
+   "fieldtype": "Section Break",
+   "label": "Social"
+  },
+  {
+   "description": "Twitter/X @handle for twitter:site and twitter:creator (include the leading @).",
+   "fieldname": "twitter_handle",
+   "fieldtype": "Data",
+   "label": "Twitter Handle"
+  },
+  {
+   "fieldname": "seo_crawlers_section",
+   "fieldtype": "Section Break",
+   "label": "Crawlers & AI"
+  },
+  {
+   "default": "50000",
+   "description": "Maximum URLs per generated sitemap file. sitemaps.org caps a single sitemap at 50,000 URLs; leave at the default unless you have a reason to lower it.",
+   "fieldname": "sitemap_urls_per_page",
+   "fieldtype": "Int",
+   "label": "Sitemap URLs Per Page"
+  },
+  {
+   "description": "Content served at /llms.txt for AI crawlers. Leave blank to use the built-in default.",
+   "fieldname": "llms_txt",
+   "fieldtype": "Code",
+   "label": "llms.txt Content"
   }
  ],
  "index_web_pages_for_search": 1,
