@@ -219,6 +219,11 @@ def get_cod_configuration():
 	)
 
 
+def format_theme_css():
+	# jinja's safe globals return documents as plain dicts, so controller methods are unreachable from templates
+	return frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings").generate_theme_css()
+
+
 def get_currency_symbol():
 	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
 	if currency == "SAR" or frappe.conf.developer_mode:
