@@ -84,11 +84,18 @@ def add_footer_section(title: str):
 
 	title = require_value(title, frappe._("Column title is required."))
 
-	frappe.get_doc({"doctype": "Footer Section Config", "section_title": title}).insert()
+	# Point the mapping at the document's name rather than the title that was typed. They are equal
+	# today only because require_value strips the title and every other divergence autoname could
+	# introduce raises instead. A mapping row naming a document that does not exist is skipped
+	# silently by get_footer_editor_data, so the column would vanish from the board with no error —
+	# too quiet a failure to leave resting on that coincidence.
+	section = frappe.get_doc({"doctype": "Footer Section Config", "section_title": title}).insert()
 
 	settings = frappe.get_single("Lifestyle Settings")
 	next_order = max([row.section_order or 0 for row in settings.footer_sections], default=0) + 1
-	settings.append("footer_sections", {"footer_section": title, "section_order": next_order, "enabled": 1})
+	settings.append(
+		"footer_sections", {"footer_section": section.name, "section_order": next_order, "enabled": 1}
+	)
 	settings.save()
 
 	return get_footer_editor_data()
