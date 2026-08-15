@@ -88,11 +88,15 @@ website_route_rules = [
 before_request = ["ls_shop.utils.before_request"]
 
 doctype_js = {
-	"Item": "public/js/extends/item.js",
+	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
 	"Style Attribute Variant": "public/js/extends/seo_listing.js",
 	"Ecommerce Category": "public/js/extends/seo_listing.js",
-	"Lifestyle Settings": "public/js/extends/seo_listing.js",
+	"Lifestyle Settings": [
+		"public/js/extends/seo_listing.js",
+		"public/js/extends/footer_manager.js",
+		"public/js/extends/navbar_manager.js",
+	],
 }
 
 after_install = "ls_shop.migrate.after_install"
@@ -139,6 +143,8 @@ jinja = {
 		"ls_shop.utils.get_currency_symbol",
 		"ls_shop.search.result_card.get_search_result_fields",
 		"ls_shop.seo_jinja",
+		"ls_shop.shop_data.get_header_data",
+		"ls_shop.shop_data.get_storefront_menu",
 	],
 }
 

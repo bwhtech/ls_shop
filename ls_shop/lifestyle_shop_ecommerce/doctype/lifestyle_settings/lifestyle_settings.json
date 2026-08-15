@@ -96,6 +96,7 @@
   "copyright_text",
   "section_break_footer_sections",
   "footer_sections",
+  "footer_editor",
   "color_scheme_tab",
   "primary_color",
   "primary_hover_color",
@@ -120,6 +121,8 @@
   "footer_bg_color",
   "column_break_footer_colors",
   "footer_text_color",
+  "navbar_tab",
+  "navbar_editor",
   "communication_tab",
   "order_section",
   "order_confirmation_email_template",
@@ -798,6 +801,23 @@
    "fieldname": "llms_txt",
    "fieldtype": "Code",
    "label": "llms.txt Content"
+  },
+  {
+   "fieldname": "navbar_tab",
+   "fieldtype": "Tab Break",
+   "label": "Navbar"
+  },
+  {
+   "fieldname": "navbar_editor",
+   "fieldtype": "HTML",
+   "label": "Navbar Editor",
+   "description": "Manage the storefront's top navigation tabs, columns, links and brands here instead of jumping between Ecommerce Category, Item Group and Brand."
+  },
+  {
+   "fieldname": "footer_editor",
+   "fieldtype": "HTML",
+   "label": "Footer Editor",
+   "description": "Manage footer columns and links here instead of jumping between Footer Section Config and Footer Link."
   }
  ],
  "index_web_pages_for_search": 1,
