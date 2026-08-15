@@ -4,8 +4,9 @@
 import frappe
 from frappe.model.document import Document
 from frappe.query_builder import DocType
-from frappe.utils import create_batch
+from frappe.utils import cint, create_batch
 
+from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import parse_list
 from ls_shop.search.sync import enqueue_upsert_many
 from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -72,6 +73,24 @@ def save_publish_state(publish, changed_names):
 
 def publish_variants(publish, names=None, item_groups=None):
 	return save_publish_state(publish, get_variants_to_publish(publish, names=names, item_groups=item_groups))
+
+
+@frappe.whitelist(methods=["POST"])
+def set_variants_published(publish, names):
+	"""Publish or unpublish exactly the variants named, and nothing else.
+
+	`bulk_toggle_publish` ANDs this Single's *stored* filter fields into its query, so a filter left
+	behind on the Bulk Publish Variants form would silently shrink an explicit selection made
+	somewhere else — the Item ecommerce tab's "Publish all ready" would quietly publish a subset.
+	This path takes the names and no other criteria.
+	"""
+	frappe.has_permission(PRODUCT_DOCTYPE, "write", throw=True)
+
+	names = parse_list(names)
+	if not names:
+		return {"updated_count": 0}
+
+	return {"updated_count": len(publish_variants(cint(publish), names=names))}
 
 
 class BulkPublishVariants(Document):

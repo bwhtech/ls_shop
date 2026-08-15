@@ -52,6 +52,9 @@ const PANEL_STYLES = `<style>
 // `red;background-image:url(...)` through — only an allow-list keeps that cell safe.
 const CSS_COLOR_PATTERN = /^(#[0-9a-f]{3,8}|[a-z]+)$/i;
 
+const PUBLISH_METHOD =
+	'ls_shop.lifestyle_shop_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants.set_variants_published';
+
 frappe.ui.form.on('Item', {
 	refresh(frm) {
 		refresh_ecommerce_panel(frm);
@@ -275,20 +278,15 @@ async function publish_ready_variants(frm, $button) {
 
 	$button.prop('disabled', true).text(__('Publishing…'));
 	try {
-		// Bulk Publish Variants owns the only bulk write to `is_published`, and therefore the only
-		// search-index enqueue; publishing from here directly would leave the index stale.
+		// bulk_publish_variants owns the only bulk write to `is_published`, and therefore the only
+		// search-index enqueue; publishing from here directly would leave the index stale. This goes
+		// to set_variants_published rather than the Single's bulk_toggle_publish, which would also
+		// AND in whatever filters were last left on the Bulk Publish Variants form.
 		const response = await frappe.call({
-			method: 'run_doc_method',
+			method: PUBLISH_METHOD,
 			args: {
-				dt: 'Bulk Publish Variants',
-				dn: 'Bulk Publish Variants',
-				method: 'bulk_toggle_publish',
-				args: {
-					publish: 1,
-					style_attribute_variant_list: ready_unpublished.map(
-						(variant) => variant.name,
-					),
-				},
+				publish: 1,
+				names: ready_unpublished.map((variant) => variant.name),
 			},
 		});
 		frappe.show_alert(

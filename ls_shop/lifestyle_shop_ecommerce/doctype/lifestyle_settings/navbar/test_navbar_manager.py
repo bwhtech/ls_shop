@@ -679,6 +679,34 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		job.assert_called_once_with("Style Attribute Variant", [self.dress])
 		self.assertFalse(frappe.db.get_value("Style Attribute Variant", self.incomplete, "is_published"))
 
+	def test_publishing_a_named_set_ignores_filters_left_on_the_bulk_publish_form(self):
+		"""The Item tab's "Publish all ready" sends an explicit list, and it must publish that list.
+
+		`bulk_toggle_publish` ANDs the Single's stored filter fields into its query, so a stale
+		`brand` left on the Bulk Publish Variants form would silently shrink someone else's
+		selection down to nothing and report success.
+		"""
+		tool = frappe.get_single("Bulk Publish Variants")
+		tool.vendor_code = tool.dcs = tool.brand = tool.season_code = None
+		# A leftover filter, exactly as it would sit on the form between two uses of the tool.
+		tool.item_code = "ZZ-PUB-NO-SUCH-ITEM"
+
+		# The old path: the stale filter matches nothing, so the explicit selection is lost.
+		with patch.object(bulk_publish_variants, "enqueue_upsert_many", side_effect=sync.upsert_docs):
+			filtered = tool.bulk_toggle_publish(publish=1, style_attribute_variant_list=[self.dress])
+		self.assertEqual(filtered["updated_count"], 0)
+		self.assertFalse(frappe.db.get_value("Style Attribute Variant", self.dress, "is_published"))
+
+		# The endpoint the tab actually calls takes the names and no other criteria.
+		with patch.object(bulk_publish_variants, "enqueue_upsert_many", side_effect=sync.upsert_docs) as job:
+			result = bulk_publish_variants.set_variants_published(1, [self.dress, self.incomplete])
+
+		self.assertEqual(result, {"updated_count": 1})
+		job.assert_called_once_with("Style Attribute Variant", [self.dress])
+		self.assertTrue(frappe.db.get_value("Style Attribute Variant", self.dress, "is_published"))
+		# The completeness gate still applies — an explicit list is not a licence to publish a draft.
+		self.assertFalse(frappe.db.get_value("Style Attribute Variant", self.incomplete, "is_published"))
+
 	def test_set_published_hands_the_changed_names_to_the_index_job(self):
 		_result, job = self.set_published_now(self.women, 1)
 
