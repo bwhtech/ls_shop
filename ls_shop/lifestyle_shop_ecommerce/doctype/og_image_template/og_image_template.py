@@ -55,6 +55,9 @@ class OGImageTemplate(Document):
 				},
 			)
 			if prior:
+				# Clear the link first: File deletion refuses while a field still points at it,
+				# which made every preview after the first one throw LinkExistsError.
+				self.db_set("preview_image", None)
 				frappe.delete_doc("File", prior, ignore_permissions=True)
 
 		preview_file = save_file(

@@ -137,7 +137,13 @@ def build_product_seo(
 def build_product_json_ld(product_variant, product, images, price=None, availability=None, currency=None):
 	override = product_variant.get("json_ld")
 	if override:
-		parsed = frappe.parse_json(override)
+		# A half-edited override is admin typo territory, and orjson raises straight through
+		# frappe.parse_json. Falling back to the generated block keeps the product page up.
+		try:
+			parsed = frappe.parse_json(override)
+		except Exception:
+			frappe.log_error(title=f"Invalid json_ld override on {product_variant.get('name')}")
+			parsed = None
 		if parsed:
 			return parsed
 
@@ -361,46 +367,6 @@ def default_seo():
 		"currency": None,
 		"availability": None,
 	}
-
-
-def build_localbusiness_json_ld():
-	settings = get_seo_settings()
-	store_name = get_store_name()
-
-	json_ld = {
-		"@context": "https://schema.org",
-		"@type": "LocalBusiness",
-		"name": store_name,
-		"url": get_url(),
-	}
-
-	telephone = settings.get("contact_phone")
-	if telephone:
-		json_ld["telephone"] = telephone
-
-	email = settings.get("contact_email")
-	if email:
-		json_ld["email"] = email
-
-	street_address = settings.get("contact_address")
-	if street_address:
-		json_ld["address"] = {"@type": "PostalAddress", "streetAddress": street_address}
-
-	working_hours = settings.get("working_hours")
-	if working_hours:
-		json_ld["openingHours"] = working_hours
-
-	maps_url = settings.get("maps_url")
-	if maps_url:
-		json_ld["hasMap"] = maps_url
-
-	favicon = settings.get("favicon")
-	if favicon:
-		logo = absolute_url(favicon)
-		json_ld["image"] = logo
-		json_ld["logo"] = logo
-
-	return json_ld
 
 
 def org_website_json_ld():

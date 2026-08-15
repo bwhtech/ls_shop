@@ -89,12 +89,6 @@ class TestOGImageTemplate(IntegrationTestCase):
 		self.assertEqual(len(files), 1)
 		self.addCleanup(frappe.delete_doc, "File", files[0].name, force=True)
 
-	@unittest.skip(
-		"BUG og_image_template.py:56 — generate_preview deletes the prior preview File while "
-		"preview_image still points at it, so frappe.delete_doc raises LinkExistsError and the "
-		"second click on Generate Preview always fails. Reproduced outside the test runner. "
-		"Fix: db_set('preview_image', None) before deleting, or delete with force. Then un-skip."
-	)
 	def test_generate_preview_replaces_prior_file(self):
 		if not get_published_variant():
 			self.skipTest("No published Style Attribute Variant to preview against.")

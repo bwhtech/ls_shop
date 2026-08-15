@@ -293,67 +293,6 @@ class TestBreadcrumbJsonLd(IntegrationTestCase):
 		self.assertEqual(items[0]["position"], 1)
 
 
-# contact_address / maps_url are read by build_localbusiness_json_ld but ls_shop's
-# Lifestyle Settings does not carry those fields, so address/hasMap can never be emitted here.
-LOCALBUSINESS_FIELDS = (
-	"store_name",
-	"contact_phone",
-	"contact_email",
-	"working_hours",
-	"favicon",
-)
-
-
-def set_localbusiness_settings(**values):
-	"""Write the Lifestyle Settings contact fields and bust the cached doc so
-	build_localbusiness_json_ld observes the deterministic values.
-	"""
-	for field in LOCALBUSINESS_FIELDS:
-		frappe.db.set_single_value("Lifestyle Settings", field, values.get(field, ""))
-	frappe.clear_document_cache("Lifestyle Settings", "Lifestyle Settings")
-
-
-class TestLocalBusinessJsonLd(IntegrationTestCase):
-	def test_type_and_required_fields(self):
-		set_localbusiness_settings(store_name="MyStore")
-		result = seo.build_localbusiness_json_ld()
-		self.assertEqual(result["@context"], "https://schema.org")
-		self.assertEqual(result["@type"], "LocalBusiness")
-		self.assertEqual(result["name"], "MyStore")
-		# url is always present (site root), even on an otherwise-empty contact tab
-		self.assertTrue(result["url"])
-
-	def test_populated_fields_mapped(self):
-		set_localbusiness_settings(
-			store_name="MyStore",
-			contact_phone="+971 4 123 4567",
-			contact_email="hello@mystore.test",
-			working_hours="Mo-Fr 09:00-18:00",
-			favicon="/files/favicon.png",
-		)
-		result = seo.build_localbusiness_json_ld()
-		self.assertEqual(result["telephone"], "+971 4 123 4567")
-		self.assertEqual(result["email"], "hello@mystore.test")
-		self.assertEqual(result["openingHours"], "Mo-Fr 09:00-18:00")
-		# favicon feeds both image and logo as an absolute, crawler-safe URL
-		self.assertIn("/files/favicon.png", result["image"])
-		self.assertEqual(result["image"], result["logo"])
-
-	def test_unbacked_address_keys_never_emitted(self):
-		# Guards the gap above: if the address/maps fields are ever added to Lifestyle
-		# Settings this test fails and the populated-mapping test must be extended.
-		set_localbusiness_settings(store_name="MyStore", contact_phone="+971 4 123 4567")
-		result = seo.build_localbusiness_json_ld()
-		self.assertNotIn("address", result)
-		self.assertNotIn("hasMap", result)
-
-	def test_blank_fields_omitted(self):
-		set_localbusiness_settings(store_name="MyStore")
-		result = seo.build_localbusiness_json_ld()
-		for absent_key in ("telephone", "email", "address", "openingHours", "hasMap", "image", "logo"):
-			self.assertNotIn(absent_key, result)
-
-
 class TestUtilityPageNoindexInjection(IntegrationTestCase):
 	"""The theme renderer bypasses the www get_context controllers, so cart/account/login
 	noindex is injected via update_website_context. Locks that route-keyed injection and,
@@ -613,12 +552,6 @@ class TestBuildProductJsonLd(IntegrationTestCase):
 		)
 		self.assertEqual(result, override)
 
-	@unittest.skip(
-		"BUG seo.py:140 — build_product_json_ld calls frappe.parse_json on the stored json_ld "
-		"override with no guard, so malformed admin JSON raises orjson.JSONDecodeError and 500s "
-		"the product page. Style Attribute Variant does not validate the field on save either. "
-		"Un-skip once the parse is wrapped."
-	)
 	def test_unparseable_override_falls_back_to_generated(self):
 		# A half-edited override must not take down the page's structured data.
 		result = seo.build_product_json_ld(
