@@ -6,3 +6,5 @@
 # Patches added in this section will be executed after doctypes are migrated
 ls_shop.patches.add_analytics_event_log_retention
 ls_shop.patches.migrate_telr_to_bwh_payments
+ls_shop.patches.rebuild_ecommerce_category_tree
+ls_shop.patches.drop_item_group_nav_fields
