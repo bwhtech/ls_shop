@@ -76,8 +76,12 @@
     }
 </style>
 
+{# Bound once per render so the header, the mobile drawer and any theme override all read the same
+   menu; a page controller may pre-supply it to avoid the second lookup. #}
+{% set header_data = header_data if header_data is defined and header_data else get_header_data() %}
+
 <body x-data dir="auto">
-    {% include "templates/includes/header.html" %}
+    {% block header %}{% include "templates/includes/header.html" %}{% endblock %}
 
     <main class="relative" x-data="toaster">
         <div class="max-w-7xl mx-auto px-6 md:px-10 ">
@@ -93,7 +97,7 @@
         {% include "templates/includes/toast-teleport.html" %}
     </main>
 
-    {% include "templates/includes/footer.html" %}
+    {% block footer %}{% include "templates/includes/footer.html" %}{% endblock %}
     {% block analytics_events %}{% include "templates/includes/analytics-events.html" %}{% endblock %}
 </body>
 {% block script %} {% endblock %}

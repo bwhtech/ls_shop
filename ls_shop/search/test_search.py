@@ -223,7 +223,6 @@ class TestStorefrontSearch(IntegrationTestCase):
 					"parent_item_group": "All Item Groups",
 					# ls_shop customises Item Group with two mandatory storefront display names.
 					"custom_displayname": item_group,
-					"custom_item_group_display_name": item_group,
 				}
 			).insert(ignore_permissions=True)
 

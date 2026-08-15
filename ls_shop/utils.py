@@ -7,10 +7,13 @@ from erpnext.selling.doctype.customer.customer import (
 from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
-from frappe.utils import add_days, cstr, flt, get_datetime, now_datetime
+from frappe.utils import add_days, create_batch, cstr, flt, get_datetime, now_datetime
 from pypika import Order
 
 from ls_shop.core import get_address_docs, get_party
+
+# Ceiling for any IN (...) list this app sends to MariaDB/Postgres.
+IN_CLAUSE_CHUNK_SIZE = 1000
 
 
 def get_complete_nested_links(parent_group):
@@ -419,25 +422,42 @@ def can_return(order_name, return_period_days):
 
 
 def get_available_stock(item_code, warehouse):
+	return get_available_stocks([item_code], warehouse)[cstr(item_code)]
+
+
+def get_available_stocks(item_codes, warehouse):
+	"""Sellable qty per item code — two grouped queries for the whole list, not two per item."""
 	if not warehouse:
 		warehouse = "website_warehouse"
-	bin_data = frappe.get_value(
-		"Bin",
-		{"item_code": item_code, "warehouse": warehouse},
-		["actual_qty", "reserved_qty"],
-		as_dict=True,
-	)
-	if not bin_data:
-		return {
-			"stock_qty": 0,
-			"in_stock": 0,
-		}
-	pos_reserved_qty = get_pos_reserved_qty(item_code, warehouse)
-	actual_qty = flt(bin_data.actual_qty) - flt(bin_data.reserved_qty) - flt(pos_reserved_qty)
-	return {
-		"stock_qty": actual_qty,
-		"in_stock": int(actual_qty > 0),
-	}
+	if not item_codes:
+		return {}
+
+	item_codes = [cstr(item_code) for item_code in item_codes]
+	bin_doctype = frappe.qb.DocType("Bin")
+	bin_by_item_code = {}
+	for item_code_chunk in create_batch(item_codes, IN_CLAUSE_CHUNK_SIZE):
+		bin_rows = (
+			frappe.qb.from_(bin_doctype)
+			.select(bin_doctype.item_code, bin_doctype.actual_qty, bin_doctype.reserved_qty)
+			.where((bin_doctype.item_code.isin(item_code_chunk)) & (bin_doctype.warehouse == warehouse))
+		).run(as_dict=True)
+		bin_by_item_code.update({cstr(row.item_code): row for row in bin_rows})
+
+	pos_reserved_by_item_code = get_pos_reserved_qtys(item_codes, warehouse)
+
+	stock_by_item_code = {}
+	for item_code in item_codes:
+		bin_data = bin_by_item_code.get(item_code)
+		if not bin_data:
+			stock_by_item_code[item_code] = {"stock_qty": 0, "in_stock": 0}
+			continue
+		actual_qty = (
+			flt(bin_data.actual_qty)
+			- flt(bin_data.reserved_qty)
+			- flt(pos_reserved_by_item_code.get(item_code))
+		)
+		stock_by_item_code[item_code] = {"stock_qty": actual_qty, "in_stock": int(actual_qty > 0)}
+	return stock_by_item_code
 
 
 def get_discount_percent(default_price, sale_price):
@@ -448,23 +468,34 @@ def get_discount_percent(default_price, sale_price):
 
 
 def get_pos_reserved_qty(item_code, warehouse):
+	return get_pos_reserved_qtys([item_code], warehouse).get(cstr(item_code), 0)
+
+
+def get_pos_reserved_qtys(item_codes, warehouse):
+	if not item_codes:
+		return {}
+
 	p_inv = frappe.qb.DocType("POS Invoice")
 	p_item = frappe.qb.DocType("POS Invoice Item")
 
-	reserved_qty = (
-		frappe.qb.from_(p_inv)
-		.from_(p_item)
-		.select(Sum(p_item.stock_qty).as_("stock_qty"))
-		.where(
-			(p_inv.name == p_item.parent)
-			& (p_inv.status.isin(["Paid", "Return"]))
-			& (p_item.docstatus == 1)
-			& (p_item.item_code == item_code)
-			& (p_item.warehouse == warehouse)
-		)
-	).run(as_dict=True)
+	reserved_by_item_code = {}
+	for item_code_chunk in create_batch(list(item_codes), IN_CLAUSE_CHUNK_SIZE):
+		rows = (
+			frappe.qb.from_(p_inv)
+			.from_(p_item)
+			.select(p_item.item_code, Sum(p_item.stock_qty).as_("stock_qty"))
+			.where(
+				(p_inv.name == p_item.parent)
+				& (p_inv.status.isin(["Paid", "Return"]))
+				& (p_item.docstatus == 1)
+				& (p_item.item_code.isin(item_code_chunk))
+				& (p_item.warehouse == warehouse)
+			)
+			.groupby(p_item.item_code)
+		).run(as_dict=True)
+		reserved_by_item_code.update({cstr(row.item_code): flt(row.stock_qty) for row in rows})
 
-	return flt(reserved_qty[0].stock_qty) if reserved_qty else 0
+	return reserved_by_item_code
 
 
 def update_so_status_from_related_doc(doc, method):

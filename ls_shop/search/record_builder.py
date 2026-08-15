@@ -1,7 +1,8 @@
 import frappe
 from frappe.utils import cint, create_batch, cstr
 
-IN_CLAUSE_CHUNK_SIZE = 1000
+from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import root_filter
+from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
 # The only doctypes reachable from a variant (itself, its Item, its Style Attribute Configurator).
 ALLOWED_CONTENT_DOCTYPES = ("Item", "Style Attribute Variant", "Style Attribute Configurator")
@@ -176,25 +177,52 @@ def build_product_detail(variant, item, sizes, images, prices):
 	return detail
 
 
+def get_root_route_slugs():
+	"""(lft, rgt, route_slug) of every menu root, so a nested entry can borrow a landable slug.
+
+	Only roots own a `route_slug` — a nested entry is reached through its parent's listing page —
+	so a hit on a child would otherwise index an empty slug and send the shopper to `/products?category=`.
+	"""
+	return frappe.get_all(
+		"Ecommerce Category",
+		filters={"parent_ecommerce_category": root_filter()},
+		fields=["lft", "rgt", "route_slug"],
+	)
+
+
 def build_category_search_records(names=None):
 	# `enabled` stays ANDed with the name filter for the same reason as `is_published` above.
 	categories = get_indexable_docs(
 		"Ecommerce Category",
 		{"enabled": 1},
 		names,
-		["name", "category_name", "display_name", "route_slug"],
+		["name", "category_name", "display_name", "route_slug", "lft"],
 	)
+	if not categories:
+		return []
+
+	roots = get_root_route_slugs()
 
 	records = []
 	for category in categories:
 		category_name = category.category_name or ""
 		display_name = category.display_name or ""
+		route_slug = category.route_slug or ""
+		if not route_slug:
+			route_slug = next(
+				(
+					root.route_slug
+					for root in roots
+					if root.route_slug and root.lft <= category.lft <= root.rgt
+				),
+				"",
+			)
 		records.append(
 			{
 				"name": category.name,
 				"title": display_name or category_name,
 				"content": " ".join(part for part in (category_name, display_name) if part).strip(),
-				"route_slug": category.route_slug or "",
+				"route_slug": route_slug,
 			}
 		)
 	return records
