@@ -109,6 +109,16 @@ doc_events = {
 		],
 	},
 	"Stock Ledger Entry": {"after_insert": ["ls_shop.jobs.send_product_back_in_stock_email"]},
+	"Style Attribute Variant": {
+		"on_update": "ls_shop.search.sync.on_update",
+		"after_rename": "ls_shop.search.sync.after_rename",
+		"on_trash": "ls_shop.search.sync.on_trash",
+	},
+	"Ecommerce Category": {
+		"on_update": "ls_shop.search.sync.on_update",
+		"after_rename": "ls_shop.search.sync.after_rename",
+		"on_trash": "ls_shop.search.sync.on_trash",
+	},
 	"Sales Invoice": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},
 	"Delivery Note": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},
 	"Shipment": {"on_submit": "ls_shop.utils.update_so_status_from_related_doc"},
@@ -116,8 +126,17 @@ doc_events = {
 
 jinja = {
 	"filters": ["ls_shop.utils.can_return"],
-	"methods": ["ls_shop.utils.format_theme_css", "ls_shop.utils.get_currency_symbol"],
+	"methods": [
+		"ls_shop.utils.format_theme_css",
+		"ls_shop.utils.get_currency_symbol",
+		"ls_shop.search.result_card.get_search_result_fields",
+	],
 }
+
+# Deliberately NOT registered as frappe's `sqlite_search` hook. Registering enlists core's global
+# `*` doc_events update_doc_index/delete_doc_index, which fires an index_exists() probe on every save
+# of every doctype site-wide. search/sync.py owns incremental writes; search/build.py owns the build,
+# the nightly reconcile, and (via ensure_index_built) resuming an interrupted build.
 
 
 ignore_links_on_delete = [
@@ -378,5 +397,6 @@ scheduler_events = {
 	"daily": [
 		"ls_shop.jobs.delete_notified_oos",
 		"ls_shop.jobs.delete_old_draft_quotations",
+		"ls_shop.search.build.rebuild_index_nightly",
 	],
 }

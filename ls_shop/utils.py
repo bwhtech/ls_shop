@@ -7,7 +7,7 @@ from erpnext.selling.doctype.customer.customer import (
 from frappe.geo.country_info import get_all
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Count, Min, Sum
-from frappe.utils import add_days, flt, get_datetime, now_datetime
+from frappe.utils import add_days, cstr, flt, get_datetime, now_datetime
 from pypika import Order
 
 from ls_shop.core import get_address_docs, get_party
@@ -43,7 +43,28 @@ def get_nested_links(link_doctype, link_name):
 
 
 def get_product_list(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
-	"""Fetches products dynamically based on selected filters."""
+	"""Storefront product grid: FTS-ranked when a rankable term is searched, frappe.qb otherwise."""
+	from ls_shop.search import query as search_query
+	from ls_shop.search.engine_cache import get_search_engine
+
+	if product_list is not None or search_query.use_qb_fallback(filters):
+		return get_product_list_qb(filters, product_list, page, page_length, sort_by)
+
+	ranked_names = get_search_engine().search_products(filters, page, page_length, sort_by)
+	if not ranked_names:
+		return []
+
+	# Hydrate through the retained frappe.qb select so search cards carry exactly the same keys as
+	# browse cards, then restore the engine's rank (frappe.qb returns them ordered by name).
+	cards_by_name = {
+		card["name"]: card
+		for card in get_product_list_qb(product_list=ranked_names, page_length=len(ranked_names))
+	}
+	return [cards_by_name[name] for name in ranked_names if name in cards_by_name]
+
+
+def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30, sort_by="default"):
+	"""Retained frappe.qb product grid — browse, pinned lists, and the Arabic/short-term search fallback."""
 
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")
@@ -73,9 +94,13 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 			style_attribute_variant.route,
 			style_attribute_variant.item_style,
 			style_attribute_variant.display_name,
-			style_attribute_variant.attribute_name.as_("attribute_value"),
+			style_attribute_variant.attribute_value,
+			style_attribute_variant.attribute_name.as_("color"),
+			style_attribute_variant.item_group,
+			style_attribute_variant.modified,
 			item.brand,
 			item.item_name,
+			item.is_stock_item,
 			color_size_item.item_code.as_("variant_item_code"),
 			Min(item_price_default.price_list_rate).as_("default_price"),
 			Min(item_price_sale.price_list_rate).as_("sale_price"),
@@ -102,12 +127,84 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 	else:
 		query = query.orderby("name", order=Order.asc)
 	# Execute Query
-	variants = query.run(as_dict=True)
-	return variants
+	return shape_product_cards(query.run(as_dict=True))
+
+
+def shape_product_cards(cards):
+	"""Give every product card the one storefront card shape, whichever grid built it.
+
+	The search modal is served by the index on one keystroke and by frappe.qb on the next, so a card
+	whose key set changes between the two makes the same product render differently. The index's
+	product_detail snapshot is the canonical shape; keys the frappe.qb select cannot reach are
+	derived from what it did select.
+	"""
+	from ls_shop.search.record_builder import sizes_for_variants
+	from ls_shop.search.sqlite_product_search import SqliteProductSearch
+
+	if not cards:
+		return cards
+
+	unsized = [card["name"] for card in cards if card.get("sizes") is None]
+	sizes_by_variant = sizes_for_variants(unsized) if unsized else {}
+
+	for card in cards:
+		if card.get("sizes") is None:
+			card["sizes"] = sizes_by_variant.get(card["name"], [])
+		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
+			if column != "doc_id":
+				card.setdefault(column, None)
+		# Mirrors record_builder.aggregate_prices so a price a card was filtered or sorted by means
+		# the same thing on both grids.
+		if card["effective_price"] is None:
+			card["effective_price"] = (
+				card["sale_price"] if card["sale_price"] is not None else (card["default_price"] or 0)
+			)
+		if card["has_discount"] is None:
+			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
+		# frappe.qb hands back a datetime where the index snapshot holds a string, and the card is
+		# json.dumps'd straight into the wishlist attribute in item_card.html.
+		card["modified"] = cstr(card["modified"]) if card["modified"] else None
+	return cards
+
+
+def attach_live_prices(cards):
+	"""Overlay the live Item Price onto index-hydrated cards.
+
+	Item Price edits fire no Style Attribute Variant event, so the indexed price snapshot can lag a
+	price change until the nightly rebuild. The snapshot still drives filtering and sorting; only the
+	displayed figures are refreshed here.
+	"""
+	from ls_shop.search.record_builder import aggregate_prices, rates_by_item_code
+
+	if not cards:
+		return cards
+
+	settings = frappe.get_cached_doc("Lifestyle Settings")
+	item_codes = list(
+		{size["item_code"] for card in cards for size in (card.get("sizes") or []) if size.get("item_code")}
+	)
+	default_rate, sale_rate, sale_upto = rates_by_item_code(
+		item_codes, settings.default_price_list, settings.sale_price_list
+	)
+
+	for card in cards:
+		codes = [size["item_code"] for size in (card.get("sizes") or []) if size.get("item_code")]
+		card.update(aggregate_prices(codes, default_rate, sale_rate, sale_upto))
+	return cards
 
 
 def get_total_product_count(filters=None, product_list=None):
-	"""Returns total products based on filters"""
+	"""Total products for the grid's pagination controls — from SQLite unless frappe.qb owns the grid."""
+	from ls_shop.search import query as search_query
+	from ls_shop.search.engine_cache import get_search_engine
+
+	if product_list is None and not search_query.use_qb_fallback(filters):
+		return get_search_engine().search_count(filters)
+	return get_product_count_qb(filters, product_list)
+
+
+def get_product_count_qb(filters=None, product_list=None):
+	"""Retained frappe.qb total count — used under the frappe.qb fallback and for pinned product lists."""
 
 	query = get_product_base_query(filters, product_list)
 	style_attribute_variant = DocType("Style Attribute Variant")

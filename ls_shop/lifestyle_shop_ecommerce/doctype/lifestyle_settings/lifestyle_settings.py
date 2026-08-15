@@ -5,6 +5,17 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 
+from ls_shop.search.build import enqueue_full_rebuild
+from ls_shop.search.record_builder import ALLOWED_CONTENT_DOCTYPES, is_indexable_content_field
+from ls_shop.search.result_card import (
+	MANDATORY_RESULT_FIELDS,
+	MAX_RESULT_FIELDS,
+	MIN_RESULT_FIELDS,
+	RESULT_CARD_CATALOG,
+)
+
+MAX_CONTENT_FIELDS = 15
+
 
 class LifestyleSettings(Document):
 	# begin: auto-generated types
@@ -20,6 +31,12 @@ class LifestyleSettings(Document):
 		)
 		from ls_shop.lifestyle_shop_ecommerce.doctype.item_group_map.item_group_map import ItemGroupMap
 		from ls_shop.lifestyle_shop_ecommerce.doctype.return_reason.return_reason import ReturnReason
+		from ls_shop.lifestyle_shop_ecommerce.doctype.search_content_field.search_content_field import (
+			SearchContentField,
+		)
+		from ls_shop.lifestyle_shop_ecommerce.doctype.search_result_field.search_result_field import (
+			SearchResultField,
+		)
 
 		accent_color: DF.Color | None
 		attribute_name_field: DF.Data | None
@@ -67,6 +84,8 @@ class LifestyleSettings(Document):
 		reason_for_return: DF.Table[ReturnReason]
 		return_period: DF.Int
 		sale_price_list: DF.Link | None
+		search_content_fields: DF.Table[SearchContentField]
+		search_result_fields: DF.Table[SearchResultField]
 		secondary_accent_color: DF.Color | None
 		shipping_rule: DF.Link | None
 		snapchat_url: DF.Data | None
@@ -85,6 +104,79 @@ class LifestyleSettings(Document):
 	def validate(self):
 		if not self.telr_enabled and not self.tabby_enabled and not self.cod_enabled:
 			frappe.throw(frappe._("At least one payment method (Telr, Tabby, or COD) must be enabled."))
+		self.validate_search_content_fields()
+		self.validate_search_result_fields()
+
+	def validate_search_content_fields(self):
+		rows = self.search_content_fields or []
+		if len(rows) > MAX_CONTENT_FIELDS:
+			frappe.throw(
+				frappe._("You can index at most {0} search content fields.").format(MAX_CONTENT_FIELDS)
+			)
+		pairs = [(row.search_doctype, row.field) for row in rows]
+		if len(pairs) != len(set(pairs)):
+			frappe.throw(frappe._("Duplicate search content fields are not allowed."))
+
+	def validate_search_result_fields(self):
+		"""Reject an invalid result-card config; an empty table falls back to the default layout."""
+		rows = self.search_result_fields or []
+		if not rows:
+			return
+
+		fields = [row.field for row in rows]
+
+		unknown = [field for field in fields if field not in RESULT_CARD_CATALOG]
+		if unknown:
+			frappe.throw(frappe._("Unknown search result card field(s): {0}").format(", ".join(unknown)))
+
+		if len(fields) != len(set(fields)):
+			frappe.throw(frappe._("Each search result card field can be listed only once."))
+
+		enabled = [row.field for row in rows if row.show]
+		disabled_mandatory = [field for field in MANDATORY_RESULT_FIELDS if field not in enabled]
+		if disabled_mandatory:
+			labels = ", ".join(RESULT_CARD_CATALOG[field] for field in disabled_mandatory)
+			frappe.throw(frappe._("These search result card fields must stay enabled: {0}").format(labels))
+
+		if not MIN_RESULT_FIELDS <= len(enabled) <= MAX_RESULT_FIELDS:
+			frappe.throw(
+				frappe._("Enable between {0} and {1} search result card fields.").format(
+					MIN_RESULT_FIELDS, MAX_RESULT_FIELDS
+				)
+			)
+
+	@frappe.whitelist()
+	def get_result_card_field_options(self):
+		"""Newline-joined catalog keys for the Search Result Field grid Select."""
+		return "\n".join(RESULT_CARD_CATALOG)
+
+	@frappe.whitelist()
+	def get_content_field_options(self, search_doctype):
+		"""Newline-joined indexable field names of `search_doctype` for the Search Content Field Select.
+
+		Served from Python so the grid offers exactly what the index will accept — duplicating the
+		fieldtype allowlist in the client let the two drift and offered fields the build then dropped.
+		"""
+		if search_doctype not in ALLOWED_CONTENT_DOCTYPES:
+			return ""
+		fields = [
+			field.fieldname
+			for field in frappe.get_meta(search_doctype).fields
+			if field.fieldname and is_indexable_content_field(search_doctype, field.fieldname)
+		]
+		return "\n".join(["", *fields])
+
+	def on_update(self):
+		"""Enqueue a background index rebuild only when the indexed field list changes."""
+		if frappe.flags.in_install or frappe.flags.in_migrate:
+			return
+		before = self.get_doc_before_save()
+		if before is None:
+			return
+		old_pairs = [(row.search_doctype, row.field) for row in (before.search_content_fields or [])]
+		new_pairs = [(row.search_doctype, row.field) for row in (self.search_content_fields or [])]
+		if old_pairs != new_pairs:
+			enqueue_full_rebuild(deduplicate=True)
 
 	def get_default_price_list(self):
 		return self.default_price_list
@@ -146,23 +238,23 @@ class LifestyleSettings(Document):
 		return f"""
 		<style>
 		:root {{
-			--ls-primary: {self.primary_color or '#b91c1c'};
-			--ls-primary-hover: {self.primary_hover_color or '#991b1b'};
-			--ls-link: {self.link_color or '#7f1d1d'};
-			--ls-link-hover: {self.link_hover_color or '#991b1b'};
-			--ls-accent: {self.accent_color or '#b91c1c'};
-			--ls-border-accent: {self.border_accent_color or '#b91c1c'};
-			--ls-button-bg: {self.button_bg_color or '#b91c1c'};
-			--ls-strikethrough: {self.strikethrough_color or '#b91c1c'};
-			--ls-badge-bg: {self.badge_bg_color or '#b91c1c'};
-			--ls-heading-accent: {self.heading_accent_color or '#991b1b'};
-			--ls-brand-text: {self.brand_text_color or '#b91c1c'};
-			--ls-secondary-accent: {self.secondary_accent_color or '#991b1b'};
-			--ls-form-accent: {self.form_accent_color or '#b91c1c'};
-			--ls-focus-ring: {self.focus_ring_color or '#b91c1c'};
-			--ls-carousel-dot: {self.accent_color or '#b91c1c'};
-			--ls-footer-bg: {self.footer_bg_color or '#111827'};
-			--ls-footer-text: {self.footer_text_color or '#ffffff'};
+			--ls-primary: {self.primary_color or "#b91c1c"};
+			--ls-primary-hover: {self.primary_hover_color or "#991b1b"};
+			--ls-link: {self.link_color or "#7f1d1d"};
+			--ls-link-hover: {self.link_hover_color or "#991b1b"};
+			--ls-accent: {self.accent_color or "#b91c1c"};
+			--ls-border-accent: {self.border_accent_color or "#b91c1c"};
+			--ls-button-bg: {self.button_bg_color or "#b91c1c"};
+			--ls-strikethrough: {self.strikethrough_color or "#b91c1c"};
+			--ls-badge-bg: {self.badge_bg_color or "#b91c1c"};
+			--ls-heading-accent: {self.heading_accent_color or "#991b1b"};
+			--ls-brand-text: {self.brand_text_color or "#b91c1c"};
+			--ls-secondary-accent: {self.secondary_accent_color or "#991b1b"};
+			--ls-form-accent: {self.form_accent_color or "#b91c1c"};
+			--ls-focus-ring: {self.focus_ring_color or "#b91c1c"};
+			--ls-carousel-dot: {self.accent_color or "#b91c1c"};
+			--ls-footer-bg: {self.footer_bg_color or "#111827"};
+			--ls-footer-text: {self.footer_text_color or "#ffffff"};
 		}}
 
 		/* Primary color utilities */

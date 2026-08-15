@@ -1,8 +1,10 @@
 import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Cast_, Min
+from frappe.utils import flt
 from frappe.utils.caching import redis_cache
 
+from ls_shop.search import query as search_query
 from ls_shop.utils import (
 	get_current_page,
 	get_nested_links,
@@ -22,12 +24,9 @@ def get_filter_brands(filters=None):
 	item = DocType("Item")
 
 	query = query.select(item.brand).distinct().orderby(item.brand)
-	brands = query.run(pluck=True)
-	if not brands:
-		return []
-	# Filter out None or empty brand values
-	brands = [b.title() for b in brands if b]
-	return brands
+	# Values are returned raw: they round-trip through the checkbox value and the URL into a
+	# case-sensitive SQLite IN on the index, and the template already display-cases them.
+	return [brand for brand in query.run(pluck=True) if brand]
 
 
 def get_filter_colors(filters=None):
@@ -38,11 +37,7 @@ def get_filter_colors(filters=None):
 	variant = DocType("Style Attribute Variant")
 
 	query = query.select(variant.attribute_name).distinct().orderby(variant.attribute_name)
-	colors = query.run(pluck=True)
-	if not colors:
-		return colors
-	colors = [c.title() for c in colors]
-	return colors
+	return [color for color in query.run(pluck=True) if color]
 
 
 def get_filter_sizes(filters=None):
@@ -132,9 +127,15 @@ def get_product_filters(selected_filters):
 					# If category tree fails, just skip this category
 					pass
 
-	filters["brands"] = get_filter_brands(selected_filters)
-	filters["sizes"] = get_filter_sizes(selected_filters)
-	filters["colors"] = get_filter_colors(selected_filters)
+	# When SQLite serves the grid the sidebar must be faceted from the same result set, or a listed
+	# brand/colour/size would filter down to nothing.
+	facets = search_query.listing_facets(selected_filters)
+	if facets:
+		filters.update(facets)
+	else:
+		filters["brands"] = get_filter_brands(selected_filters)
+		filters["sizes"] = get_filter_sizes(selected_filters)
+		filters["colors"] = get_filter_colors(selected_filters)
 
 	return filters, price_range[0] if price_range else {"min_price": 0, "max_price": 0}
 
@@ -157,18 +158,16 @@ def get_selected_filters():
 	min_price = query_params.get("min")
 	max_price = query_params.get("max")
 
-	# Convert to float if provided
+	# flt, not int: the price slider posts decimals (?min=74.5), which int() rejects with a 500.
 	if min_price:
-		filters["min_price"] = int(min_price)
+		filters["min_price"] = flt(min_price)
 	if max_price:
-		filters["max_price"] = int(max_price)
+		filters["max_price"] = flt(max_price)
 	return filters
 
 
-def get_sort_by():
-	query_params = frappe.form_dict
-	sort_by = query_params.get("sort_by", "new_arrival")
-	return sort_by
+def get_sort_by(default_sort):
+	return frappe.form_dict.get("sort_by") or default_sort
 
 
 def get_context(context):
@@ -178,7 +177,8 @@ def get_context(context):
 	filters, price_range = get_product_filters(selected_filters)
 	# Fetch filtered product list
 	context.page_length = 30
-	context.sort_by = get_sort_by()
+	context.show_relevance_sort = search_query.relevance_sort_available(selected_filters)
+	context.sort_by = get_sort_by("default" if context.show_relevance_sort else "new_arrival")
 	products = get_product_list(
 		filters=selected_filters,
 		page=page,

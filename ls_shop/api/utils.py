@@ -3,8 +3,11 @@ from functools import wraps
 import frappe
 from erpnext.controllers.website_list_for_contact import get_transaction_list
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.translate import get_all_translations
+from frappe.utils import cstr
 
+from ls_shop.search import query as search_query
 from ls_shop.utils import get_product_list
 
 
@@ -77,10 +80,12 @@ def get_item_details(items):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=120, seconds=60)
 def get_search_results(search):
-	filters = {"search": search}
-	products = get_product_list(filters=filters, page_length=6)
-	return products
+	filters = {"search": cstr(search)}
+	if search_query.relevance_sort_available(filters):
+		return search_query.storefront_search(filters["search"], limit=6)["products"]
+	return get_product_list(filters=filters, page_length=6)
 
 
 @frappe.whitelist()

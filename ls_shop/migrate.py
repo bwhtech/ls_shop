@@ -1,4 +1,10 @@
+import traceback
+
 import frappe
+
+from ls_shop.search.build import ensure_index_built
+from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
+from ls_shop.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
 
 
 def after_install():
@@ -14,10 +20,47 @@ def after_install():
 		frappe.errprint(traceback.format_exc())
 
 	register_optional_doctype_links()
+	populate_search_settings()
+	ensure_storefront_search_index()
 
 
 def after_migrate():
 	register_optional_doctype_links()
+	populate_search_settings()
+	ensure_storefront_search_index()
+
+
+def populate_search_settings():
+	"""Seed the search content/result field tables when they have never been configured (idempotent)."""
+	if not frappe.db.exists("DocType", "Lifestyle Settings"):
+		return
+
+	settings = frappe.get_single("Lifestyle Settings")
+	if settings.search_content_fields and settings.search_result_fields:
+		return
+
+	if not settings.search_content_fields:
+		for search_doctype, field in DEFAULT_CONTENT_FIELDS:
+			settings.append("search_content_fields", {"search_doctype": search_doctype, "field": field})
+
+	if not settings.search_result_fields:
+		for field in RESULT_CARD_CATALOG:
+			settings.append(
+				"search_result_fields",
+				{"field": field, "show": 1 if field in DEFAULT_RESULT_FIELDS else 0},
+			)
+
+	# Fresh site: company/price lists are unset, so ignore_mandatory stops save() raising MandatoryError.
+	settings.flags.ignore_mandatory = True
+	settings.save(ignore_permissions=True)
+
+
+def ensure_storefront_search_index():
+	"""Backstop the storefront search index on install/migrate; never fail migrate over it."""
+	try:
+		ensure_index_built()
+	except Exception:
+		frappe.log_error(traceback.format_exc(), "Storefront Search Index - ensure_index_built")
 
 
 def register_optional_doctype_links():

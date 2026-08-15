@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.query_builder import DocType
 
+from ls_shop.search.sync import enqueue_upsert_many
+
 
 class BulkPublishVariants(Document):
 	# begin: auto-generated types
@@ -80,5 +82,8 @@ class BulkPublishVariants(Document):
 				{"name": ["in", variant_names]},
 				{"is_published": publish},
 			)
+			# frappe.db.set_value fires no document event, so the search index has to be handed the
+			# changed names explicitly or an unpublished variant stays searchable until the nightly job.
+			enqueue_upsert_many("Style Attribute Variant", variant_names)
 
 		return {"updated_count": total_count, "total_matched": len(variant_names)}
