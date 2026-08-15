@@ -116,7 +116,7 @@ doc_events = {
 
 jinja = {
 	"filters": ["ls_shop.utils.can_return"],
-	"methods": ["ls_shop.utils.get_currency_symbol"],
+	"methods": ["ls_shop.utils.format_theme_css", "ls_shop.utils.get_currency_symbol"],
 }
 
 
