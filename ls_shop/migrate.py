@@ -7,6 +7,7 @@ from ls_shop.api.payments import COD_PAYMENT_MODE
 from ls_shop.search.build import ensure_index_built
 from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
 from ls_shop.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
+from ls_shop.shop_themes.doctype.shop_theme_settings.shop_theme_settings import seed_default_routes
 from ls_shop.www.llms import DEFAULT_LLMS_TXT
 
 # Marks the robots.txt value as ours. Its absence from a non-blank value means an admin
@@ -31,6 +32,7 @@ def after_install():
 	ensure_storefront_search_index()
 	setup_robots_txt()
 	seed_llms_txt()
+	seed_default_routes()
 
 
 def after_migrate():
@@ -40,6 +42,7 @@ def after_migrate():
 	ensure_storefront_search_index()
 	setup_robots_txt()
 	seed_llms_txt()
+	seed_default_routes()
 
 
 def populate_search_settings():

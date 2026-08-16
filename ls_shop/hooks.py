@@ -87,6 +87,15 @@ website_route_rules = [
 
 before_request = ["ls_shop.utils.before_request"]
 
+# Instantiated before every core renderer (frappe/website/path_resolver.py). can_render()
+# returns False whenever Shop Theme Settings.active_theme is unset or the theme ships no
+# page for the route, which is the safety valve that leaves stock routing untouched.
+page_renderer = ["ls_shop.shop_themes.theme_resolver.ThemePageRenderer"]
+
+# Records of a custom doctype do not import on migrate at all without this
+# (frappe/model/sync.py). The module folder is an export target only.
+importable_doctypes = ["Shop Theme"]
+
 doctype_js = {
 	"Item": ["public/js/extends/item.js", "public/js/extends/ecommerce_tab.js"],
 	"Sales Order": "public/js/extends/sales_order.js",
@@ -145,6 +154,8 @@ jinja = {
 		"ls_shop.seo_jinja",
 		"ls_shop.shop_data.get_header_data",
 		"ls_shop.shop_data.get_storefront_menu",
+		"ls_shop.shop_themes.jinja_helpers.shop_theme_asset_url",
+		"ls_shop.shop_themes.jinja_helpers.shop_theme_config",
 	],
 }
 
