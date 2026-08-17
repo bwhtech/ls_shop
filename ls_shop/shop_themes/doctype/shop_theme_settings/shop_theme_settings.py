@@ -3,6 +3,8 @@ import re
 import frappe
 from frappe.model.document import Document
 
+from ls_shop.shop_themes.doctype.shop_theme.shop_theme import clear_render_theme_context
+
 LANG = r"(?P<lang>en|ar)"
 
 # The routes the bundled themes ship pages for. Seeded from after_install AND after_migrate
@@ -73,9 +75,7 @@ class ShopThemeSettings(Document):
 			try:
 				re.compile(row.url_pattern)
 			except re.error as error:
-				frappe.throw(
-					frappe._("Invalid regex in route {0}: {1}").format(row.url_pattern, error)
-				)
+				frappe.throw(frappe._("Invalid regex in route {0}: {1}").format(row.url_pattern, error))
 
 	def on_update(self):
 		clear_settings_cache()
@@ -100,6 +100,8 @@ def seed_default_routes():
 def clear_settings_cache():
 	frappe.cache.delete_value(COMPILED_ROUTES_CACHE_KEY)
 	frappe.local.shop_theme_compiled_routes = None
+	# The active theme lives on this Single, so the memoised render context is stale too.
+	clear_render_theme_context()
 
 
 def build_compiled_routes():

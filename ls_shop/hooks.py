@@ -92,6 +92,14 @@ before_request = ["ls_shop.utils.before_request"]
 # page for the route, which is the safety valve that leaves stock routing untouched.
 page_renderer = ["ls_shop.shop_themes.theme_resolver.ThemePageRenderer"]
 
+# The theme engine memoises the active theme and the compiled route table on frappe.local to
+# keep them off the per-request redis path, and frappe.clear_cache() flushes redis without
+# touching frappe.local - so a theme switch would stay invisible for the rest of the request.
+clear_cache = [
+	"ls_shop.shop_themes.doctype.shop_theme.shop_theme.clear_theme_cache",
+	"ls_shop.shop_themes.doctype.shop_theme_settings.shop_theme_settings.clear_settings_cache",
+]
+
 # Records of a custom doctype do not import on migrate at all without this
 # (frappe/model/sync.py). The module folder is an export target only.
 importable_doctypes = ["Shop Theme"]

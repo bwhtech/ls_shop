@@ -20,8 +20,22 @@ PREVIEW_THEME_PARAM = "preview_theme"
 class ShopTheme(Document):
 	def validate(self):
 		validate_theme_name(self.theme_name)
+		self.validate_unique_slug()
 		if self.parent_theme:
 			self.validate_no_circular_inheritance()
+
+	def validate_unique_slug(self):
+		# Every filesystem path a theme owns is frappe.scrub(theme_name), and "Foo Bar" and
+		# "Foo-Bar" both scrub to foo_bar. on_trash rmtrees by slug, so a collision lets
+		# deleting one theme take out the other's source tree.
+		# ponytail: scrubs every theme name in python, revisit if a site ever ships enough
+		# themes for this to matter
+		slug = frappe.scrub(self.theme_name)
+		# "" rather than self.name: a new doc has no name yet, and `!= NULL` matches no rows.
+		filters = {"name": ("!=", self.name or "")}
+		for theme_name in frappe.get_all("Shop Theme", filters=filters, pluck="theme_name"):
+			if frappe.scrub(theme_name) == slug:
+				frappe.throw(frappe._("Theme {0} already uses the folder name {1}").format(theme_name, slug))
 
 	def after_insert(self):
 		# A read-only apps volume would otherwise break the insert itself.
@@ -72,9 +86,7 @@ class ShopTheme(Document):
 			return
 
 		doc_before = self.get_doc_before_save()
-		if doc_before and not any(
-			self.get(field) != doc_before.get(field) for field in EXPORTED_FIELDS
-		):
+		if doc_before and not any(self.get(field) != doc_before.get(field) for field in EXPORTED_FIELDS):
 			return
 
 		export_module_json(self, is_standard=bool(self.is_standard), module=self.module)
@@ -274,8 +286,21 @@ def resolve_theme():
 	return requested_preview_theme() or resolve_active_theme()
 
 
+RENDER_THEME_CONTEXT_LOCAL_KEY = "shop_theme_render_context"
+
+
 def get_render_theme_context():
-	return get_theme_context(resolve_theme())
+	# Memoised on frappe.local over redis, same as get_compiled_routes(): can_render() runs
+	# ahead of every core renderer on every request, so the redis hget sits on that path.
+	context = getattr(frappe.local, RENDER_THEME_CONTEXT_LOCAL_KEY, None)
+	if context is None:
+		context = get_theme_context(resolve_theme())
+		setattr(frappe.local, RENDER_THEME_CONTEXT_LOCAL_KEY, context)
+	return context
+
+
+def clear_render_theme_context():
+	setattr(frappe.local, RENDER_THEME_CONTEXT_LOCAL_KEY, None)
 
 
 def requested_preview_theme():
@@ -295,3 +320,4 @@ def requested_preview_theme():
 
 def clear_theme_cache():
 	frappe.cache.delete_value(THEME_CONTEXT_CACHE_KEY)
+	clear_render_theme_context()
