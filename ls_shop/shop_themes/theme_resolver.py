@@ -6,7 +6,8 @@ from frappe.utils.jinja import get_jenv
 from frappe.utils.jinja_globals import is_rtl
 from frappe.website.doctype.website_settings.website_settings import get_website_settings
 from frappe.website.utils import build_response
-from jinja2 import BaseLoader, TemplateNotFound
+from jinja2 import BaseLoader, BytecodeCache, TemplateNotFound
+from jinja2.utils import LRUCache
 
 from ls_shop.shop_themes.doctype.shop_theme.shop_theme import (
 	get_render_theme_context,
@@ -160,9 +161,8 @@ class ThemePageRenderer:
 		return build_response(self.path, html, self.http_status_code or 200)
 
 	def render_with_theme_loader(self, context):
-		jenv = get_jenv()
-		theme_env = get_theme_environment(jenv, self.theme_dirs)
-		template = theme_env.get_template(f"theme://{self.template_path}", globals=jenv.globals)
+		theme_env = get_theme_environment(get_jenv(), self.theme_dirs)
+		template = theme_env.get_template(f"theme://{self.template_path}")
 		return template.render(context)
 
 
@@ -178,7 +178,15 @@ def is_dynamic_page(settings, request_path):
 	if not settings["dynamic_pages_enabled"] or not request_path:
 		return False
 
-	first_segment = request_path.split("/")[0]
+	segments = request_path.split("/")
+
+	# werkzeug percent-decodes request.path before a renderer sees it, so %2e%2e%2f arrives
+	# here as "..". Containment checks downstream catch the escape, but the template path is
+	# built from this string and must never carry a traversal in the first place.
+	if ".." in segments:
+		return False
+
+	first_segment = segments[0]
 	if first_segment in RESERVED_PATH_SEGMENTS:
 		return False
 
@@ -220,22 +228,54 @@ def read_template_source(full_path):
 	)
 
 
-theme_environments = {}
+class ThemeBytecodeCache(BytecodeCache):
+	"""Shares compiled template code across requests without sharing Template objects.
+
+	A shared Template cache cannot be used here: jinja memoises the module of a context-less
+	`{% import %}` on the Template itself, so the first request's lang, user and csrf token
+	would be frozen into every later request's macros. Compiled code carries no request
+	state, so it is the only part that is safe to keep.
+	"""
+
+	def __init__(self):
+		self.buckets = LRUCache(200)
+
+	def load_bytecode(self, bucket):
+		cached = self.buckets.get(bucket.key)
+		if cached and cached[0] == bucket.checksum:
+			bucket.code = cached[1]
+
+	def dump_bytecode(self, bucket):
+		self.buckets[bucket.key] = (bucket.checksum, bucket.code)
+
+
+theme_bytecode_caches = {}
+
+
+def get_theme_bytecode_cache():
+	# Keyed per site: theme dirs are bench-wide app paths, so anything keyed on those alone
+	# is one cache shared by every site on the bench.
+	site = getattr(frappe.local, "site", None)
+	bytecode_cache = theme_bytecode_caches.get(site)
+	if bytecode_cache is None:
+		bytecode_cache = ThemeBytecodeCache()
+		theme_bytecode_caches[site] = bytecode_cache
+	return bytecode_cache
 
 
 def get_theme_environment(jenv, theme_dirs):
-	key = tuple(theme_dirs)
-	theme_env = theme_environments.get(key)
-	if theme_env is None:
-		loader = ThemeFallbackLoader(theme_dirs, jenv.loader)
-		theme_env = jenv.overlay(loader=loader)
-		theme_env.auto_reload = bool(frappe.conf.get("developer_mode") or frappe._dev_server)
-		theme_environments[key] = theme_env
+	# Built fresh per request, never cached: a jinja overlay keeps a reference to the globals
+	# dict it was built from, and jenv.globals holds THIS request's user, full_name,
+	# form_dict, lang and csrf token. Caching the environment freezes the first request's
+	# identity into every macro imported without context, for every site on the bench.
+	theme_env = jenv.overlay(loader=ThemeFallbackLoader(theme_dirs, jenv.loader))
+	theme_env.auto_reload = bool(frappe.conf.get("developer_mode") or frappe._dev_server)
+	theme_env.bytecode_cache = get_theme_bytecode_cache()
 	return theme_env
 
 
 def build_base_context(match):
-	context = frappe._dict(is_rtl=is_rtl(), csrf_token=frappe.sessions.get_csrf_token())
+	context = frappe._dict(is_rtl=is_rtl())
 
 	if match:
 		apply_route_groups(match, context)
@@ -261,9 +301,11 @@ def apply_website_settings(context):
 		settings = frappe.client_cache.get_doc("Website Settings")
 		context.app_name = settings.app_name or DEFAULT_APP_NAME
 		context.app_logo = settings.app_logo
-	except Exception:
-		# Branding is cosmetic; a themed page must still render without it.
-		frappe.log_error(title="Shop Theme: website settings failed")
+	except frappe.DoesNotExistError:
+		# Website Settings only goes missing on a site mid-install; branding is cosmetic and a
+		# themed page must still render without it. Anything else is a real fault and must
+		# surface - swallowing it wrote an Error Log row per anonymous page view.
+		pass
 
 
 def apply_route_groups(match, context):

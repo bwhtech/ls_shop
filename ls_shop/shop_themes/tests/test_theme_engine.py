@@ -5,9 +5,11 @@
 
 import os
 import re
+import tempfile
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
+from frappe.utils.jinja import get_jenv
 
 from ls_shop.shop_themes.doctype.shop_theme.shop_theme import (
 	build_theme_context,
@@ -22,9 +24,14 @@ from ls_shop.shop_themes.doctype.shop_theme_settings.shop_theme_settings import 
 )
 from ls_shop.shop_themes.jinja_helpers import shop_theme_asset_url, shop_theme_config
 from ls_shop.shop_themes.theme_resolver import (
+	ThemePageRenderer,
+	build_base_context,
 	find_theme_file,
+	get_theme_bytecode_cache,
+	get_theme_environment,
 	is_dynamic_page,
 	match_route,
+	theme_bytecode_caches,
 )
 
 APP_PATH = frappe.get_app_path("ls_shop")
@@ -76,6 +83,16 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 	def activate(self, theme_name):
 		frappe.db.set_single_value("Shop Theme Settings", "active_theme", theme_name)
 		frappe.clear_cache()
+
+	def test_a_theme_name_that_scrubs_onto_an_existing_theme_is_rejected(self):
+		# "Shop-Default-Theme" scrubs to shop_default_theme, the folder the shipped theme owns.
+		# on_trash rmtrees by slug, so allowing both would let deleting one delete the other.
+		# Validated without inserting: after_insert scaffolds real directories under the app.
+		collision = frappe.new_doc("Shop Theme", theme_name="Shop-Default-Theme")
+		self.assertRaises(frappe.ValidationError, collision.validate)
+
+	def test_a_theme_validates_against_its_own_slug(self):
+		frappe.get_doc("Shop Theme", "Shop Default Theme").validate()
 
 	def test_build_theme_context_resolves_the_inheritance_chain_and_dirs(self):
 		context = build_theme_context("Shop Default Theme")
@@ -147,6 +164,15 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.assertFalse(is_dynamic_page(settings, "not-a-lang/foo"))
 		self.assertTrue(is_dynamic_page(settings, "en/foo"))
 
+	def test_is_dynamic_page_rejects_traversal_segments(self):
+		# werkzeug hands the renderer an already percent-decoded path, so %2e%2e%2f is ".."
+		# by the time it reaches here and would land in the template path verbatim.
+		settings = {"routes": [], "dynamic_pages_enabled": True}
+		self.assertFalse(is_dynamic_page(settings, "en/../../../etc/passwd"))
+		self.assertFalse(is_dynamic_page(settings, "en/.."))
+		self.assertFalse(is_dynamic_page(settings, "../en/about"))
+		self.assertTrue(is_dynamic_page(settings, "en/about"))
+
 	def test_is_dynamic_page_off_when_disabled(self):
 		settings = {"dynamic_pages_enabled": False}
 		self.assertFalse(is_dynamic_page(settings, "en/foo"))
@@ -206,6 +232,107 @@ class IntegrationTestThemeBaseContract(IntegrationTestCase):
 					re.search(r"\{%-?\s*block\s+" + block_name + r"\s*-?%\}", source),
 					f"{theme_slug}/components/base.html is missing the required '{block_name}' block",
 				)
+
+
+class IntegrationTestThemeEnvironmentIsolation(IntegrationTestCase):
+	"""The theme environment must carry THIS request's identity, never the first request's.
+
+	A jinja overlay keeps a reference to the globals dict it was built from, and jinja
+	memoises the module of a context-less `{% import %}` on the Template object. Caching
+	either across requests freezes user, lang and csrf_token - and theme dirs are bench-wide
+	app paths, so a cache keyed on them is shared by every site on the bench.
+	"""
+
+	def setUp(self):
+		self.theme_dir = tempfile.mkdtemp(prefix="shop_theme_isolation_")
+		self.addCleanup(self.remove_theme_dir)
+		os.makedirs(os.path.join(self.theme_dir, "components"))
+		os.makedirs(os.path.join(self.theme_dir, "pages"))
+		self.write_theme_file(
+			"components/probe_macros.html",
+			"{% macro identity() %}lang={{ frappe.lang }} user={{ frappe.session.user }}{% endmacro %}",
+		)
+		# Imported WITHOUT context, exactly as the shipped theme imports item_carousel.html
+		# and search_bar_modal.html - that is the import form that freezes.
+		self.write_theme_file(
+			"pages/probe.html",
+			"{% import 'components/probe_macros.html' as probe %}"
+			"top lang={{ frappe.lang }} user={{ frappe.session.user }} macro {{ probe.identity() }}",
+		)
+		self.original_lang = frappe.local.lang
+		self.addCleanup(self.restore_request)
+
+	def remove_theme_dir(self):
+		for relative_path in ("components/probe_macros.html", "pages/probe.html"):
+			os.remove(os.path.join(self.theme_dir, relative_path))
+		for folder in ("components", "pages"):
+			os.rmdir(os.path.join(self.theme_dir, folder))
+		os.rmdir(self.theme_dir)
+
+	def restore_request(self):
+		frappe.set_user("Administrator")
+		frappe.local.lang = self.original_lang
+
+	def write_theme_file(self, relative_path, source):
+		with open(os.path.join(self.theme_dir, relative_path), "w") as theme_file:
+			theme_file.write(source)
+
+	def render_as(self, user, lang):
+		frappe.set_user(user)
+		frappe.local.lang = lang
+		# get_jenv() memoises the per-request environment on frappe.local; dropping it is what
+		# makes one call here equivalent to one fresh request.
+		for local_key in ("jenv_restricted", "jenv_unrestricted"):
+			if hasattr(frappe.local, local_key):
+				delattr(frappe.local, local_key)
+
+		renderer = ThemePageRenderer("probe")
+		renderer.theme_dirs = [self.theme_dir]
+		renderer.template_path = "pages/probe.html"
+		return renderer.render_with_theme_loader(frappe._dict())
+
+	def test_a_later_request_sees_its_own_user_and_lang_inside_a_contextless_macro(self):
+		self.assertEqual(
+			self.render_as("Administrator", "en"),
+			"top lang=en user=Administrator macro lang=en user=Administrator",
+		)
+		self.assertEqual(
+			self.render_as("Guest", "ar"),
+			"top lang=ar user=Guest macro lang=ar user=Guest",
+		)
+		self.assertEqual(
+			self.render_as("Administrator", "en"),
+			"top lang=en user=Administrator macro lang=en user=Administrator",
+		)
+
+	def test_theme_environment_is_never_reused_across_requests(self):
+		first_env = get_theme_environment(get_jenv(), [self.theme_dir])
+		second_env = get_theme_environment(get_jenv(), [self.theme_dir])
+		self.assertIsNot(first_env, second_env)
+		self.assertIsNot(first_env.loader, second_env.loader)
+
+	def test_theme_environment_globals_are_the_current_requests_globals(self):
+		jenv = get_jenv()
+		self.assertIs(get_theme_environment(jenv, [self.theme_dir]).globals, jenv.globals)
+
+	def test_bytecode_cache_is_scoped_to_the_site(self):
+		# The only thing shared across requests. Theme dirs are app paths every site on the
+		# bench resolves identically, so an unkeyed cache would be one bench-wide cache.
+		original_site = frappe.local.site
+		self.addCleanup(setattr, frappe.local, "site", original_site)
+
+		own_cache = get_theme_bytecode_cache()
+		frappe.local.site = "another-tenant.localhost"
+		self.addCleanup(theme_bytecode_caches.pop, "another-tenant.localhost", None)
+		self.assertIsNot(own_cache, get_theme_bytecode_cache())
+
+
+class IntegrationTestThemeBaseContext(IntegrationTestCase):
+	def test_base_context_does_not_mint_a_csrf_token(self):
+		# No template reads context.csrf_token - they read frappe.session.csrf_token from the
+		# jinja globals. Calling get_csrf_token() here minted a throwaway token per anonymous
+		# request and made a themed page differ from the same page unthemed.
+		self.assertNotIn("csrf_token", build_base_context(None))
 
 
 class IntegrationTestThemedRendering(IntegrationTestCase):

@@ -19,14 +19,13 @@ def render_themed_template(template, context=None, theme_name=None):
 	if not theme_context["dirs"]:
 		return frappe.render_template(template, context)
 
-	jenv = get_jenv()
-	theme_env = get_theme_environment(jenv, theme_context["dirs"])
+	theme_env = get_theme_environment(get_jenv(), theme_context["dirs"])
 
 	if guess_is_path(template):
-		compiled = theme_env.get_template(template, globals=jenv.globals)
+		compiled = theme_env.get_template(template)
 	else:
 		if ".__" in template:
 			frappe.throw(frappe._("Illegal template"))
-		compiled = theme_env.from_string(template, globals=jenv.globals)
+		compiled = theme_env.from_string(template)
 
 	return compiled.render(context or {})
