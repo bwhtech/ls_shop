@@ -1,14 +1,17 @@
-{% extends "templates/layout.html" %}
-{% from "templates/macros/item_card.html" import item_card %}
+{% extends "components/base.html" %}
+{% from "components/macros/product_card.html" import product_card as item_card %}
 {% from "templates/macros/icon.html" import icon %}
 {% from "templates/macros/modal.html" import modal %}
-{% from 'templates/macros/tabby-promo.html' import tabby   %}
+{% from 'templates/macros/tabby-promo.html' import tabby %}
+
 {% block head %}
 {% include "templates/partials/products_details/head.html" %}
 {% endblock %}
+
 {% block body %}
 {% include "templates/partials/products_details/body.html" %}
 {% endblock %}
+
 {% block script %}
 {% include "templates/partials/products_details/script.html" %}
 {% endblock %}

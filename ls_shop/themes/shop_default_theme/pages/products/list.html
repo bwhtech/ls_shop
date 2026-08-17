@@ -1,0 +1,20 @@
+{% extends "components/base.html" %}
+{% from "components/macros/product_card.html" import product_card as item_card %}
+
+{% block body %}
+{% include "templates/partials/products_list/body.html" %}
+{% endblock %}
+
+{% block script %}
+<script>
+	function go_to_page(page) {
+		state.page = `${page}`;
+		window.location.reload();
+		window.scrollTo(0, 0);
+	}
+	function sort_by(sort_by_value) {
+		state.sort_by = `${sort_by_value}`;
+		window.location.reload();
+	}
+</script>
+{% endblock %}

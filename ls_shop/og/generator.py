@@ -10,6 +10,7 @@ import frappe
 from frappe.utils import flt, get_files_path
 
 from ls_shop import seo
+from ls_shop.shop_themes.render import render_themed_template
 
 # resvg-js is pathologically slow on large embedded images (a 1220x1760 source took ~58s;
 # downscaled it renders in <1s), so product photos are inlined at this longest-edge px.
@@ -111,11 +112,11 @@ def resolve_template(for_doctype):
 
 def render_card_for_doc(for_doctype, doc):
 	context = context_builder_for(for_doctype)(doc)
-	# Renders on the global jenv, outside any request, so it sees no theme overrides. When
-	# the theme engine lands, swap this one call for render_themed_template(); the rest of
-	# the pipeline is already template-agnostic.
+	# Renders through the active theme's loader when one is set, outside any request; falls
+	# back to frappe.render_template when no theme is active - the rest of the pipeline is
+	# already template-agnostic.
 	# nosemgrep: frappe-ssti  # template is admin-authored OG Image Template, not end-user input
-	html_str = frappe.render_template(resolve_template(for_doctype), context)
+	html_str = render_themed_template(resolve_template(for_doctype), context)
 	return render_og_png(html_str, DEFAULT_OG_WIDTH, DEFAULT_OG_HEIGHT)
 
 
