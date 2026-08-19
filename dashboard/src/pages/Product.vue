@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import VariantRow from "@/components/VariantRow.vue"
+import OptionRow from "@/components/OptionRow.vue"
 import type { ProductDetail, ProductVariant } from "@/types"
 import { formatPriceRange, publishTheme, sumStock } from "@/utils/format"
 import {
+	Alert,
 	Badge,
 	Breadcrumbs,
 	Button,
@@ -84,16 +85,14 @@ const stockTotal = computed(() =>
 	variants.value.reduce((total, variant) => total + sumStock(variant.sizes), 0),
 )
 
-// Options that were skipped are the ones still missing an image or a size; naming them beats a
-// silent partial success the owner has to go hunting for.
-const skippedNotice = computed(() => {
-	const skipped = publishAll.data?.skipped ?? []
-	return skipped.length
-		? `Still not live: ${skipped.join(", ")} — add an image first.`
-		: ""
-})
+// The one thing an owner most needs to know is why the product is not selling yet, so lead with
+// it rather than leaving them to notice a greyed-out switch.
+const blockedOptions = computed(() =>
+	variants.value
+		.filter((variant) => variant.blockers.length > 0)
+		.map((variant) => variant.option),
+)
 
-// Only a live option has a page a customer can actually open.
 const storefrontUrl = computed(
 	() =>
 		variants.value.find(
@@ -101,7 +100,12 @@ const storefrontUrl = computed(
 		)?.storefront_url ?? "",
 )
 
-const collectionOptions = computed(() => collections.data ?? [])
+const heroImage = computed(
+	() =>
+		product.data?.image ??
+		variants.value.find((variant) => variant.images.length)?.images[0] ??
+		"",
+)
 
 function saveDetails() {
 	updateProduct.submit({
@@ -116,7 +120,7 @@ function saveDetails() {
 <template>
 	<div class="flex h-full flex-col bg-surface-base">
 		<header
-			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
+			class="flex min-h-12 shrink-0 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
 		>
 			<Breadcrumbs
 				:items="[
@@ -144,83 +148,109 @@ function saveDetails() {
 			</div>
 		</header>
 
-		<div class="min-h-0 flex-1 overflow-y-auto">
-			<div class="body-container pb-40 pt-5">
-				<LoadingText v-if="product.loading && !product.data" :lines="3" />
+		<LoadingText v-if="product.loading && !product.data" class="p-5" :lines="4" />
 
-				<template v-else-if="product.data">
-					<dl class="flex gap-8 pb-5">
-						<div>
-							<dt class="text-sm text-ink-gray-5">Storefront</dt>
-							<dd class="mt-1">
-								<Badge
-									variant="subtle"
-									:theme="publishTheme(liveCount)"
-									:label="liveCount ? `${liveCount} live` : 'Not live'"
-								/>
-							</dd>
-						</div>
-						<div>
-							<dt class="text-sm text-ink-gray-5">Price</dt>
-							<dd class="mt-1 text-base text-ink-gray-9">{{ priceLabel }}</dd>
-						</div>
-						<div>
-							<dt class="text-sm text-ink-gray-5">In stock</dt>
-							<dd class="mt-1 text-base text-ink-gray-9">{{ stockTotal }}</dd>
-						</div>
-					</dl>
+		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
+			<!-- Main pane: the options are the work surface, so they get the width. -->
+			<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
+				<Alert
+					v-if="blockedOptions.length"
+					class="mb-5"
+					theme="orange"
+					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
+				>
+					{{ blockedOptions.join(", ") }} still needs a photo before it can go live.
+				</Alert>
 
-					<section>
-						<div class="flex items-baseline gap-2">
-							<h2 class="text-md text-ink-gray-9">Options</h2>
-							<span class="text-sm text-ink-gray-5">
-								{{ liveCount }} of {{ variants.length }} live
-							</span>
-						</div>
+				<div class="flex items-baseline justify-between">
+					<h2 class="text-md text-ink-gray-9">Options</h2>
+					<span class="text-sm text-ink-gray-5">{{ liveCount }} of {{ variants.length }} live</span>
+				</div>
 
-						<p v-if="skippedNotice" class="mt-1 text-p-sm text-ink-amber-6">
-							{{ skippedNotice }}
-						</p>
+				<div class="mt-1 flex items-center gap-4 border-b border-outline-gray-1 pb-1.5">
+					<span class="flex-1 text-sm text-ink-gray-5">Option</span>
+					<span class="w-24 shrink-0 text-right text-sm text-ink-gray-5">Price</span>
+					<span class="w-20 shrink-0 text-right text-sm text-ink-gray-5">Stock</span>
+					<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">Live</span>
+				</div>
 
-						<div class="mt-2 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
-							<VariantRow
-								v-for="variant in variants"
-								:key="variant.name"
-								:variant="variant"
-								@changed="product.reload()"
-							/>
-						</div>
-					</section>
-
-					<section class="mt-6">
-						<h2 class="text-md text-ink-gray-9">Details</h2>
-						<div class="mt-3 max-w-xl space-y-4">
-							<FormControl v-model="details.title" label="Title" required />
-							<FormControl
-								v-model="details.collection"
-								type="select"
-								label="Collection"
-								:options="collectionOptions"
-							/>
-							<FormControl
-								v-model="details.description"
-								type="textarea"
-								label="Description"
-								description="Shown to customers on the product page."
-								:rows="4"
-							/>
-							<div class="flex justify-end">
-								<Button
-									:loading="updateProduct.loading"
-									:disabled="!detailsChanged"
-									label="Save changes"
-									@click="saveDetails"
-								/>
-							</div>
-						</div>
-					</section>
-				</template>
+				<div class="divide-y divide-outline-gray-1">
+					<OptionRow
+						v-for="variant in variants"
+						:key="variant.name"
+						:variant="variant"
+						@changed="product.reload()"
+					/>
+				</div>
 			</div>
+
+			<!-- Side panel: what the product *is*, kept out of the way of what you came to change. -->
+			<aside
+				class="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-outline-gray-1 lg:flex"
+			>
+				<div class="flex items-center gap-3 border-b border-outline-gray-1 px-4 py-4">
+					<img
+						v-if="heroImage"
+						:src="heroImage"
+						alt=""
+						class="size-12 shrink-0 rounded-lg object-cover"
+					/>
+					<div
+						v-else
+						class="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-gray-2 text-ink-gray-4"
+					>
+						{{ details.title.slice(0, 1) }}
+					</div>
+					<div class="min-w-0">
+						<div class="truncate text-base text-ink-gray-9">{{ product.data.title }}</div>
+						<Badge
+							class="mt-1"
+							variant="subtle"
+							:theme="publishTheme(liveCount)"
+							:label="liveCount ? `${liveCount} live` : 'Not live'"
+						/>
+					</div>
+				</div>
+
+				<dl class="space-y-2.5 border-b border-outline-gray-1 px-4 py-4">
+					<div class="flex items-center justify-between">
+						<dt class="text-sm text-ink-gray-5">Options</dt>
+						<dd class="text-base text-ink-gray-9">{{ variants.length }}</dd>
+					</div>
+					<div class="flex items-center justify-between">
+						<dt class="text-sm text-ink-gray-5">Price</dt>
+						<dd class="text-base text-ink-gray-9">{{ priceLabel }}</dd>
+					</div>
+					<div class="flex items-center justify-between">
+						<dt class="text-sm text-ink-gray-5">In stock</dt>
+						<dd class="text-base text-ink-gray-9">{{ stockTotal }}</dd>
+					</div>
+				</dl>
+
+				<div class="space-y-4 px-4 py-4">
+					<FormControl v-model="details.title" label="Title" required />
+					<FormControl
+						v-model="details.collection"
+						type="select"
+						label="Collection"
+						:options="collections.data ?? []"
+					/>
+					<FormControl
+						v-model="details.description"
+						type="textarea"
+						label="Description"
+						description="Shown on the product page."
+						:rows="4"
+					/>
+					<Button
+						class="w-full"
+						:loading="updateProduct.loading"
+						:disabled="!detailsChanged"
+						:label="detailsChanged ? 'Save changes' : 'Saved'"
+						@click="saveDetails"
+					/>
+				</div>
+			</aside>
 		</div>
 	</div>
 </template>

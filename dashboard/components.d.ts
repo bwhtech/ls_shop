@@ -12,8 +12,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
+    OptionRow: typeof import('./src/components/OptionRow.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    VariantRow: typeof import('./src/components/VariantRow.vue')['default']
   }
 }
