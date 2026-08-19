@@ -159,3 +159,33 @@
 		padding-bottom: 50px;
 	}
 }
+
+/* --- Marquee band: the loop dz.carousel.js used to drive --- */
+
+/* style.css leaves .dz-features-wrapper display:block and the single .dz-features ul at the
+   wrapper's own width, so @keyframes ticker's translateX(-100%) shifts one viewport rather than
+   one track length and the strip snaps back mid-word. Laying the two tracks out in a row and
+   sizing each to its content makes -100% exactly one track, so the duplicate arrives in the
+   first one's place and the wrap point disappears. */
+.dz-features-wrapper {
+	display: flex;
+	/* The wrapper is a decorative strip, not reading order: pinning it LTR keeps the two tracks
+	   in the order the animation assumes, so /ar cannot reverse them and expose the gap. Arabic
+	   labels still shape RTL inside their own item. */
+	direction: ltr;
+}
+
+.dz-features-wrapper .dz-features {
+	flex: 0 0 auto;
+	width: max-content;
+	/* 32.9528s was written by the vendor JS for a shift of one 1440px viewport. Ours travels a
+	   whole 4355px track, so the duration is re-timed to keep the reference's 43.8px/s crawl. */
+	animation-duration: 99s;
+}
+
+/* style.css only pauses on hover; a strip that never stops is exactly what this query is for. */
+@media (prefers-reduced-motion: reduce) {
+	.dz-features-wrapper .dz-features {
+		animation-play-state: paused;
+	}
+}

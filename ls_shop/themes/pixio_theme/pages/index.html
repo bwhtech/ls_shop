@@ -9,6 +9,7 @@
 {% block uncontained_body %}
 	{% if settings.hero_slides %}{% include "components/sections/hero_slider.html" %}{% endif %}
 	{% if settings.shop_by_category %}{% include "components/sections/category_strip.html" %}{% endif %}
+	{% if header_data.navigation_menu %}{% include "components/sections/marquee.html" %}{% endif %}
 	{% if picked_products.best_picks %}{% include "components/sections/products_grid.html" %}{% endif %}
 	{% if settings.collection_banners %}{% include "components/sections/collection.html" %}{% endif %}
 	{% if picked_products.deal_picks %}{% include "components/sections/deals.html" %}{% endif %}
