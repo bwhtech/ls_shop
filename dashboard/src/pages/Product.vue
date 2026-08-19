@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import OptionRow from "@/components/OptionRow.vue"
+import OptionsTable from "@/components/OptionsTable.vue"
+import ProductMedia from "@/components/ProductMedia.vue"
 import type { ProductDetail, ProductVariant } from "@/types"
 import { formatPriceRange, publishTheme, sumStock } from "@/utils/format"
 import {
@@ -150,107 +151,95 @@ function saveDetails() {
 
 		<LoadingText v-if="product.loading && !product.data" class="p-5" :lines="4" />
 
-		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
-			<!-- Main pane: the options are the work surface, so they get the width. -->
-			<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
-				<Alert
-					v-if="blockedOptions.length"
-					class="mb-5"
-					theme="orange"
-					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
+		<template v-else-if="product.data">
+			<!-- Identity strip: what this product is and whether it is selling, before any form. -->
+			<div
+				class="flex shrink-0 items-center gap-4 border-b border-outline-gray-1 px-3 py-4 sm:px-5"
+			>
+				<img
+					v-if="heroImage"
+					:src="heroImage"
+					alt=""
+					class="size-14 shrink-0 rounded-lg object-cover"
+				/>
+				<div
+					v-else
+					class="grid size-14 shrink-0 place-items-center rounded-lg bg-surface-gray-2 text-ink-gray-4"
 				>
-					{{ blockedOptions.join(", ") }} still needs a photo before it can go live.
-				</Alert>
-
-				<div class="flex items-baseline justify-between">
-					<h2 class="text-md text-ink-gray-9">Options</h2>
-					<span class="text-sm text-ink-gray-5">{{ liveCount }} of {{ variants.length }} live</span>
+					{{ details.title.slice(0, 1) }}
 				</div>
 
-				<div class="mt-1 flex items-center gap-4 border-b border-outline-gray-1 pb-1.5">
-					<span class="flex-1 text-sm text-ink-gray-5">Option</span>
-					<span class="w-24 shrink-0 text-right text-sm text-ink-gray-5">Price</span>
-					<span class="w-20 shrink-0 text-right text-sm text-ink-gray-5">Stock</span>
-					<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">Live</span>
-				</div>
-
-				<div class="divide-y divide-outline-gray-1">
-					<OptionRow
-						v-for="variant in variants"
-						:key="variant.name"
-						:variant="variant"
-						@changed="product.reload()"
-					/>
+				<div class="min-w-0">
+					<h1 class="truncate text-lg text-ink-gray-9">{{ product.data.title }}</h1>
+					<div class="mt-1 flex items-center gap-2">
+						<Badge
+							variant="subtle"
+							:theme="publishTheme(liveCount)"
+							:label="liveCount ? `${liveCount} of ${variants.length} live` : 'Not live'"
+						/>
+						<span class="text-sm text-ink-gray-5">
+							{{ priceLabel }} · {{ stockTotal }} in stock
+						</span>
+					</div>
 				</div>
 			</div>
 
-			<!-- Side panel: what the product *is*, kept out of the way of what you came to change. -->
-			<aside
-				class="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-outline-gray-1 lg:flex"
-			>
-				<div class="flex items-center gap-3 border-b border-outline-gray-1 px-4 py-4">
-					<img
-						v-if="heroImage"
-						:src="heroImage"
-						alt=""
-						class="size-12 shrink-0 rounded-lg object-cover"
-					/>
-					<div
-						v-else
-						class="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-gray-2 text-ink-gray-4"
+			<div class="flex min-h-0 flex-1 overflow-hidden">
+				<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
+					<Alert
+						v-if="blockedOptions.length"
+						class="mb-5"
+						theme="orange"
+						:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
 					>
-						{{ details.title.slice(0, 1) }}
-					</div>
-					<div class="min-w-0">
-						<div class="truncate text-base text-ink-gray-9">{{ product.data.title }}</div>
-						<Badge
-							class="mt-1"
-							variant="subtle"
-							:theme="publishTheme(liveCount)"
-							:label="liveCount ? `${liveCount} live` : 'Not live'"
-						/>
-					</div>
-				</div>
+						{{ blockedOptions.join(", ") }} still needs a photo before it can go live.
+					</Alert>
 
-				<dl class="space-y-2.5 border-b border-outline-gray-1 px-4 py-4">
-					<div class="flex items-center justify-between">
-						<dt class="text-sm text-ink-gray-5">Options</dt>
-						<dd class="text-base text-ink-gray-9">{{ variants.length }}</dd>
-					</div>
-					<div class="flex items-center justify-between">
-						<dt class="text-sm text-ink-gray-5">Price</dt>
-						<dd class="text-base text-ink-gray-9">{{ priceLabel }}</dd>
-					</div>
-					<div class="flex items-center justify-between">
-						<dt class="text-sm text-ink-gray-5">In stock</dt>
-						<dd class="text-base text-ink-gray-9">{{ stockTotal }}</dd>
-					</div>
-				</dl>
+					<section class="mb-5 rounded-lg border border-outline-gray-1">
+						<h2 class="border-b border-outline-gray-1 px-4 py-3 text-base text-ink-gray-9">
+							Details
+						</h2>
+						<div class="space-y-4 p-4">
+							<FormControl v-model="details.title" label="Title" required />
+							<FormControl
+								v-model="details.collection"
+								type="select"
+								label="Collection"
+								:options="collections.data ?? []"
+							/>
+							<FormControl
+								v-model="details.description"
+								type="textarea"
+								label="Description"
+								description="Shown to customers on the product page."
+								:rows="3"
+							/>
+							<div class="flex justify-end">
+								<Button
+									:loading="updateProduct.loading"
+									:disabled="!detailsChanged"
+									:label="detailsChanged ? 'Save changes' : 'Saved'"
+									@click="saveDetails"
+								/>
+							</div>
+						</div>
+					</section>
 
-				<div class="space-y-4 px-4 py-4">
-					<FormControl v-model="details.title" label="Title" required />
-					<FormControl
-						v-model="details.collection"
-						type="select"
-						label="Collection"
-						:options="collections.data ?? []"
-					/>
-					<FormControl
-						v-model="details.description"
-						type="textarea"
-						label="Description"
-						description="Shown on the product page."
-						:rows="4"
-					/>
-					<Button
-						class="w-full"
-						:loading="updateProduct.loading"
-						:disabled="!detailsChanged"
-						:label="detailsChanged ? 'Save changes' : 'Saved'"
-						@click="saveDetails"
-					/>
+					<section class="mb-5 rounded-lg border border-outline-gray-1">
+						<h2 class="border-b border-outline-gray-1 px-4 py-3 text-base text-ink-gray-9">
+							Photos
+						</h2>
+						<ProductMedia :variants="variants" @changed="product.reload()" />
+					</section>
+
+					<section class="rounded-lg border border-outline-gray-1">
+						<h2 class="border-b border-outline-gray-1 px-4 py-3 text-base text-ink-gray-9">
+							Options &amp; inventory
+						</h2>
+						<OptionsTable :variants="variants" @changed="product.reload()" />
+					</section>
 				</div>
-			</aside>
-		</div>
+			</div>
+		</template>
 	</div>
 </template>
