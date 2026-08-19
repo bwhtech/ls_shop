@@ -1,0 +1,161 @@
+/* Net-new CSS for the Pixio theme.
+
+   Everything here exists because the reference markup is driven by Swiper and slick, which
+   size their slides from JavaScript config that this theme does not ship. Embla only moves
+   the track - it never writes a width - so the per-carousel widths and gutters that used to
+   live in the vendor JS options live here instead. Nothing else belongs in this file:
+   style.css and skin-1.css own the theme's looks. */
+
+[data-pixio-carousel] > .swiper-wrapper {
+	flex-direction: row;
+	height: auto;
+}
+
+/* slick wrapped its slides in a clipping .slick-list; Embla only moves the track, so the
+   hero's two viewports have to do their own clipping. .swiper carousels get this from
+   swiper-bundle.min.css already. */
+.main-slider-wrapper .slider-main,
+.main-slider-wrapper .slider-thumbs {
+	overflow: hidden;
+}
+
+[data-pixio-carousel] .swiper-slide,
+[data-pixio-carousel] .slick-slide {
+	flex: 0 0 auto;
+	width: 100%;
+	height: auto;
+}
+
+/* Two banners per view: style.css marks the slide after the current one .slick-active too, and
+   only reveals its rotated data-name label there, which is slick's two-up config showing
+   through. .slider-thumbs is already 65vw wide, so the pair overhangs the right edge. */
+.main-slider-wrapper .slider-thumbs .slick-slide {
+	width: 50%;
+}
+
+.swiper-shop .swiper-slide {
+	width: 33.333%;
+	padding-inline: 15px;
+}
+
+.swiper-four .swiper-slide {
+	width: 25%;
+	padding-inline: 15px;
+}
+
+/* The offer rail is the one carousel the reference runs three-up on a 15px spaceBetween instead of
+   the 30px gutter the others use, and the width is load-bearing rather than cosmetic:
+   .product-box.style-2 pins its copy to the right edge of a fixed 400px card, so a narrower slide
+   drags the 50px heading back across the middle of the photo. Its breakpoints step 3 - 2 - 1.5 - 1,
+   which is why it no longer shares the rules below. */
+.swiper-product .swiper-slide {
+	width: calc(33.333% - 10px);
+	margin-inline-end: 15px;
+}
+
+/* .shop-card.style-4 lays its media and copy out side by side behind a 150px fixed image,
+   so the featured rail runs one slide wider than the other two to keep titles off four lines. */
+.swiper-product2 .swiper-slide {
+	width: 33.333%;
+	padding-inline: 15px;
+}
+
+@media only screen and (max-width: 1199px) {
+	.swiper-four .swiper-slide {
+		width: 33.333%;
+	}
+
+	.swiper-product .swiper-slide {
+		width: calc(50% - 7.5px);
+	}
+
+	.swiper-product2 .swiper-slide {
+		width: 50%;
+	}
+}
+
+@media only screen and (max-width: 991px) {
+	.swiper-shop .swiper-slide,
+	.swiper-four .swiper-slide,
+	.swiper-product2 .swiper-slide {
+		width: 50%;
+	}
+}
+
+@media only screen and (max-width: 767px) {
+	.swiper-product .swiper-slide {
+		width: calc(66.666% - 5px);
+	}
+}
+
+@media only screen and (max-width: 575px) {
+	.main-slider-wrapper .slider-thumbs .slick-slide {
+		width: 55%;
+	}
+
+	.swiper-shop .swiper-slide {
+		width: 50%;
+	}
+
+	.swiper-four .swiper-slide,
+	.swiper-product2 .swiper-slide {
+		width: 80%;
+	}
+
+	.swiper-product .swiper-slide {
+		width: 100%;
+	}
+}
+
+/* The reference grid's uniform card height comes from its photography, not from CSS: every
+   images/shop/product/*.png is 450x600 and .dz-media has no size of its own. Catalogue images
+   are merchant uploads ranging from 0.51 to 1.17 aspect, so without a box to fit them into the
+   row staircases. 3/4 is the reference's own frame. */
+.card-container .shop-card .dz-media {
+	aspect-ratio: 3 / 4;
+	background-color: var(--bg-light);
+}
+
+/* contain, not cover: the catalogue ships cut-out packshots cropped to the garment's own edges,
+   so filling the frame amputates them - the 130x255 jeans lose their legs. */
+.card-container .shop-card .dz-media img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+/* --- Header gaps left by the vendor JS this theme does not load --- */
+
+/* bootstrap-select replaces the category <select> with a .bootstrap-select.default-select
+   wrapper and a .dropdown-toggle button, and style.css puts the column's geometry on those.
+   Without that script the native control is the only element left, so it has to carry the
+   wrapper's 185px column, its 45px row and its hairline divider itself. */
+.dz-search-area .search-input select.default-select {
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 185px;
+	height: 45px;
+	padding: 0 20px !important;
+	background-color: transparent;
+	border-right: 1px solid rgba(187, 187, 187, 0.68) !important;
+}
+
+/* style.css fixes the canvas at 580px to fit the reference's product carousel. This one holds
+   the form alone - see the note in overlays/search_canvas.html - so a fixed height would be
+   400px of empty cream. */
+.dz-search-area.offcanvas {
+	height: auto;
+	/* .offcanvas pins bottom as well as top, so height alone would still stretch to the fold. */
+	bottom: auto;
+}
+
+/* --- Footer gap left by this theme's own mobile chrome --- */
+
+/* Below 992px the header's .extra-nav icon bar is position:fixed across the bottom 50px of the
+   viewport. The reference has no such bar, so nothing in style.css reserves the space, and the
+   footer is the page's last element - its payment strip is what ends up underneath. */
+@media only screen and (max-width: 991px) {
+	.site-footer.style-1 .footer-bottom {
+		padding-bottom: 50px;
+	}
+}

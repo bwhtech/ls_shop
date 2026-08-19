@@ -1,0 +1,23 @@
+{% extends "components/theme_layout.html" %}
+
+{% set settings = shop_theme_config() %}
+
+{# Every band is full-bleed - .main-slider-wrapper, .shop-section and .adv-area all break out
+   of the container - so the homepage lives in uncontained_body and each section opens its own
+   .container. Each is guarded on the settings field that feeds it: an unconfigured section
+   renders nothing rather than an empty shell. #}
+{% block uncontained_body %}
+	{% if settings.hero_slides %}{% include "components/sections/hero_slider.html" %}{% endif %}
+	{% if settings.shop_by_category %}{% include "components/sections/category_strip.html" %}{% endif %}
+	{% if picked_products.best_picks %}{% include "components/sections/products_grid.html" %}{% endif %}
+	{% if settings.collection_banners %}{% include "components/sections/collection.html" %}{% endif %}
+	{% if picked_products.deal_picks %}{% include "components/sections/deals.html" %}{% endif %}
+	{% if settings.offer_banners %}{% include "components/sections/offers.html" %}{% endif %}
+	{% if picked_products.featured_picks %}{% include "components/sections/featured.html" %}{% endif %}
+{% endblock %}
+
+{% block script %}
+	{{ super() }}
+	<script defer src="/assets/ls_shop/js/vendor/embla-carousel/core.js"></script>
+	<script defer src="{{ shop_theme_asset_url('js/pixio_carousels.js') }}"></script>
+{% endblock %}
