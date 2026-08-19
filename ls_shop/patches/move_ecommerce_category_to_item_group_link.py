@@ -112,7 +112,12 @@ def seed_menu_when_empty():
 
 
 def drop_child_table():
-	# Removing the doctype folder from the app leaves the DocType doc and its table behind — migrate
-	# only ever syncs the JSON files it finds — so the delete has to be asked for.
+	# Removing the doctype folder from the app leaves the DocType doc behind — migrate only ever
+	# syncs the JSON files it finds — and deleting that doc does not take the table with it, so both
+	# have to be asked for. The drop goes through the query builder rather than a literal statement
+	# because MariaDB and Postgres quote the identifier differently.
 	if frappe.db.exists("DocType", CHILD_DOCTYPE):
 		frappe.delete_doc("DocType", CHILD_DOCTYPE, ignore_permissions=True)
+
+	if frappe.db.table_exists(CHILD_DOCTYPE):
+		frappe.db.sql_ddl(frappe.qb.drop_table(frappe.qb.DocType(CHILD_DOCTYPE)).if_exists().get_sql())

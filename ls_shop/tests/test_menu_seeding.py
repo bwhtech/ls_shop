@@ -272,6 +272,9 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		migration.execute()
 
 		self.assertFalse(frappe.db.exists("DocType", LEGACY_CHILD_DOCTYPE))
+		# Deleting the DocType does not take its table with it, and an orphan table survives every
+		# later migrate — so the drop is the half of this that actually needs guarding.
+		self.assertFalse(frappe.db.table_exists(LEGACY_CHILD_DOCTYPE))
 
 	def test_running_the_migration_twice_changes_nothing(self):
 		add_legacy_link(self.entry, self.shirts, 1)
