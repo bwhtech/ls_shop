@@ -83,7 +83,7 @@ function confirmFulfil() {
 					Placed {{ order.data.placed_on }} · {{ order.data.payment_mode ?? "No payment mode" }}
 				</p>
 
-				<section class="mt-5">
+				<section class="mt-6">
 					<h2 class="text-md text-ink-gray-9">Items</h2>
 					<table class="mt-2 w-full">
 						<thead>

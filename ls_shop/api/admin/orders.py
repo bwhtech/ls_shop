@@ -188,7 +188,13 @@ def fulfil_order(sales_order: str):
 	Delegates to ERPNext's own Sales Order -> Delivery Note mapper rather than hand-building the
 	document, so pricing, taxes and the delivered-quantity bookkeeping stay ERPNext's problem.
 	"""
-	from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
+	# ERPNext moved its transaction mappers out of the doctype module into a sibling `mapper`
+	# module. Both layouts are in the wild across the versions this app runs against, so resolve
+	# whichever one is installed rather than pinning to a single import path.
+	try:
+		from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
+	except ImportError:
+		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
 
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="submit", throw=True)
 	frappe.has_permission("Delivery Note", ptype="create", throw=True)
