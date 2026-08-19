@@ -80,3 +80,15 @@ export type OrderDetail = {
 	items: OrderItem[]
 	deliveries: string[]
 }
+
+export type InventoryRow = {
+	item_code: string
+	product: string
+	product_name: string
+	option: string
+	variant: string
+	size: string
+	stock: number
+	is_published: boolean
+	availability: string
+}

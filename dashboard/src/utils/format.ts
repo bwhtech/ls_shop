@@ -36,3 +36,11 @@ export function orderStateTheme(state: string) {
 		}[state] ?? "gray"
 	)
 }
+
+export function availabilityTheme(availability: string) {
+	return (
+		{ "Out of stock": "red", Low: "orange", "In stock": "green" }[
+			availability
+		] ?? "gray"
+	)
+}
