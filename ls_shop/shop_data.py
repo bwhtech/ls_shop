@@ -39,18 +39,16 @@ def find_menu_root(menu, category):
 def build_facet_node(node):
 	"""One sidebar facet, or None when the entry can never filter the listing.
 
-	`item_groups` is the facet's identity: the sidebar joins it into the CSV `?subcategory=` filter
-	and splits it back to decide whether the facet is ticked. `name` is that same CSV, because
-	`templates/components/product_filter.html` still reads a single string.
+	`name` is the entry's item group: the sidebar puts it in the `?subcategory=` filter and reads it
+	back to decide whether the facet is ticked.
 	"""
 	children = build_facet_nodes(node["children"])
-	# A URL or Brand entry links no item groups, so a facet for it would be a checkbox that filters
+	# A URL or Brand entry links no item group, so a facet for it would be a checkbox that filters
 	# on the empty string — tickable, but matching nothing.
-	if not node["item_groups"] and not children:
+	if not node["item_group"] and not children:
 		return None
 	return {
-		"name": ",".join(node["item_groups"]),
-		"item_groups": node["item_groups"],
+		"name": node["item_group"],
 		"display_name": node["label"],
 		"children": children,
 		"is_leaf": int(not children),
@@ -69,7 +67,6 @@ def get_category_tree(root_category):
 	if not facet:
 		return {
 			"name": root_category,
-			"item_groups": [],
 			"display_name": root_category,
 			"children": [],
 			"is_leaf": 1,
@@ -90,10 +87,10 @@ def as_legacy_item_group(node):
 	"""Shape one menu entry the way the pre-tree headers read an Item Group row.
 
 	Those templates key off `name` (the `?subcategory=` value) and a display name; an entry with no
-	item groups falls back to its own name so the link still resolves to something.
+	item group falls back to its own name so the link still resolves to something.
 	"""
 	return frappe._dict(
-		name=",".join(node["item_groups"]) or node["name"],
+		name=node["item_group"] or node["name"],
 		display_name=node["label"],
 	)
 

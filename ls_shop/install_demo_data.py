@@ -840,7 +840,8 @@ def create_ecommerce_categories():
 			"category_name": "Engine Parts",
 			"display_name": "Engine Parts",
 			"route_slug": "engine-parts",
-			"item_group": "Engine Parts",  # Links to Item Group created above
+			"link_type": "Item Group",
+			"item_group": "Engine Parts",
 			"enabled": 1,
 			"display_order": 1,
 		},
@@ -848,7 +849,8 @@ def create_ecommerce_categories():
 			"category_name": "Brake System",
 			"display_name": "Brake System",
 			"route_slug": "brake-system",
-			"item_group": "Brake System",  # Links to Item Group created above
+			"link_type": "Item Group",
+			"item_group": "Brake System",
 			"enabled": 1,
 			"display_order": 2,
 		},
@@ -856,7 +858,8 @@ def create_ecommerce_categories():
 			"category_name": "Interior Accessories",
 			"display_name": "Interior Accessories",
 			"route_slug": "interior-accessories",
-			"item_group": "Interior Accessories",  # Links to Item Group created above
+			"link_type": "Item Group",
+			"item_group": "Interior Accessories",
 			"enabled": 1,
 			"display_order": 3,
 		},

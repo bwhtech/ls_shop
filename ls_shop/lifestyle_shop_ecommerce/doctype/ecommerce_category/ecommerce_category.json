@@ -16,7 +16,7 @@
 		"section_break_2",
 		"route_slug",
 		"link_type",
-		"link_item_groups",
+		"item_group",
 		"link_brand",
 		"link_url",
 		"section_break_3",
@@ -102,11 +102,12 @@
 		},
 		{
 			"depends_on": "eval:doc.link_type == 'Item Group'",
-			"description": "Products from every listed group are shown together.",
-			"fieldname": "link_item_groups",
-			"fieldtype": "Table",
-			"label": "Item Groups",
-			"options": "Ecommerce Category Item Group"
+			"description": "Products in this group are shown together. Sub-groups get their own menu entries.",
+			"fieldname": "item_group",
+			"fieldtype": "Link",
+			"label": "Item Group",
+			"options": "Item Group",
+			"search_index": 1
 		},
 		{
 			"depends_on": "eval:doc.link_type == 'Brand'",
@@ -206,7 +207,7 @@
 	"index_web_pages_for_search": 1,
 	"is_tree": 1,
 	"links": [],
-	"modified": "2026-08-04 10:00:00.000000",
+	"modified": "2026-08-19 10:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Lifestyle Shop Ecommerce",
 	"name": "Ecommerce Category",

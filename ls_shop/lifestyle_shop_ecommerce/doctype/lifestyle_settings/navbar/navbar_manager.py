@@ -80,13 +80,12 @@ def get_unique_category_name(parent, display_name):
 
 def set_link(doc, link_type, link_target):
 	doc.link_type = link_type or ""
-	doc.link_item_groups = []
+	doc.item_group = None
 	doc.link_brand = None
 	doc.link_url = None
 
 	if link_type == "Item Group":
-		for item_group in parse_list(link_target):
-			doc.append("link_item_groups", {"item_group": item_group})
+		doc.item_group = link_target
 	elif link_type == "Brand":
 		doc.link_brand = link_target
 	elif link_type == "URL":
@@ -300,8 +299,8 @@ def get_linked_nodes():
 	linked = {}
 
 	def index(node):
-		for item_group in node["item_groups"]:
-			linked[(node["parent"], item_group)] = node["name"]
+		if node["item_group"]:
+			linked[(node["parent"], node["item_group"])] = node["name"]
 		for child in node["children"]:
 			index(child)
 
@@ -310,14 +309,16 @@ def get_linked_nodes():
 	return linked
 
 
-@frappe.whitelist(methods=["POST"])
-def import_from_item_group(item_group=None, parent=None):
-	frappe.has_permission("Ecommerce Category", "create", throw=True)
+def seed_categories_from_item_groups(item_group=None, parent=""):
+	"""Copy the Item Group tree into the menu as Ecommerce Category entries.
 
-	parent = (parent or "").strip()
+	A one-time copy, never a live mirror: from here on the shop owner reorders, renames and prunes
+	the menu without any of it reaching the catalogue. Re-running is safe — an entry already linked
+	to the same group under the same parent is reused rather than duplicated.
+	"""
 	root_names, source_groups = get_source_item_groups(item_group)
 	if not source_groups:
-		return get_menu_editor_data()
+		return
 
 	linked_nodes = get_linked_nodes()
 	base_level = get_depth(parent) + 1
@@ -352,7 +353,7 @@ def import_from_item_group(item_group=None, parent=None):
 					menu_parent,
 					group.item_group_name or group.name,
 					"Item Group",
-					[group.name],
+					group.name,
 					display_order=next_display_order[menu_parent],
 				).name
 				next_display_order[menu_parent] += 1
@@ -361,6 +362,13 @@ def import_from_item_group(item_group=None, parent=None):
 		rebuild_tree("Ecommerce Category")
 	finally:
 		frappe.local.flags.ignore_ecommerce_category_nsm = previous_flag
+
+
+@frappe.whitelist(methods=["POST"])
+def import_from_item_group(item_group=None, parent=None):
+	frappe.has_permission("Ecommerce Category", "create", throw=True)
+
+	seed_categories_from_item_groups(item_group, (parent or "").strip())
 
 	return get_menu_editor_data()
 
@@ -399,7 +407,8 @@ def get_subtree_item_groups(node):
 	pending = [node]
 	while pending:
 		current = pending.pop()
-		item_groups.extend(current["item_groups"])
+		if current["item_group"]:
+			item_groups.append(current["item_group"])
 		pending.extend(current["children"])
 	return list(dict.fromkeys(item_groups))
 
