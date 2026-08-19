@@ -25,6 +25,9 @@ website_redirects = [
 # website_path_resolver = "ls_shop.utils.resolve_bilingual_path"
 
 website_route_rules = [
+	# The store admin SPA owns client-side routing under /dashboard, so every deep link has to
+	# resolve back to the same shell instead of 404ing on a reload.
+	{"from_route": "/dashboard/<path:app_path>", "to_route": "/dashboard"},
 	# ------------
 	# English Routes
 	# ------------

@@ -415,3 +415,119 @@ def set_variant_published(style_attribute_variant: str, publish):
 	variant.save()
 
 	return {"name": variant.name, "is_published": bool(variant.is_published)}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_product_images(style_attribute_variant: str, file_urls: list | str):
+	"""Attach already-uploaded files to an option, then report what still blocks publishing.
+
+	The dashboard's whole point is that the owner never has to guess why a product is not live,
+	so every write that can change publishability hands the blockers straight back.
+	"""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	variant.add_images(file_urls)
+	variant.reload()
+
+	return {
+		"name": variant.name,
+		"images": [row.image for row in variant.images],
+		"blockers": get_publish_blockers(variant.images, variant.sizes),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_product_image(style_attribute_variant: str, file_url: str):
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	variant.remove_image(file_url)
+	variant.reload()
+
+	return {
+		"name": variant.name,
+		"images": [row.image for row in variant.images],
+		"blockers": get_publish_blockers(variant.images, variant.sizes),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_product_prices(style_attribute_variant: str, size_prices: list | str):
+	"""Edit the per-size default and sale prices of one option."""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	return variant.save_size_prices(size_prices)
+
+
+@frappe.whitelist(methods=["POST"])
+def receive_product_stock(
+	style_attribute_variant: str, received_quantities: dict | str, valuation_rates: dict | str | None = None
+):
+	"""Take stock in against one option - a submitted Material Receipt into the shop warehouse."""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	return {"stock_entry": variant.receive_stock(received_quantities, valuation_rates)}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_product_published(item_template: str, publish):
+	"""Publish or unpublish every option of a product in one go.
+
+	Options that are not ready are skipped rather than failing the whole request, and come back
+	named so the owner can see which ones still need work.
+	"""
+	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
+
+	publish = cint(publish)
+	configurators = frappe.get_all(
+		"Style Attribute Configurator", filters={"item_template": item_template}, pluck="name"
+	)
+	if not configurators:
+		return {"updated": [], "skipped": []}
+
+	variants = frappe.get_all(
+		"Style Attribute Variant",
+		filters={"configurator": ["in", configurators]},
+		fields=["name", "attribute_value", "display_name"],
+	)
+	variant_names = [row.name for row in variants]
+
+	# Work out readiness for the whole set in two queries; loading each variant just to count
+	# its images and sizes would be a read per row.
+	ready = get_ready_variant_names(variant_names) if publish else set(variant_names)
+
+	updated = []
+	skipped = []
+	for row in variants:
+		label = row.attribute_value or row.display_name
+		if row.name not in ready:
+			skipped.append(label)
+			continue
+
+		# ponytail: one save per option so validation and route generation still run,
+		# move to a background job if a product ever carries more than a few dozen options
+		variant = frappe.get_doc("Style Attribute Variant", row.name)
+		variant.is_published = publish
+		variant.save()
+		updated.append(label)
+
+	return {"updated": updated, "skipped": skipped}
+
+
+def get_ready_variant_names(variant_names):
+	"""The variants that carry both an image and a size, so they are allowed to go live."""
+	if not variant_names:
+		return set()
+
+	with_images = {
+		row.parent
+		for row in frappe.get_all(
+			"Website Slideshow Item",
+			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+			fields=["parent"],
+		)
+	}
+	with_sizes = {
+		row.parent
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+			fields=["parent"],
+		)
+	}
+	return with_images & with_sizes

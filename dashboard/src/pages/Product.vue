@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import VariantCard from "@/components/VariantCard.vue"
+import type { ProductVariant } from "@/types"
 import { createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
@@ -25,12 +27,27 @@ const updateProduct = createResource({
 	onSuccess: () => product.reload(),
 })
 
-const setPublished = createResource({
-	url: "ls_shop.api.admin.catalog.set_variant_published",
+const publishAll = createResource({
+	url: "ls_shop.api.admin.catalog.set_product_published",
 	onSuccess: () => product.reload(),
 })
 
-const publishError = computed(() => setPublished.error?.messages?.[0])
+// Options that were skipped are the ones still missing an image or a size; naming them beats a
+// silent partial success the owner has to go hunting for.
+const skippedNotice = computed(() => {
+	const skipped = publishAll.data?.skipped ?? []
+	return skipped.length
+		? `Still not live: ${skipped.join(", ")} — add an image first.`
+		: ""
+})
+
+const allLive = computed(
+	() =>
+		product.data?.variants?.length > 0 &&
+		product.data.variants.every(
+			(variant: ProductVariant) => variant.is_published,
+		),
+)
 </script>
 
 <template>
@@ -56,43 +73,30 @@ const publishError = computed(() => setPublished.error?.messages?.[0])
 			</Button>
 		</div>
 
-		<h2 class="mb-2 text-base font-medium text-ink-gray-8">Options</h2>
-		<ErrorMessage class="mb-2" :message="publishError" />
+		<div class="mb-2 flex items-center justify-between">
+			<h2 class="text-base font-medium text-ink-gray-8">Options</h2>
+			<Button
+				variant="solid"
+				:loading="publishAll.loading"
+				@click="
+					publishAll.submit({ item_template: productName, publish: allLive ? 0 : 1 })
+				"
+			>
+				{{ allLive ? "Unpublish all" : "Publish all" }}
+			</Button>
+		</div>
+
+		<div v-if="skippedNotice" class="mb-3 text-p-sm text-ink-amber-3">
+			{{ skippedNotice }}
+		</div>
 
 		<div class="space-y-2">
-			<div
+			<VariantCard
 				v-for="variant in product.data.variants"
 				:key="variant.name"
-				class="flex items-center justify-between rounded border border-outline-gray-2 px-4 py-3"
-			>
-				<div>
-					<div class="text-base text-ink-gray-8">{{ variant.option }}</div>
-					<div class="text-p-sm text-ink-gray-5">
-						{{ variant.sizes.length }} sizes · {{ variant.images.length }} images
-					</div>
-					<div v-if="variant.blockers.length" class="mt-1 text-p-sm text-ink-amber-3">
-						{{ variant.blockers.join(" · ") }}
-					</div>
-				</div>
-				<div class="flex items-center gap-3">
-					<Badge
-						:theme="variant.is_published ? 'green' : 'gray'"
-						:label="variant.is_published ? 'Live' : 'Not live'"
-					/>
-					<Button
-						:loading="setPublished.loading"
-						:disabled="!variant.is_published && variant.blockers.length > 0"
-						@click="
-							setPublished.submit({
-								style_attribute_variant: variant.name,
-								publish: variant.is_published ? 0 : 1,
-							})
-						"
-					>
-						{{ variant.is_published ? "Unpublish" : "Publish" }}
-					</Button>
-				</div>
-			</div>
+				:variant="variant"
+				@changed="product.reload()"
+			/>
 		</div>
 	</div>
 </template>
