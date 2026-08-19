@@ -5,7 +5,7 @@ from bwh_payments.bwh_payments.utils import get_available_payment_modes
 
 from ls_shop.api.payments import COD_PAYMENT_MODE
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar.navbar_manager import (
-	seed_categories_from_item_groups,
+	seed_menu_when_empty,
 )
 from ls_shop.search.build import ensure_index_built
 from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
@@ -36,19 +36,7 @@ def after_install():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
-	seed_storefront_menu()
-
-
-def seed_storefront_menu():
-	"""Give a fresh store a menu copied from its Item Group tree.
-
-	Only on install: after_migrate would refill a menu the shop owner emptied on purpose. From here
-	the two trees are independent — editing the menu never reaches the catalogue.
-	"""
-	if frappe.db.count("Ecommerce Category"):
-		return
-
-	seed_categories_from_item_groups()
+	seed_menu_when_empty()
 
 
 def after_migrate():

@@ -15,7 +15,6 @@ from frappe.utils.nestedset import get_root_of
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar import navbar_manager
-from ls_shop.migrate import seed_storefront_menu
 from ls_shop.patches import move_ecommerce_category_to_item_group_link as migration
 from ls_shop.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters
 
@@ -179,14 +178,14 @@ class TestMenuSeeding(IntegrationTestCase):
 	def test_install_seeds_the_menu_only_when_the_store_has_none(self):
 		frappe.db.delete("Ecommerce Category")
 
-		seed_storefront_menu()
+		navbar_manager.seed_menu_when_empty()
 		self.assertIn(self.shoes, self.seeded_entries())
 
 		# A shop owner who built their own menu must not have the catalogue poured back into it.
 		frappe.db.delete("Ecommerce Category")
 		navbar_manager.create_node("", f"{PREFIX} Hand Built")
 
-		seed_storefront_menu()
+		navbar_manager.seed_menu_when_empty()
 		self.assertNotIn(self.shoes, self.seeded_entries())
 
 	def test_seeded_nested_entries_stay_out_of_the_sitemap(self):

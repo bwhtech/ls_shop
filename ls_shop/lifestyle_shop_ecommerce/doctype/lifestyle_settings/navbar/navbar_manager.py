@@ -364,6 +364,19 @@ def seed_categories_from_item_groups(item_group=None, parent=""):
 		frappe.local.flags.ignore_ecommerce_category_nsm = previous_flag
 
 
+def seed_menu_when_empty():
+	"""Give a store with no menu one copied from its Item Group tree.
+
+	Runs on install and on the upgrade that introduced the copy, so the storefront has navigation
+	before anyone opens the editor. Never on every migrate — a shop owner who emptied the menu on
+	purpose must not have the catalogue poured back into it.
+	"""
+	if frappe.db.count("Ecommerce Category"):
+		return
+
+	seed_categories_from_item_groups()
+
+
 @frappe.whitelist(methods=["POST"])
 def import_from_item_group(item_group=None, parent=None):
 	frappe.has_permission("Ecommerce Category", "create", throw=True)

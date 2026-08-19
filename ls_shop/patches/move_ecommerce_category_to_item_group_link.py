@@ -3,7 +3,7 @@ from frappe.query_builder import Case
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar.navbar_manager import (
 	create_node,
-	seed_categories_from_item_groups,
+	seed_menu_when_empty,
 )
 from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
@@ -101,14 +101,6 @@ def backfill_item_group_links():
 
 	for entry in entries:
 		add_sibling_entries(entry, links[entry.name][1:])
-
-
-def seed_menu_when_empty():
-	"""A site that never built a menu gets the Item Group tree copied in, the way a fresh install does."""
-	if frappe.db.count("Ecommerce Category"):
-		return
-
-	seed_categories_from_item_groups()
 
 
 def drop_child_table():
