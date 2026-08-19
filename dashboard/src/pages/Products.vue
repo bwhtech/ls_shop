@@ -9,7 +9,7 @@ import {
 	PageHeader,
 	createResource,
 } from "frappe-ui"
-import { computed, h, ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
@@ -98,8 +98,23 @@ const listOptions = {
 			:options="listOptions"
 		>
 			<template #cell="{ item, row, column }">
+				<div v-if="column.key === 'title'" class="flex min-w-0 items-center gap-2.5">
+					<img
+						v-if="row.image"
+						:src="row.image"
+						alt=""
+						class="size-7 shrink-0 rounded object-cover"
+					/>
+					<div
+						v-else
+						class="grid size-7 shrink-0 place-items-center rounded bg-surface-gray-2 text-p-xs text-ink-gray-4"
+					>
+						{{ row.title.slice(0, 1) }}
+					</div>
+					<span class="truncate text-ink-gray-8">{{ row.title }}</span>
+				</div>
 				<Badge
-					v-if="column.key === 'status'"
+					v-else-if="column.key === 'status'"
 					:theme="row.published_count ? 'green' : 'gray'"
 					:label="
 						row.published_count

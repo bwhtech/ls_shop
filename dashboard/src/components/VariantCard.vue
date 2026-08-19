@@ -63,6 +63,29 @@ const rates = ref<Record<string, string>>({})
 const receiveQuantities = ref<Record<string, string>>({})
 
 const canPublish = computed(() => props.variant.blockers.length === 0)
+
+const stockTotal = computed(() =>
+	props.variant.sizes.reduce((total, size) => total + (size.stock ?? 0), 0),
+)
+
+const priceLabel = computed(() => {
+	const values = props.variant.sizes
+		.map((size) => size.rate)
+		.filter((rate): rate is number => rate !== null && rate !== undefined)
+	if (!values.length) return "No price"
+	const low = Math.min(...values)
+	const high = Math.max(...values)
+	return low === high ? String(low) : `${low} – ${high}`
+})
+
+const summary = computed(() => {
+	const sizeCount = props.variant.sizes.length
+	return [
+		`${sizeCount} ${sizeCount === 1 ? "size" : "sizes"}`,
+		priceLabel.value,
+		`${stockTotal.value} in stock`,
+	].join(" · ")
+})
 const publishHint = computed(() =>
 	canPublish.value ? "" : props.variant.blockers.join(" · "),
 )
@@ -122,9 +145,7 @@ function submitStock() {
 					<div class="truncate text-base font-medium text-ink-gray-8">
 						{{ variant.option }}
 					</div>
-					<div class="text-p-sm text-ink-gray-5">
-						{{ variant.sizes.length }} sizes · {{ variant.images.length }} images
-					</div>
+					<div class="text-p-sm text-ink-gray-5">{{ summary }}</div>
 					<div v-if="publishHint" class="mt-0.5 text-p-sm text-ink-amber-3">
 						{{ publishHint }}
 					</div>

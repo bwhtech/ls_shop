@@ -76,6 +76,18 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 	rates_by_item_code = get_default_rates(item_codes)
 	stock_by_item_code = get_ecommerce_stock(item_codes)
 
+	# A product created from the dashboard never sets Item.image - the picture lives on the
+	# option - so fall back to the first option image rather than showing a blank row.
+	first_image_by_variant = {}
+	if variant_names:
+		for row in frappe.get_all(
+			"Website Slideshow Item",
+			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+			fields=["parent", "image"],
+			order_by="idx asc",
+		):
+			first_image_by_variant.setdefault(row.parent, row.image)
+
 	item_codes_by_variant = {}
 	for row in sizes:
 		if row.item_code:
@@ -99,7 +111,15 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 			{
 				"name": template.name,
 				"title": template.item_name,
-				"image": template.image,
+				"image": template.image
+				or next(
+					(
+						first_image_by_variant[row.name]
+						for row in template_variants
+						if row.name in first_image_by_variant
+					),
+					None,
+				),
 				"collection": template.item_group,
 				"disabled": bool(template.disabled),
 				"variant_count": len(template_variants),
