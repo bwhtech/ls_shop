@@ -56,7 +56,6 @@ class TestNavbarManager(IntegrationTestCase):
 	def tearDown(self):
 		# IntegrationTestCase only rolls back once, after the whole class finishes, so each test's rows
 		# must be cleared explicitly to avoid duplicate-name collisions with the next test's setUp.
-		frappe.db.delete("Ecommerce Category Item Group", {"parent": ["like", "Test MM%"]})
 		frappe.db.delete("Ecommerce Category", {"name": ["like", "Test MM%"]})
 		frappe.db.delete("Item Group", {"name": ["like", "Test MM%"]})
 		frappe.db.delete("Brand", {"name": ["like", "Test MM%"]})
@@ -83,9 +82,7 @@ class TestNavbarManager(IntegrationTestCase):
 
 	def test_editing_the_menu_never_touches_item_group(self):
 		accessories = self.add_node(self.men, "Test MM Accessories")
-		bags = self.add_node(
-			accessories["name"], "Test MM Bags", "Item Group", ["Test MM Bags", "Test MM Belts"]
-		)
+		bags = self.add_node(accessories["name"], "Test MM Bags", "Item Group", "Test MM Bags")
 
 		before = self.item_group_snapshot()
 
@@ -98,7 +95,7 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(before, self.item_group_snapshot())
 
 	def test_deleting_a_node_never_touches_item_group(self):
-		shoes = self.add_node(self.men, "Test MM Shoes", "Item Group", ["Test MM Shirts"])
+		shoes = self.add_node(self.men, "Test MM Shoes", "Item Group", "Test MM Shirts")
 		before = self.item_group_snapshot()
 
 		navbar_manager.delete_node(shoes["name"])
@@ -125,11 +122,11 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(find_node(menu, men_bags["name"])["label"], "Test MM Man Bags")
 		self.assertEqual(find_node(menu, women_bags["name"])["label"], "Test MM Bags")
 
-	def test_node_links_to_many_item_groups(self):
-		bags = self.add_node(self.men, "Test MM Bags", "Item Group", ["Test MM Bags", "Test MM Belts"])
+	def test_node_links_to_one_item_group(self):
+		bags = self.add_node(self.men, "Test MM Bags", "Item Group", "Test MM Bags")
 
-		self.assertEqual(bags["item_groups"], ["Test MM Bags", "Test MM Belts"])
-		self.assertIn("subcategory=Test%20MM%20Bags%2CTest%20MM%20Belts", bags["href"])
+		self.assertEqual(bags["item_group"], "Test MM Bags")
+		self.assertIn("subcategory=Test%20MM%20Bags", bags["href"])
 
 	def test_link_type_brand_and_url(self):
 		brand = self.add_node(self.men, "Test MM Brand Tab", "Brand", "Test MM Brand 1")
@@ -188,14 +185,13 @@ class TestNavbarManager(IntegrationTestCase):
 
 	def test_delete_node_takes_its_whole_subtree(self):
 		column = self.add_node(self.men, "Test MM Accessories")["name"]
-		leaf = self.add_node(column, "Test MM Bags Tab", "Item Group", ["Test MM Bags"])["name"]
+		leaf = self.add_node(column, "Test MM Bags Tab", "Item Group", "Test MM Bags")["name"]
 
 		menu = navbar_manager.delete_node(self.men)["menu"]
 
 		for name in (self.men, column, leaf):
 			self.assertFalse(frappe.db.exists("Ecommerce Category", name))
 			self.assertIsNone(find_node(menu, name))
-		self.assertFalse(frappe.db.exists("Ecommerce Category Item Group", {"parent": leaf}))
 		self.assertTrue(frappe.db.exists("Ecommerce Category", self.women), "a sibling tab was deleted")
 
 	def test_set_visibility_writes_enabled(self):
@@ -232,7 +228,7 @@ class TestNavbarManager(IntegrationTestCase):
 		menu = navbar_manager.import_from_item_group(item_group="Test MM Catalog")["menu"]
 
 		catalog = find_node(menu, "Test MM Catalog")
-		self.assertEqual(catalog["item_groups"], ["Test MM Catalog"])
+		self.assertEqual(catalog["item_group"], "Test MM Catalog")
 		level_2 = catalog["children"][0]
 		level_3 = level_2["children"][0]
 		self.assertEqual(level_2["label"], "Test MM Level 2")
@@ -395,12 +391,12 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(find_node(menu, self.men)["meta_title"], "Test MM Menswear")
 
 	def test_update_node_keeps_the_other_fields_when_only_seo_changes(self):
-		bags = self.add_node(None, "Test MM Bags", "Item Group", ["Test MM Bags", "Test MM Belts"])
+		bags = self.add_node(None, "Test MM Bags", "Item Group", "Test MM Bags")
 
 		menu = navbar_manager.update_node(bags["name"], meta_title="Test MM Bags Page")["menu"]
 
 		node = find_node(menu, bags["name"])
-		self.assertEqual(node["item_groups"], ["Test MM Bags", "Test MM Belts"])
+		self.assertEqual(node["item_group"], "Test MM Bags")
 		self.assertEqual(node["label"], "Test MM Bags")
 		self.assertEqual(node["link_type"], "Item Group")
 		self.assertEqual(node["route_slug"], "test_mm_bags")
@@ -432,7 +428,6 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		SqliteProductSearch().drop_index()
 		SqliteProductSearch.INDEX_NAME = cls.original_index_name
 		SqliteProductSearch.INDEXABLE_DOCTYPES = cls.original_indexable
-		frappe.db.delete("Ecommerce Category Item Group", {"parent": ["like", f"{PUBLISH_PREFIX}%"]})
 		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PUBLISH_PREFIX}%"]})
 		super().tearDownClass()
 
@@ -537,11 +532,11 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 
 	@classmethod
 	def build_menu(cls):
-		cls.women = navbar_manager.create_node("", "ZZ Pub Women", "Item Group", ["ZZ Pub Dresses"]).name
+		cls.women = navbar_manager.create_node("", "ZZ Pub Women", "Item Group", "ZZ Pub Dresses").name
 		cls.footwear = navbar_manager.create_node(
-			cls.women, "ZZ Pub Footwear", "Item Group", ["ZZ Pub Footwear"]
+			cls.women, "ZZ Pub Footwear", "Item Group", "ZZ Pub Footwear"
 		).name
-		cls.men = navbar_manager.create_node("", "ZZ Pub Men", "Item Group", ["ZZ Pub Luggage"]).name
+		cls.men = navbar_manager.create_node("", "ZZ Pub Men", "Item Group", "ZZ Pub Luggage").name
 		cls.heading = navbar_manager.create_node("", "ZZ Pub Heading").name
 
 	@classmethod
@@ -620,7 +615,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 
 		self.assertTrue(frappe.db.get_value("Style Attribute Variant", self.bag, "is_published"))
 
-	def test_node_without_linked_item_groups_is_a_safe_no_op(self):
+	def test_node_without_a_linked_item_group_is_a_safe_no_op(self):
 		before = self.published_variants()
 
 		self.assertEqual(navbar_manager.get_publish_preview(self.heading, 1)["count"], 0)

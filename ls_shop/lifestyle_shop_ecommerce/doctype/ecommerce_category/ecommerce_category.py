@@ -33,10 +33,6 @@ class EcommerceCategory(NestedSet):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category_item_group.ecommerce_category_item_group import (
-			EcommerceCategoryItemGroup,
-		)
-
 		category_name: DF.Data
 		display_name: DF.Data
 		display_order: DF.Int
@@ -44,9 +40,9 @@ class EcommerceCategory(NestedSet):
 		icon: DF.Data | None
 		image: DF.AttachImage | None
 		is_group: DF.Check
+		item_group: DF.Link | None
 		lft: DF.Int
 		link_brand: DF.Link | None
-		link_item_groups: DF.Table[EcommerceCategoryItemGroup]
 		link_type: DF.Literal["", "Item Group", "Brand", "URL"]
 		link_url: DF.Data | None
 		meta_description: DF.SmallText | None
@@ -93,17 +89,25 @@ class EcommerceCategory(NestedSet):
 
 	def validate(self):
 		self.validate_route_slug()
-		self.validate_link_url()
+		self.validate_link_target()
 		self.validate_depth()
 		self.set_defaults()
 
-	def validate_link_url(self):
-		"""A menu URL is written straight into an href on a public page, and Frappe's Jinja
-		environment has autoescaping off, so a `javascript:` scheme here is stored XSS.
+	def validate_link_target(self):
+		"""Keep only the target the selected link type uses, and check it.
 
-		The navbar editor endpoint already checks this, but a Desk form write, a REST insert or a
-		fixture bypasses that endpoint — the model is the only place that covers every write path.
+		Switching a type in the Desk form leaves the old target on the doc; left there, a later
+		switch back silently resurrects a target the shop owner thought they had cleared.
+
+		A menu URL is written straight into an href on a public page, and Frappe's Jinja environment
+		has autoescaping off, so a `javascript:` scheme here is stored XSS. The navbar editor
+		endpoint already checks this, but a Desk form write, a REST insert or a fixture bypasses that
+		endpoint — the model is the only place that covers every write path.
 		"""
+		if self.link_type != "Item Group":
+			self.item_group = None
+		if self.link_type != "Brand":
+			self.link_brand = None
 		if self.link_type != "URL":
 			self.link_url = None
 			return
@@ -152,9 +156,9 @@ class EcommerceCategory(NestedSet):
 			self.display_name = self.category_name
 
 
-def build_listing_href(root_slug, item_groups, language):
-	"""Product listing URL for a set of item groups, as the CSV `?subcategory=` filter expects."""
-	subcategory = quote(",".join(item_groups))
+def build_listing_href(root_slug, item_group, language):
+	"""Product listing URL for one item group, as the `?subcategory=` filter expects."""
+	subcategory = quote(item_group)
 	if root_slug:
 		return f"/{language}/products?category={root_slug}&subcategory={subcategory}"
 	return f"/{language}/products?subcategory={subcategory}"
@@ -186,10 +190,10 @@ def get_subtree_height(name):
 
 
 def get_menu_tree(enabled_only=False):
-	"""The whole menu as nested nodes, in two queries.
+	"""The whole menu as nested nodes, in one query.
 
 	Read on every storefront render, so it never walks the tree per node: one ordered pass over the
-	entries plus one over their linked item groups, assembled in Python.
+	entries, assembled in Python.
 	"""
 	filters = {"enabled": 1} if enabled_only else {}
 	entries = frappe.get_all(
@@ -204,6 +208,7 @@ def get_menu_tree(enabled_only=False):
 			"display_order",
 			"route_slug",
 			"link_type",
+			"item_group",
 			"link_brand",
 			"link_url",
 			"icon",
@@ -219,15 +224,6 @@ def get_menu_tree(enabled_only=False):
 	if not entries:
 		return []
 
-	item_groups = {}
-	for row in frappe.get_all(
-		"Ecommerce Category Item Group",
-		filters={"parent": ["in", [entry.name for entry in entries]]},
-		fields=["parent", "item_group"],
-		order_by="idx asc",
-	):
-		item_groups.setdefault(row.parent, []).append(row.item_group)
-
 	language = frappe.local.lang or "en"
 	nodes = {}
 	roots = []
@@ -238,7 +234,7 @@ def get_menu_tree(enabled_only=False):
 			"parent": entry.parent_ecommerce_category or "",
 			"route_slug": entry.route_slug or "",
 			"link_type": entry.link_type or "",
-			"item_groups": item_groups.get(entry.name, []),
+			"item_group": entry.item_group or "",
 			"brand": entry.link_brand or "",
 			"url": entry.link_url or "",
 			"icon": entry.icon or "",
@@ -285,8 +281,8 @@ def get_node_href(node, root_slug, language):
 		return node["url"] or None
 	if node["link_type"] == "Brand":
 		return f"/{language}/products?brands={quote(node['brand'])}" if node["brand"] else None
-	if node["link_type"] == "Item Group" and node["item_groups"]:
-		return build_listing_href(root_slug, node["item_groups"], language)
+	if node["link_type"] == "Item Group" and node["item_group"]:
+		return build_listing_href(root_slug, node["item_group"], language)
 	if not node["parent"]:
 		return f"/{language}/products?category={root_slug}"
 	return None

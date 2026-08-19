@@ -93,7 +93,7 @@
                         </template>
                     </div>
                 </div>
-                {# Category facets come from the menu tree: `name` is the CSV of `item_groups` the
+                {# Category facets come from the menu tree: `name` is the item group the
                    `?subcategory=` filter round-trips, `display_name` is the shop owner's label. #}
                 {% block storefront_filter_categories %}
                 <div x-show="current_tab === key && Array.isArray(values) && values.length > 0 && values[0].display_name" x-transition
