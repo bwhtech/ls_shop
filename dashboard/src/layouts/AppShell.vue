@@ -3,7 +3,7 @@ import { DesktopShell, Sidebar, SidebarItem, SidebarLabel } from "frappe-ui"
 </script>
 
 <template>
-	<DesktopShell>
+	<DesktopShell :scroll="false">
 		<template #sidebar>
 			<Sidebar>
 				<SidebarLabel>Store</SidebarLabel>

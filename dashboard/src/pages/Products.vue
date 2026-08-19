@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import AddProductDialog from "@/components/AddProductDialog.vue"
-import { createResource } from "frappe-ui"
-import { computed, ref } from "vue"
+import type { ProductRow } from "@/types"
+import {
+	Avatar,
+	Badge,
+	Breadcrumbs,
+	ListView,
+	PageHeader,
+	createResource,
+} from "frappe-ui"
+import { computed, h, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
 const showAddProduct = ref(false)
-
 const search = ref("")
 
 const products = createResource({
@@ -15,86 +22,97 @@ const products = createResource({
 	auto: true,
 })
 
-const rows = computed(() => products.data?.products ?? [])
+// Typing should not fire a request per keystroke; wait until the owner pauses.
+let searchTimer: ReturnType<typeof setTimeout>
+watch(search, () => {
+	clearTimeout(searchTimer)
+	searchTimer = setTimeout(() => products.reload(), 300)
+})
 
-function formatPrice(from: number | null, to: number | null) {
-	if (from === null || from === undefined) return "No price"
-	if (to && to !== from) return `${from} – ${to}`
-	return `${from}`
+const rows = computed<ProductRow[]>(() => products.data?.products ?? [])
+
+function formatPrice(row: ProductRow) {
+	if (row.price_from === null) return "—"
+	if (row.price_to && row.price_to !== row.price_from) {
+		return `${row.price_from} – ${row.price_to}`
+	}
+	return String(row.price_from)
+}
+
+const columns = [
+	{
+		label: "Product",
+		key: "title",
+		width: 3,
+		prefix: ({ row }: { row: ProductRow }) =>
+			h(Avatar, {
+				shape: "square",
+				image: row.image ?? undefined,
+				label: row.title,
+				size: "sm",
+			}),
+	},
+	{ label: "Collection", key: "collection", width: 1.5 },
+	{ label: "Options", key: "variant_count", width: 0.8 },
+	{ label: "Price", key: "price", width: 1.2 },
+	{ label: "Stock", key: "stock", width: 0.8 },
+	{ label: "Status", key: "status", width: 1.2 },
+]
+
+const listOptions = {
+	getRowRoute: (row: ProductRow) => ({
+		name: "Product",
+		params: { name: row.name },
+	}),
+	showTooltip: false,
+	emptyState: {
+		title: "No products yet",
+		description: "Add your first product to start selling.",
+		button: {
+			label: "Add product",
+			variant: "solid",
+			onClick: () => {
+				showAddProduct.value = true
+			},
+		},
+	},
 }
 </script>
 
 <template>
-	<div class="p-6">
-		<div class="mb-5 flex items-center justify-between">
-			<h1 class="text-xl font-semibold text-ink-gray-9">Products</h1>
-			<Button variant="solid" @click="showAddProduct = true">Add product</Button>
+	<PageHeader>
+		<Breadcrumbs :items="[{ label: 'Products', route: { name: 'Products' } }]" />
+		<Button variant="solid" label="Add product" @click="showAddProduct = true" />
+	</PageHeader>
+
+	<div class="flex h-full flex-col px-5 pb-5">
+		<div class="py-3">
+			<FormControl v-model="search" type="text" placeholder="Search products" class="max-w-xs" />
 		</div>
 
-		<FormControl
-			v-model="search"
-			type="text"
-			placeholder="Search products"
-			class="mb-4 max-w-xs"
-			@input="products.reload()"
-		/>
-
-		<div v-if="products.loading" class="text-base text-ink-gray-5">Loading…</div>
-
-		<div v-else-if="!rows.length" class="text-base text-ink-gray-5">
-			No products yet.
-		</div>
-
-		<div v-else class="overflow-x-auto rounded border border-outline-gray-2">
-			<table class="w-full text-base">
-				<thead class="bg-surface-gray-2 text-ink-gray-6">
-					<tr>
-						<th class="px-3 py-2 text-left font-medium">Product</th>
-						<th class="px-3 py-2 text-left font-medium">Collection</th>
-						<th class="px-3 py-2 text-left font-medium">Options</th>
-						<th class="px-3 py-2 text-left font-medium">Price</th>
-						<th class="px-3 py-2 text-left font-medium">Stock</th>
-						<th class="px-3 py-2 text-left font-medium">Status</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr
-						v-for="row in rows"
-						:key="row.name"
-						class="cursor-pointer border-t border-outline-gray-2 hover:bg-surface-gray-1"
-						@click="router.push({ name: 'Product', params: { name: row.name } })"
-					>
-						<td class="px-3 py-2">
-							<div class="flex items-center gap-2">
-								<img
-									v-if="row.image"
-									:src="row.image"
-									alt=""
-									class="h-8 w-8 rounded object-cover"
-								/>
-								<span class="text-ink-gray-8">{{ row.title }}</span>
-							</div>
-						</td>
-						<td class="px-3 py-2 text-ink-gray-6">{{ row.collection }}</td>
-						<td class="px-3 py-2 text-ink-gray-6">{{ row.variant_count }}</td>
-						<td class="px-3 py-2 text-ink-gray-6">
-							{{ formatPrice(row.price_from, row.price_to) }}
-						</td>
-						<td class="px-3 py-2 text-ink-gray-6">{{ row.stock }}</td>
-						<td class="px-3 py-2">
-							<Badge
-								:theme="row.published_count ? 'green' : 'gray'"
-								:label="
-									row.published_count
-										? `${row.published_count} of ${row.variant_count} live`
-										: 'Not live'
-								"
-							/>
-						</td>
-					</tr>
-				</tbody>
-			</table>
-		</div>
+		<ListView
+			class="min-h-0 flex-1"
+			row-key="name"
+			:columns="columns"
+			:rows="rows"
+			:options="listOptions"
+		>
+			<template #cell="{ item, row, column }">
+				<Badge
+					v-if="column.key === 'status'"
+					:theme="row.published_count ? 'green' : 'gray'"
+					:label="
+						row.published_count
+							? `${row.published_count} of ${row.variant_count} live`
+							: 'Not live'
+					"
+				/>
+				<span v-else-if="column.key === 'price'" class="text-ink-gray-7">
+					{{ formatPrice(row) }}
+				</span>
+				<span v-else class="truncate text-ink-gray-7">{{ item }}</span>
+			</template>
+		</ListView>
 
 		<AddProductDialog
 			v-model="showAddProduct"
