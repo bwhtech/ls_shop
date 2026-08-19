@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { FormLabel, Select, createResource } from "frappe-ui"
+import {
+	Button,
+	Dialog,
+	ErrorMessage,
+	FormControl,
+	Select,
+	toast,
+	useCall,
+} from "frappe-ui"
 import { computed, ref } from "vue"
 
 const emit = defineEmits<{ created: [name: string] }>()
-const show = defineModel<boolean>({ required: true })
+const open = defineModel<boolean>("open", { required: true })
 
 const title = ref("")
 const collection = ref("")
@@ -14,33 +22,24 @@ const salePrice = ref("")
 
 // A store owner cannot be expected to type an Item Group's exact name, so offer the real list
 // rather than validating a free-text guess after the fact.
-const collections = createResource({
-	url: "ls_shop.api.admin.catalog.get_collections",
-	auto: true,
+const collections = useCall<string[]>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.get_collections",
 })
 
-const collectionOptions = computed(() =>
-	(collections.data ?? []).map((name: string) => ({
-		label: name,
-		value: name,
-	})),
-)
-
-const createProduct = createResource({
-	url: "ls_shop.api.admin.catalog.create_product",
-	onSuccess: (data: { name: string }) => {
-		show.value = false
-		emit("created", data.name)
+const createProduct = useCall<{ name: string }>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.create_product",
+	method: "POST",
+	immediate: false,
+	onSuccess: (product) => {
+		open.value = false
+		reset()
+		emit("created", product.name)
 	},
+	onError: (error: { message?: string }) =>
+		toast.error(error?.message ?? "Could not create product"),
 })
 
-// frappe-ui puts the server-side messages on `messages` and the transport error on `message`;
-// showing only one of them renders a bare "ValidationError" with the useful half missing.
-const errorMessage = computed(() => {
-	const error = createProduct.error
-	if (!error) return ""
-	return error.messages?.length ? error.messages.join(", ") : error.message
-})
+const collectionOptions = computed(() => collections.data ?? [])
 
 function splitValues(value: string) {
 	return value
@@ -49,8 +48,16 @@ function splitValues(value: string) {
 		.filter(Boolean)
 }
 
+function reset() {
+	title.value = ""
+	collection.value = ""
+	options.value = ""
+	sizes.value = ""
+	price.value = ""
+	salePrice.value = ""
+}
+
 function submit() {
-	createProduct.error = null
 	createProduct.submit({
 		title: title.value,
 		collection: collection.value,
@@ -65,14 +72,22 @@ function submit() {
 </script>
 
 <template>
-	<Dialog v-model="show" title="Add product">
+	<Dialog v-model:open="open" title="Add product">
 		<template #default>
 			<div class="space-y-4">
-				<FormControl v-model="title" label="Title" placeholder="Merino Wool Jacket" />
-				<div>
-					<FormLabel label="Collection" />
-					<Select v-model="collection" class="mt-1.5 w-full" :options="collectionOptions" />
-				</div>
+				<FormControl
+					v-model="title"
+					label="Title"
+					required
+					placeholder="Merino Wool Jacket"
+				/>
+				<FormControl
+					v-model="collection"
+					type="select"
+					label="Collection"
+					required
+					:options="collectionOptions"
+				/>
 				<FormControl
 					v-model="options"
 					label="Colours"
@@ -86,18 +101,19 @@ function submit() {
 					placeholder="S, M, L"
 				/>
 				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="price" label="Price" type="number" />
-					<FormControl v-model="salePrice" label="Sale price" type="number" />
+					<FormControl v-model="price" type="number" label="Price" />
+					<FormControl v-model="salePrice" type="number" label="Sale price" />
 				</div>
-				<ErrorMessage :message="errorMessage" />
+				<ErrorMessage :message="createProduct.error?.message" />
 				<Button
 					class="w-full"
 					variant="solid"
+					theme="gray"
+					icon-left="lucide-plus"
 					:loading="createProduct.loading"
+					label="Create product"
 					@click="submit"
-				>
-					Create product
-				</Button>
+				/>
 			</div>
 		</template>
 	</Dialog>

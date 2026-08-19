@@ -42,10 +42,11 @@ export default defineConfig({
 		// named 'default'" (feather-icons -> FeatherIcon, debug -> socket.io-client).
 		include: [
 			"feather-icons",
-			"frappe-ui > feather-icons",
-			"debug",
+			"tippy.js",
+			"showdown",
+			"engine.io-client",
 			"socket.io-client",
-			"frappe-ui > socket.io-client",
+			"debug",
 		],
 	},
 	server: {

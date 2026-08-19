@@ -1,1 +1,12 @@
 @import "frappe-ui/style.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+	/* The shared content column every page body sits in, so pages line up with each other
+	   instead of each picking its own width. */
+	.body-container {
+		@apply mx-auto w-full max-w-[940px] px-3 sm:px-5;
+	}
+}

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import AddProductDialog from "@/components/AddProductDialog.vue"
 import type { ProductRow } from "@/types"
+import { formatRowPrice, publishTheme } from "@/utils/format"
 import {
-	Avatar,
 	Badge,
 	Breadcrumbs,
+	Button,
+	FormControl,
 	ListView,
-	PageHeader,
-	createResource,
+	useCall,
 } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
@@ -16,10 +17,9 @@ const router = useRouter()
 const showAddProduct = ref(false)
 const search = ref("")
 
-const products = createResource({
-	url: "ls_shop.api.admin.catalog.get_products",
-	makeParams: () => ({ search: search.value }),
-	auto: true,
+const products = useCall<{ products: ProductRow[]; total: number }>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.get_products",
+	params: () => ({ search: search.value }),
 })
 
 // Typing should not fire a request per keystroke; wait until the owner pauses.
@@ -29,34 +29,23 @@ watch(search, () => {
 	searchTimer = setTimeout(() => products.reload(), 300)
 })
 
-const rows = computed<ProductRow[]>(() => products.data?.products ?? [])
-
-function formatPrice(row: ProductRow) {
-	if (row.price_from === null) return "—"
-	if (row.price_to && row.price_to !== row.price_from) {
-		return `${row.price_from} – ${row.price_to}`
-	}
-	return String(row.price_from)
-}
+const rows = computed(() =>
+	(products.data?.products ?? []).map((product) => ({
+		...product,
+		price: formatRowPrice(product),
+		status: product.published_count
+			? `${product.published_count} of ${product.variant_count} live`
+			: "Not live",
+	})),
+)
 
 const columns = [
-	{
-		label: "Product",
-		key: "title",
-		width: 3,
-		prefix: ({ row }: { row: ProductRow }) =>
-			h(Avatar, {
-				shape: "square",
-				image: row.image ?? undefined,
-				label: row.title,
-				size: "sm",
-			}),
-	},
+	{ label: "Product", key: "title", width: 3 },
 	{ label: "Collection", key: "collection", width: 1.5 },
-	{ label: "Options", key: "variant_count", width: 0.8 },
-	{ label: "Price", key: "price", width: 1.2 },
-	{ label: "Stock", key: "stock", width: 0.8 },
-	{ label: "Status", key: "status", width: 1.2 },
+	{ label: "Options", key: "variant_count", width: 0.7, align: "right" },
+	{ label: "Price", key: "price", width: 1.2, align: "right" },
+	{ label: "Stock", key: "stock", width: 0.8, align: "right" },
+	{ label: "Status", key: "status", width: 1.3 },
 ]
 
 const listOptions = {
@@ -64,7 +53,9 @@ const listOptions = {
 		name: "Product",
 		params: { name: row.name },
 	}),
+	selectable: true,
 	showTooltip: false,
+	resizeColumn: true,
 	emptyState: {
 		title: "No products yet",
 		description: "Add your first product to start selling.",
@@ -80,14 +71,27 @@ const listOptions = {
 </script>
 
 <template>
-	<PageHeader>
-		<Breadcrumbs :items="[{ label: 'Products', route: { name: 'Products' } }]" />
-		<Button variant="solid" label="Add product" @click="showAddProduct = true" />
-	</PageHeader>
+	<div class="flex h-full flex-col bg-surface-base">
+		<header
+			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
+		>
+			<Breadcrumbs :items="[{ label: 'Products', route: { name: 'Products' } }]" />
+			<Button
+				variant="solid"
+				theme="gray"
+				icon-left="lucide-plus"
+				label="Add product"
+				@click="showAddProduct = true"
+			/>
+		</header>
 
-	<div class="flex h-full flex-col px-5 pb-5">
-		<div class="py-3">
-			<FormControl v-model="search" type="text" placeholder="Search products" class="max-w-xs" />
+		<div class="px-3 py-3 sm:px-5">
+			<FormControl
+				v-model="search"
+				type="text"
+				placeholder="Search products"
+				class="max-w-xs"
+			/>
 		</div>
 
 		<ListView
@@ -95,42 +99,41 @@ const listOptions = {
 			row-key="name"
 			:columns="columns"
 			:rows="rows"
+			:loading="products.loading"
 			:options="listOptions"
 		>
+			<!-- The #cell slot replaces ListView's default rendering for every column, a column's
+			     own prefix included, so the thumbnail is drawn here rather than declared there. -->
 			<template #cell="{ item, row, column }">
 				<div v-if="column.key === 'title'" class="flex min-w-0 items-center gap-2.5">
 					<img
 						v-if="row.image"
 						:src="row.image"
 						alt=""
-						class="size-7 shrink-0 rounded object-cover"
+						class="size-6 shrink-0 rounded object-cover"
 					/>
 					<div
 						v-else
-						class="grid size-7 shrink-0 place-items-center rounded bg-surface-gray-2 text-p-xs text-ink-gray-4"
+						class="grid size-6 shrink-0 place-items-center rounded bg-surface-gray-2 text-2xs text-ink-gray-4"
 					>
 						{{ row.title.slice(0, 1) }}
 					</div>
-					<span class="truncate text-ink-gray-8">{{ row.title }}</span>
+					<span class="truncate text-base text-ink-gray-9">{{ row.title }}</span>
 				</div>
+
 				<Badge
 					v-else-if="column.key === 'status'"
-					:theme="row.published_count ? 'green' : 'gray'"
-					:label="
-						row.published_count
-							? `${row.published_count} of ${row.variant_count} live`
-							: 'Not live'
-					"
+					variant="subtle"
+					:theme="publishTheme(row.published_count)"
+					:label="row.status"
 				/>
-				<span v-else-if="column.key === 'price'" class="text-ink-gray-7">
-					{{ formatPrice(row) }}
-				</span>
-				<span v-else class="truncate text-ink-gray-7">{{ item }}</span>
+
+				<span v-else class="truncate text-base text-ink-gray-7">{{ item }}</span>
 			</template>
 		</ListView>
 
 		<AddProductDialog
-			v-model="showAddProduct"
+			v-model:open="showAddProduct"
 			@created="(name) => router.push({ name: 'Product', params: { name } })"
 		/>
 	</div>

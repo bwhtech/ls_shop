@@ -10,6 +10,7 @@ export type ProductVariant = {
 	option: string
 	is_published: boolean
 	route: string | null
+	storefront_url: string | null
 	sizes: ProductSize[]
 	images: string[]
 	blockers: string[]
@@ -20,6 +21,7 @@ export type ProductDetail = {
 	title: string
 	image: string | null
 	collection: string
+	description: string | null
 	disabled: boolean
 	option_attribute: string | null
 	variants: ProductVariant[]

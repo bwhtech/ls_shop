@@ -4,6 +4,7 @@
 import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe import _
+from frappe.utils import get_url
 from frappe.utils.data import cint, cstr, flt
 
 from ls_shop.api.variant_pricing import get_selling_price_lists, set_variant_prices
@@ -181,7 +182,7 @@ def get_product(item_template: str):
 	template = frappe.db.get_value(
 		"Item",
 		item_template,
-		["name", "item_name", "image", "item_group", "disabled"],
+		["name", "item_name", "image", "item_group", "description", "disabled"],
 		as_dict=True,
 	)
 	if not template:
@@ -245,6 +246,7 @@ def get_product(item_template: str):
 		"title": template.item_name,
 		"image": template.image,
 		"collection": template.item_group,
+		"description": template.description,
 		"disabled": bool(template.disabled),
 		"option_attribute": configurators[0].item_attribute if configurators else None,
 		"variants": [
@@ -253,6 +255,7 @@ def get_product(item_template: str):
 				"option": row.attribute_value or row.display_name,
 				"is_published": bool(row.is_published),
 				"route": row.route,
+				"storefront_url": get_url(f"/products/{row.route}") if row.route else None,
 				"sizes": sizes_by_variant.get(row.name, []),
 				"images": images_by_variant.get(row.name, []),
 				# The storefront refuses to publish without both, so say so before the owner
@@ -400,14 +403,18 @@ def get_default_stock_uom():
 
 
 @frappe.whitelist(methods=["POST"])
-def update_product(item_template: str, title=None, collection=None, disabled=None):
+def update_product(item_template: str, title=None, collection=None, description=None, disabled=None):
 	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
 
 	item = frappe.get_doc("Item", item_template)
 	if title is not None:
 		item.item_name = cstr(title).strip()
 	if collection is not None:
+		if not frappe.db.exists("Item Group", collection):
+			frappe.throw(_("Collection {0} does not exist.").format(collection))
 		item.item_group = collection
+	if description is not None:
+		item.description = description
 	if disabled is not None:
 		item.disabled = cint(disabled)
 	item.save()

@@ -14,6 +14,6 @@ declare module 'vue' {
     AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    VariantCard: typeof import('./src/components/VariantCard.vue')['default']
+    VariantRow: typeof import('./src/components/VariantRow.vue')['default']
   }
 }

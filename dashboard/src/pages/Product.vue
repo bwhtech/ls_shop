@@ -1,42 +1,88 @@
 <script setup lang="ts">
-import VariantCard from "@/components/VariantCard.vue"
-import type { ProductVariant } from "@/types"
+import VariantRow from "@/components/VariantRow.vue"
+import type { ProductDetail, ProductVariant } from "@/types"
+import { formatPriceRange, publishTheme, sumStock } from "@/utils/format"
 import {
 	Badge,
 	Breadcrumbs,
-	PageHeader,
-	Skeleton,
-	createResource,
+	Button,
+	FormControl,
+	LoadingText,
+	toast,
+	useCall,
 } from "frappe-ui"
-import { computed, ref, watch } from "vue"
+import { computed, reactive, watch } from "vue"
 import { useRoute } from "vue-router"
 
 const route = useRoute()
 const productName = computed(() => String(route.params.name))
 
-const product = createResource({
-	url: "ls_shop.api.admin.catalog.get_product",
-	makeParams: () => ({ item_template: productName.value }),
-	auto: true,
+const product = useCall<ProductDetail>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.get_product",
+	params: () => ({ item_template: productName.value }),
+	refetch: true,
 })
 
-const title = ref("")
+const collections = useCall<string[]>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.get_collections",
+})
+
+const details = reactive({ title: "", collection: "", description: "" })
+
 watch(
-	() => product.data?.title,
-	(value) => {
-		title.value = value ?? ""
+	() => product.data,
+	(data) => {
+		if (!data) return
+		details.title = data.title ?? ""
+		details.collection = data.collection ?? ""
+		details.description = data.description ?? ""
 	},
+	{ immediate: true },
 )
 
-const updateProduct = createResource({
-	url: "ls_shop.api.admin.catalog.update_product",
-	onSuccess: () => product.reload(),
+const detailsChanged = computed(
+	() =>
+		!!product.data &&
+		(details.title.trim() !== (product.data.title ?? "") ||
+			details.collection !== (product.data.collection ?? "") ||
+			details.description !== (product.data.description ?? "")),
+)
+
+const updateProduct = useCall({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.update_product",
+	method: "POST",
+	immediate: false,
+	onSuccess: () => {
+		toast.success("Product saved")
+		product.reload()
+	},
+	onError: (error: Error) => toast.error(error.message),
 })
 
-const publishAll = createResource({
-	url: "ls_shop.api.admin.catalog.set_product_published",
+const publishAll = useCall<{ updated: string[]; skipped: string[] }>({
+	url: "/api/v2/method/ls_shop.api.admin.catalog.set_product_published",
+	method: "POST",
+	immediate: false,
 	onSuccess: () => product.reload(),
+	onError: (error: Error) => toast.error(error.message),
 })
+
+const variants = computed<ProductVariant[]>(() => product.data?.variants ?? [])
+const liveCount = computed(
+	() => variants.value.filter((variant) => variant.is_published).length,
+)
+const allLive = computed(
+	() => variants.value.length > 0 && liveCount.value === variants.value.length,
+)
+
+const priceLabel = computed(() =>
+	formatPriceRange(
+		variants.value.flatMap((variant) => variant.sizes.map((size) => size.rate)),
+	),
+)
+const stockTotal = computed(() =>
+	variants.value.reduce((total, variant) => total + sumStock(variant.sizes), 0),
+)
 
 // Options that were skipped are the ones still missing an image or a size; naming them beats a
 // silent partial success the owner has to go hunting for.
@@ -47,101 +93,97 @@ const skippedNotice = computed(() => {
 		: ""
 })
 
-const variants = computed<ProductVariant[]>(() => product.data?.variants ?? [])
-const allLive = computed(
+// Only a live option has a page a customer can actually open.
+const storefrontUrl = computed(
 	() =>
-		variants.value.length > 0 &&
-		variants.value.every((variant) => variant.is_published),
-)
-const liveCount = computed(
-	() => variants.value.filter((variant) => variant.is_published).length,
-)
-const titleChanged = computed(
-	() => title.value.trim() !== (product.data?.title ?? ""),
+		variants.value.find(
+			(variant) => variant.is_published && variant.storefront_url,
+		)?.storefront_url ?? "",
 )
 
-const allRates = computed(() =>
-	variants.value
-		.flatMap((variant) => variant.sizes.map((size) => size.rate))
-		.filter((rate): rate is number => rate !== null && rate !== undefined),
-)
+const collectionOptions = computed(() => collections.data ?? [])
 
-const priceLabel = computed(() => {
-	if (!allRates.value.length) return "No price"
-	const low = Math.min(...allRates.value)
-	const high = Math.max(...allRates.value)
-	return low === high ? String(low) : `${low} – ${high}`
-})
-
-const stockTotal = computed(() =>
-	variants.value.reduce(
-		(total, variant) =>
-			total + variant.sizes.reduce((sum, size) => sum + (size.stock ?? 0), 0),
-		0,
-	),
-)
-
-// The storefront route only exists for options that are live, so link the first one that is.
-const storefrontRoute = computed(
-	() =>
-		variants.value.find((variant) => variant.is_published && variant.route)
-			?.route ?? "",
-)
+function saveDetails() {
+	updateProduct.submit({
+		item_template: productName.value,
+		title: details.title,
+		collection: details.collection,
+		description: details.description,
+	})
+}
 </script>
 
 <template>
-	<PageHeader>
-		<Breadcrumbs
-			:items="[
-				{ label: 'Products', route: { name: 'Products' } },
-				{ label: product.data?.title ?? '…', route: '' },
-			]"
-		/>
-		<Button
-			v-if="variants.length"
-			variant="solid"
-			:loading="publishAll.loading"
-			:label="allLive ? 'Unpublish all' : 'Publish all'"
-			@click="publishAll.submit({ item_template: productName, publish: allLive ? 0 : 1 })"
-		/>
-	</PageHeader>
-
-	<div class="h-full overflow-y-auto">
-		<div class="mx-auto max-w-5xl px-5 py-5">
-			<div v-if="product.loading && !product.data" class="space-y-3">
-				<Skeleton class="h-24 w-full" />
-				<Skeleton class="h-20 w-full" />
+	<div class="flex h-full flex-col bg-surface-base">
+		<header
+			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
+		>
+			<Breadcrumbs
+				:items="[
+					{ label: 'Products', route: { name: 'Products' } },
+					{ label: product.data?.title ?? 'Loading', route: '' },
+				]"
+			/>
+			<div class="flex gap-2">
+				<Button
+					v-if="storefrontUrl"
+					icon-left="lucide-external-link"
+					label="View in store"
+					:link="storefrontUrl"
+				/>
+				<Button
+					v-if="variants.length"
+					variant="solid"
+					theme="gray"
+					:loading="publishAll.loading"
+					:label="allLive ? 'Unpublish all' : 'Publish all'"
+					@click="
+						publishAll.submit({ item_template: productName, publish: allLive ? 0 : 1 })
+					"
+				/>
 			</div>
+		</header>
 
-			<div v-else-if="product.data" class="flex flex-col gap-5 lg:flex-row">
-				<div class="min-w-0 flex-1 space-y-5">
-					<section class="rounded-lg border border-outline-gray-2 p-4">
-						<h2 class="mb-3 text-base font-medium text-ink-gray-8">Details</h2>
-						<div class="flex items-end gap-2">
-							<FormControl v-model="title" label="Title" class="flex-1" />
-							<Button
-								:loading="updateProduct.loading"
-								:disabled="!titleChanged"
-								label="Save"
-								@click="updateProduct.submit({ item_template: productName, title })"
-							/>
+		<div class="min-h-0 flex-1 overflow-y-auto">
+			<div class="body-container pb-40 pt-5">
+				<LoadingText v-if="product.loading && !product.data" :lines="3" />
+
+				<template v-else-if="product.data">
+					<dl class="flex gap-8 pb-5">
+						<div>
+							<dt class="text-sm text-ink-gray-5">Storefront</dt>
+							<dd class="mt-1">
+								<Badge
+									variant="subtle"
+									:theme="publishTheme(liveCount)"
+									:label="liveCount ? `${liveCount} live` : 'Not live'"
+								/>
+							</dd>
 						</div>
-					</section>
+						<div>
+							<dt class="text-sm text-ink-gray-5">Price</dt>
+							<dd class="mt-1 text-base text-ink-gray-9">{{ priceLabel }}</dd>
+						</div>
+						<div>
+							<dt class="text-sm text-ink-gray-5">In stock</dt>
+							<dd class="mt-1 text-base text-ink-gray-9">{{ stockTotal }}</dd>
+						</div>
+					</dl>
 
 					<section>
-						<div class="mb-2 flex items-baseline gap-2">
-							<h2 class="text-base font-medium text-ink-gray-8">Options</h2>
-							<span class="text-p-sm text-ink-gray-5">
+						<div class="flex items-baseline gap-2">
+							<h2 class="text-md text-ink-gray-9">Options</h2>
+							<span class="text-sm text-ink-gray-5">
 								{{ liveCount }} of {{ variants.length }} live
 							</span>
 						</div>
 
-						<div v-if="skippedNotice" class="mb-3 text-p-sm text-ink-amber-3">
+						<p v-if="skippedNotice" class="mt-1 text-p-sm text-ink-amber-6">
 							{{ skippedNotice }}
-						</div>
+						</p>
 
-						<div class="space-y-2">
-							<VariantCard
+						<div class="mt-2 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
+							<VariantRow
 								v-for="variant in variants"
 								:key="variant.name"
 								:variant="variant"
@@ -149,46 +191,35 @@ const storefrontRoute = computed(
 							/>
 						</div>
 					</section>
-				</div>
 
-				<aside class="w-full shrink-0 lg:w-72">
-					<section class="rounded-lg border border-outline-gray-2 p-4">
-						<h2 class="mb-3 text-base font-medium text-ink-gray-8">Status</h2>
-						<dl class="space-y-3 text-p-sm">
-							<div class="flex items-center justify-between">
-								<dt class="text-ink-gray-5">Storefront</dt>
-								<dd>
-									<Badge
-										:theme="liveCount ? 'green' : 'gray'"
-										:label="liveCount ? `${liveCount} live` : 'Not live'"
-									/>
-								</dd>
+					<section class="mt-6">
+						<h2 class="text-md text-ink-gray-9">Details</h2>
+						<div class="mt-3 max-w-xl space-y-4">
+							<FormControl v-model="details.title" label="Title" required />
+							<FormControl
+								v-model="details.collection"
+								type="select"
+								label="Collection"
+								:options="collectionOptions"
+							/>
+							<FormControl
+								v-model="details.description"
+								type="textarea"
+								label="Description"
+								description="Shown to customers on the product page."
+								:rows="4"
+							/>
+							<div class="flex justify-end">
+								<Button
+									:loading="updateProduct.loading"
+									:disabled="!detailsChanged"
+									label="Save changes"
+									@click="saveDetails"
+								/>
 							</div>
-							<div class="flex items-center justify-between">
-								<dt class="text-ink-gray-5">Collection</dt>
-								<dd class="text-ink-gray-8">{{ product.data.collection }}</dd>
-							</div>
-							<div class="flex items-center justify-between">
-								<dt class="text-ink-gray-5">Price</dt>
-								<dd class="text-ink-gray-8">{{ priceLabel }}</dd>
-							</div>
-							<div class="flex items-center justify-between">
-								<dt class="text-ink-gray-5">In stock</dt>
-								<dd class="text-ink-gray-8">{{ stockTotal }}</dd>
-							</div>
-						</dl>
-
-						<a
-							v-if="storefrontRoute"
-							:href="`/${storefrontRoute}`"
-							target="_blank"
-							rel="noopener"
-							class="mt-4 inline-block text-p-sm text-ink-blue-3 hover:underline"
-						>
-							View in store →
-						</a>
+						</div>
 					</section>
-				</aside>
+				</template>
 			</div>
 		</div>
 	</div>
