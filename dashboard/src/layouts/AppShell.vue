@@ -9,6 +9,7 @@ import { DesktopShell, Sidebar, SidebarItem, SidebarLabel } from "frappe-ui"
 		<template #sidebar>
 			<Sidebar>
 				<SidebarLabel>Store</SidebarLabel>
+				<SidebarItem :to="{ name: 'Orders' }" label="Orders" icon="lucide-receipt" />
 				<SidebarItem :to="{ name: 'Products' }" label="Products" icon="lucide-package" />
 			</Sidebar>
 		</template>

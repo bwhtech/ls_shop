@@ -14,6 +14,16 @@ const routes = [
 		name: "Product",
 		component: () => import("@/pages/Product.vue"),
 	},
+	{
+		path: "/store/orders",
+		name: "Orders",
+		component: () => import("@/pages/Orders.vue"),
+	},
+	{
+		path: "/store/orders/:name",
+		name: "Order",
+		component: () => import("@/pages/Order.vue"),
+	},
 ]
 
 export default createRouter({

@@ -24,3 +24,15 @@ export function sumStock(sizes: ProductSize[]) {
 export function publishTheme(publishedCount: number) {
 	return publishedCount ? "green" : "gray"
 }
+
+/** Order state themes live beside the publish map, so every badge in the app agrees. */
+export function orderStateTheme(state: string) {
+	return (
+		{
+			"To fulfil": "orange",
+			"Partly fulfilled": "blue",
+			Fulfilled: "green",
+			Cancelled: "red",
+		}[state] ?? "gray"
+	)
+}

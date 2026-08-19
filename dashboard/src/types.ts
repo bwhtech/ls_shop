@@ -39,3 +39,44 @@ export type ProductRow = {
 	price_to: number | null
 	stock: number
 }
+
+export type OrderRow = {
+	name: string
+	customer: string
+	placed_on: string
+	status: string
+	state: string
+	total: number
+	currency: string
+	item_count: number
+	payment_mode: string | null
+}
+
+export type OrderItem = {
+	item_code: string
+	title: string
+	size: string | null
+	qty: number
+	delivered_qty: number
+	rate: number
+	amount: number
+	image: string | null
+}
+
+export type OrderDetail = {
+	name: string
+	customer: string
+	email: string | null
+	phone: string | null
+	placed_on: string
+	status: string
+	state: string
+	currency: string
+	total: number
+	grand_total: number
+	payment_mode: string | null
+	shipping_address: string | null
+	can_fulfil: boolean
+	items: OrderItem[]
+	deliveries: string[]
+}
