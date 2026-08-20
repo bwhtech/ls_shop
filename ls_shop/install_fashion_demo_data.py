@@ -34,6 +34,54 @@ FASHION_COLORS = (
 
 FASHION_ITEM_GROUPS = ("Knitwear", "Suits", "Denim", "Activewear", "Shirts")
 
+# The first fashion seed made one flat top-level category per item group; FASHION_MENU replaces them.
+LEGACY_FLAT_CATEGORIES = FASHION_ITEM_GROUPS
+
+# Tab -> mega-menu column -> leaf listing, the three levels Ecommerce Category allows. Every leaf
+# names one of FASHION_ITEM_GROUPS, so no menu entry can land a shopper on an empty listing — which
+# is why the leaf under "Denim & Active" reads Denim rather than Jeans: Jeans has no products.
+FASHION_MENU = (
+	{
+		"display_name": "Women",
+		"children": (
+			{
+				"display_name": "Clothing",
+				"children": (
+					{"display_name": "Knitwear", "item_group": "Knitwear"},
+					{"display_name": "Suits", "item_group": "Suits"},
+					{"display_name": "Shirts", "item_group": "Shirts"},
+				),
+			},
+			{
+				"display_name": "Denim & Active",
+				"children": (
+					{"display_name": "Denim", "item_group": "Denim"},
+					{"display_name": "Activewear", "item_group": "Activewear"},
+				),
+			},
+		),
+	},
+	{
+		"display_name": "Men",
+		"children": (
+			{
+				"display_name": "Clothing",
+				"children": (
+					{"display_name": "Shirts", "item_group": "Shirts"},
+					{"display_name": "Suits", "item_group": "Suits"},
+				),
+			},
+			{
+				"display_name": "Denim & Active",
+				"children": (
+					{"display_name": "Denim", "item_group": "Denim"},
+					{"display_name": "Activewear", "item_group": "Activewear"},
+				),
+			},
+		),
+	},
+)
+
 DEFAULT_SIZES = ("S", "M", "L", "XL")
 
 FASHION_PRODUCTS = (
@@ -211,27 +259,72 @@ def save_item_groups():
 
 
 def save_ecommerce_categories():
-	"""One storefront category per fashion item group, and the car-part ones switched off."""
-	for display_order, item_group in enumerate(FASHION_ITEM_GROUPS, start=1):
-		if frappe.db.exists("Ecommerce Category", item_group):
-			continue
+	"""The three-level storefront menu from FASHION_MENU, and the car-part categories switched off."""
+	remove_legacy_flat_categories()
 
-		frappe.get_doc(
-			{
-				"doctype": "Ecommerce Category",
-				"category_name": item_group,
-				"display_name": item_group,
-				"route_slug": frappe.scrub(item_group).replace("_", "-"),
-				"link_type": "Item Group",
-				"link_item_groups": [{"item_group": item_group}],
-				"enabled": 1,
-				"display_order": display_order,
-			}
-		).insert(ignore_permissions=True)
+	for display_order, tab in enumerate(FASHION_MENU, start=1):
+		save_menu_branch(tab, parent=None, root_display_name=tab["display_name"], display_order=display_order)
 
 	for category in CAR_PART_CATEGORIES:
 		if frappe.db.exists("Ecommerce Category", category):
 			frappe.db.set_value("Ecommerce Category", category, "enabled", 0)
+
+
+def remove_legacy_flat_categories():
+	"""Drop the flat demo categories the tree replaces — their names are the ones a leaf would want.
+
+	Deepest-first because NestedSet refuses to trash a node that still has children, and through
+	delete_doc so the lft/rgt band is reclaimed instead of left as a hole.
+	"""
+	legacy_names = frappe.get_all(
+		"Ecommerce Category",
+		filters={"name": ["in", LEGACY_FLAT_CATEGORIES]},
+		order_by="lft desc",
+		pluck="name",
+	)
+	for name in legacy_names:
+		frappe.delete_doc("Ecommerce Category", name, ignore_permissions=True)
+
+
+def save_menu_branch(node, parent, root_display_name, display_order):
+	"""Upsert one menu entry and its subtree, parents first so validate_depth always sees height 0."""
+	children = node.get("children") or ()
+	category = save_category(node, parent, root_display_name, display_order, bool(children))
+
+	for child_order, child in enumerate(children, start=1):
+		save_menu_branch(child, category.name, root_display_name, child_order)
+
+	return category
+
+
+def save_category(node, parent, root_display_name, display_order, is_group):
+	"""category_name is the primary key, so a column named "Clothing" can only exist once site-wide —
+	every entry below a tab carries that tab's name, and display_name stays the human label."""
+	display_name = node["display_name"]
+	category_name = display_name if not parent else f"{root_display_name} {display_name}"
+
+	if frappe.db.exists("Ecommerce Category", category_name):
+		category = frappe.get_doc("Ecommerce Category", category_name)
+	else:
+		category = frappe.new_doc("Ecommerce Category")
+		category.category_name = category_name
+
+	category.display_name = display_name
+	# Assigning the parent field and saving is the NestedSet move path — it reseats lft/rgt for the
+	# whole subtree, which a db_set on the column would not.
+	category.parent_ecommerce_category = parent
+	category.is_group = 1 if is_group else 0
+	category.display_order = display_order
+	category.enabled = 1
+	# Only a tab owns a storefront URL; validate_route_slug clears the slug on everything below one.
+	category.route_slug = None if parent else frappe.scrub(category_name).replace("_", "-")
+	category.link_type = "" if is_group else "Item Group"
+	category.link_item_groups = []
+	if node.get("item_group"):
+		category.append("link_item_groups", {"item_group": node["item_group"]})
+
+	category.save(ignore_permissions=True)
+	return category
 
 
 def save_product(product):
