@@ -35,7 +35,9 @@
 
 {% block chrome_top %}
 <div class="page-wraper">
-    {% include "components/includes/site_header.html" %}
+    {# In its own block so a chrome-less render (the footer editor's preview) can drop the header
+       without also dropping .page-wraper, which this block opens and chrome_bottom closes. #}
+    {% block site_header %}{% include "components/includes/site_header.html" %}{% endblock %}
 {% endblock %}
 
 {# .page-wraper opens in chrome_top and closes here: it has to wrap header, main and footer,

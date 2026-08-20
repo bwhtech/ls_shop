@@ -13,7 +13,6 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input im
 from ls_shop.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from ls_shop.shop_themes.render import render_themed_template
 from ls_shop.shop_themes.theme_resolver import find_theme_file
-from ls_shop.utils import format_theme_css
 
 # The preview renders through the active theme's own layout, most specific first, rather than
 # rendering the footer partial on a hand-built page. A theme declares its stylesheets inside the
@@ -25,12 +24,17 @@ BASE_FOOTER = "templates/includes/footer.html"
 
 # Everything that is not the footer. Blanked rather than left to render, because the preview is a
 # footer preview - and because seo/analytics blocks would emit tracking from inside an editor pane.
+# Blanking chrome_top instead would unbalance the layout: Pixio opens .page-wraper there and closes
+# it in chrome_bottom alongside the footer, so the footer would render outside the wrapper every rule
+# in the theme scopes under. The header lives in its own block in both themes - `header` in the
+# default theme's base, `site_header` in Pixio's layout - so those come out and the wrapper stays.
 BLANKED_BLOCKS = (
 	"seo",
 	"json_ld",
 	"analytics_head",
 	"analytics_events",
-	"chrome_top",
+	"header",
+	"site_header",
 	"body",
 	"uncontained_body",
 )
@@ -105,13 +109,24 @@ def get_context(context):
 	if lang not in PREVIEW_LANGUAGES:
 		lang = frappe.local.lang or "en"
 
-	footer_context = frappe._dict(preview_settings=settings, lang=lang, is_rtl=lang == "ar")
+	footer_context = frappe._dict(
+		preview_settings=settings,
+		lang=lang,
+		is_rtl=lang == "ar",
+		# The layout emits format_theme_css(), which reads the SAVED doc - it cannot see the colour
+		# the owner is dragging right now. This is the same CSS generated off the previewed doc, and
+		# it is appended after the layout's own so it wins.
+		preview_theme_css=settings.generate_theme_css(),
+		# The default theme's base renders a breadcrumb outside any block, guarded only by this.
+		show_breadcrumb=False,
+	)
 
 	# base.html reads the page language off frappe.lang, so the ?lang switch has to move it here
 	# rather than only reaching the footer partial through the context.
 	frappe.local.lang = lang
 
-	theme_context = get_theme_context(resolve_active_theme())
+	theme_name = resolve_active_theme()
+	theme_context = get_theme_context(theme_name)
 	layout = next(
 		(
 			candidate
@@ -121,7 +136,9 @@ def get_context(context):
 		None,
 	)
 	if layout:
-		context.rendered_html = render_themed_template(build_preview_template(layout), footer_context)
+		context.rendered_html = render_themed_template(
+			get_preview_template(layout), footer_context, theme_name=theme_name
+		)
 		return
 
 	context.rendered_html = f"""<!DOCTYPE html>
@@ -129,7 +146,7 @@ def get_context(context):
 <head>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/assets/ls_shop/css/tailwind.css">
-{format_theme_css()}
+{settings.generate_theme_css()}
 </head>
 <body>
 {frappe.render_template(BASE_FOOTER, footer_context)}
@@ -137,7 +154,8 @@ def get_context(context):
 </html>"""
 
 
-def build_preview_template(layout):
-	"""The active theme's layout with everything but the footer blanked out."""
+def get_preview_template(layout):
 	blanks = "".join(f"{{% block {name} %}}{{% endblock %}}" for name in BLANKED_BLOCKS)
-	return f'{{% extends "{layout}" %}}{blanks}'
+	# super() keeps the theme's own head - its stylesheets - and appends the previewed colours.
+	head = "{% block head %}{{ super() }}{{ preview_theme_css }}{% endblock %}"
+	return f'{{% extends "{layout}" %}}{blanks}{head}'
