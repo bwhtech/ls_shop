@@ -12,14 +12,22 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
+    AdvancedSettings: typeof import('./src/components/settings/AdvancedSettings.vue')['default']
     AppCommandPalette: typeof import('./src/components/AppCommandPalette.vue')['default']
     AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
     AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
+    CollectionCombobox: typeof import('./src/components/CollectionCombobox.vue')['default']
+    FooterSettings: typeof import('./src/components/settings/FooterSettings.vue')['default']
     NavInspector: typeof import('./src/components/navigation/NavInspector.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
+    PaymentSettings: typeof import('./src/components/settings/PaymentSettings.vue')['default']
     ProfileSettings: typeof import('./src/components/settings/ProfileSettings.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SettingsAttach: typeof import('./src/components/settings/SettingsAttach.vue')['default']
+    SettingsField: typeof import('./src/components/settings/SettingsField.vue')['default']
+    SettingsLinkField: typeof import('./src/components/settings/SettingsLinkField.vue')['default']
+    ShippingSettings: typeof import('./src/components/settings/ShippingSettings.vue')['default']
     StoreDropdown: typeof import('./src/components/StoreDropdown.vue')['default']
     StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
   }

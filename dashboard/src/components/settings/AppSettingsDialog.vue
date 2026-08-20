@@ -8,8 +8,12 @@ import {
 	SettingsSidebar,
 } from "frappe-ui"
 import { markRaw } from "vue"
+import AdvancedSettings from "./AdvancedSettings.vue"
 import AppearanceSettings from "./AppearanceSettings.vue"
+import FooterSettings from "./FooterSettings.vue"
+import PaymentSettings from "./PaymentSettings.vue"
 import ProfileSettings from "./ProfileSettings.vue"
+import ShippingSettings from "./ShippingSettings.vue"
 import StoreSettings from "./StoreSettings.vue"
 import { activeSettingsTab, showSettings } from "./index"
 
@@ -35,11 +39,40 @@ const tabs = [
 		component: markRaw(StoreSettings),
 		group: "Store",
 	},
+	{
+		label: "Shipping & returns",
+		slug: "shipping",
+		icon: "lucide-truck",
+		component: markRaw(ShippingSettings),
+		group: "Store",
+	},
+	{
+		label: "Payments",
+		slug: "payments",
+		icon: "lucide-credit-card",
+		component: markRaw(PaymentSettings),
+		group: "Store",
+	},
+	{
+		label: "Footer & social",
+		slug: "footer",
+		icon: "lucide-panel-bottom",
+		component: markRaw(FooterSettings),
+		group: "Store",
+	},
+	{
+		label: "Advanced",
+		slug: "advanced",
+		icon: "lucide-settings-2",
+		component: markRaw(AdvancedSettings),
+		group: "Advanced",
+	},
 ]
 
 const tabGroups = [
 	{ label: "Account", tabs: tabs.filter((tab) => tab.group === "Account") },
 	{ label: "Store", tabs: tabs.filter((tab) => tab.group === "Store") },
+	{ label: "Advanced", tabs: tabs.filter((tab) => tab.group === "Advanced") },
 ]
 </script>
 

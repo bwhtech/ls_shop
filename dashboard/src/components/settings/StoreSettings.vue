@@ -5,73 +5,72 @@ import {
 	SettingsBody,
 	SettingsHeader,
 	SettingsRow,
-	toast,
-	useCall,
 } from "frappe-ui"
-import { computed, reactive, watch } from "vue"
+import SettingsAttach from "./SettingsAttach.vue"
+import SettingsLinkField from "./SettingsLinkField.vue"
+import { useSettingsForm } from "./useSettingsForm"
 
-const settings = useCall<Record<string, string>>({
-	url: "/api/v2/method/ls_shop.api.admin.settings.get_store_settings",
-})
+const FIELDS = [
+	"store_name",
+	"brand_logo",
+	"footer_logo",
+	"favicon",
+	"contact_email",
+	"contact_phone",
+	"working_hours",
+	"company",
+] as const
 
-const form = reactive({ store_name: "", contact_email: "", contact_phone: "" })
-
-watch(
-	() => settings.data,
-	(data) => {
-		if (!data) return
-		form.store_name = data.store_name ?? ""
-		form.contact_email = data.contact_email ?? ""
-		form.contact_phone = data.contact_phone ?? ""
-	},
-	{ immediate: true },
+const { form, changed, save, submit } = useSettingsForm(
+	"store_settings",
+	FIELDS,
+	"Store details saved",
 )
-
-const changed = computed(
-	() =>
-		!!settings.data &&
-		(form.store_name !== (settings.data.store_name ?? "") ||
-			form.contact_email !== (settings.data.contact_email ?? "") ||
-			form.contact_phone !== (settings.data.contact_phone ?? "")),
-)
-
-const save = useCall({
-	url: "/api/v2/method/ls_shop.api.admin.settings.save_store_settings",
-	method: "POST",
-	immediate: false,
-	onSuccess: () => {
-		toast.success("Store details saved")
-		settings.reload()
-	},
-	onError: (error: Error) => toast.error(error.message),
-})
 </script>
 
 <template>
-	<SettingsHeader>
-		<h2 class="text-lg font-semibold text-ink-gray-8">Store details</h2>
-	</SettingsHeader>
+	<SettingsHeader
+		title="Store details"
+		description="How your storefront names itself and how customers reach you"
+	/>
 
 	<SettingsBody>
-		<div class="space-y-4 pt-6">
-			<SettingsRow title="Store name" description="Shown across your storefront">
-				<FormControl v-model="form.store_name" />
-			</SettingsRow>
-			<SettingsRow title="Contact email" description="Where customers reach you">
-				<FormControl v-model="form.contact_email" type="email" />
-			</SettingsRow>
-			<SettingsRow title="Contact phone">
-				<FormControl v-model="form.contact_phone" />
-			</SettingsRow>
+		<div class="pt-6">
+			<div class="divide-y divide-outline-gray-1">
+				<SettingsRow title="Store name" description="Shown across your storefront">
+					<FormControl v-model="form.store_name" />
+				</SettingsRow>
+				<SettingsRow title="Brand logo" description="Used in the storefront header">
+					<SettingsAttach v-model="form.brand_logo" />
+				</SettingsRow>
+				<SettingsRow title="Footer logo">
+					<SettingsAttach v-model="form.footer_logo" />
+				</SettingsRow>
+				<SettingsRow title="Favicon" description="The small icon in the browser tab">
+					<SettingsAttach v-model="form.favicon" :image="false" />
+				</SettingsRow>
+				<SettingsRow title="Contact email" description="Where customers reach you">
+					<FormControl v-model="form.contact_email" type="email" />
+				</SettingsRow>
+				<SettingsRow title="Contact phone">
+					<FormControl v-model="form.contact_phone" />
+				</SettingsRow>
+				<SettingsRow title="Working hours" description="Shown alongside your contact details">
+					<FormControl v-model="form.working_hours" />
+				</SettingsRow>
+				<SettingsRow title="Company" description="The ERPNext company orders are booked against">
+					<SettingsLinkField v-model="form.company" doctype="Company" />
+				</SettingsRow>
+			</div>
 
-			<div class="flex justify-end pt-2">
+			<div class="flex justify-end pt-4">
 				<Button
 					variant="solid"
 					theme="gray"
 					:loading="save.loading"
 					:disabled="!changed"
 					label="Save"
-					@click="save.submit({ ...form })"
+					@click="submit()"
 				/>
 			</div>
 		</div>
