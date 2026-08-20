@@ -9,6 +9,11 @@
 {% set language = frappe.lang or "en" %}
 {% set settings = header_data.settings %}
 
+{# The route table's LANG regex (shop_theme_settings.py) is a Python constant and Lifestyle
+   Settings carries no language field, so there is nothing to read the pair from - a themed
+   storefront serves exactly /en and /ar. #}
+{% set languages = [("en", "English"), ("ar", "العربية")] %}
+
 {# Both scripts are synchronous on purpose. Alpine's core is deferred in the base head, so a
    deferred script here would run after alpine:init has already fired and the component would
    never register; a sync body script runs before every deferred one. #}
@@ -73,6 +78,40 @@
 								{% else %}
 								<a class="nav-link" href="/{{ language }}/account/dashboard">{{ _("My Account") }}</a>
 								{% endif %}
+							</li>
+							{# Bootstrap's dropdown CSS ships inside style.css but its JS does not, so Alpine
+							   stamps .show and the panel's offsets are taken from the [data-bs-popper] rules the
+							   script would otherwise write. It lives in the icon cluster at every breakpoint
+							   rather than being repeated in the drawer: below 767px .extra-nav is the fixed bottom
+							   bar, which is this theme's mobile home for exactly these controls, and one copy of
+							   the markup cannot drift from the other. pixio.css flips the panel upwards there. #}
+							<li class="nav-item language-link dropdown" @click.outside="language_open = false"
+								@keydown.escape="language_open = false"
+								x-data="{
+									language_open: false,
+									current_language: '{{ language }}',
+									async change_language(language) {
+										if (language === this.current_language) return;
+										/* The cached bundle is per language, so it has to be dropped before the
+										   next page reads it back out of localStorage. */
+										Alpine.store('i18n').i18n = {};
+										Alpine.store('i18n').lastFetched = null;
+										await Alpine.store('i18n').init();
+										window.location.href = window.location.pathname.replace(/^\/(en|ar)/, `/${language}`);
+									},
+								}">
+								<a class="nav-link" href="javascript:void(0);" @click="language_open = !language_open"
+									aria-haspopup="true" :aria-expanded="language_open" aria-label="{{ _('Change language') }}">
+									<span>{{ language|upper }}</span>
+									<i class="fas fa-chevron-down"></i>
+								</a>
+								<div class="dropdown-menu dropdown-menu-end" data-bs-popper="static"
+									:class="language_open ? 'show' : ''" x-cloak>
+									{% for code, label in languages %}
+									<button type="button" class="dropdown-item{% if code == language %} active{% endif %}"
+										@click="language_open = false; change_language('{{ code }}')">{{ label }}</button>
+									{% endfor %}
+								</div>
 							</li>
 							<li class="nav-item search-link">
 								<a class="nav-link" href="javascript:void(0);" @click="$dispatch('open-search')" aria-label="{{ _('Search') }}">

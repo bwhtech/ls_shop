@@ -189,3 +189,40 @@
 		animation-play-state: paused;
 	}
 }
+
+/* --- Language switcher: an icon-cluster item that opens a panel --- */
+
+/* The cluster's icon rule (.extra-nav .extra-cell ul li a/button) is a descendant selector, so
+   it also lands on the buttons inside the language panel and squashes each one into a centred
+   40px icon slot with no vertical padding. The toggle wants that treatment; the panel does not. */
+.site-header .extra-nav .extra-cell ul li .dropdown-menu .dropdown-item {
+	display: block;
+	min-width: 100%;
+	padding: 6px 20px;
+	line-height: 1.5;
+	text-align: start;
+}
+
+/* The toggle is a language code where its neighbours are 20px glyphs, and the same rule sizes
+   any <i> in the cluster to 20px - here the chevron only marks that a panel opens. */
+.site-header .extra-nav .extra-cell ul li.language-link a {
+	gap: 6px;
+	align-items: center;
+	font-size: 16px;
+	color: var(--title);
+}
+
+.site-header .extra-nav .extra-cell ul li.language-link a i {
+	font-size: 11px;
+}
+
+/* Below 767px .extra-nav is the fixed 50px bar on the viewport's bottom edge, so a panel that
+   drops below its toggle opens off-screen. */
+@media only screen and (max-width: 767px) {
+	.site-header .extra-nav .extra-cell ul li.language-link .dropdown-menu[data-bs-popper] {
+		top: auto;
+		bottom: 100%;
+		margin-top: 0;
+		margin-bottom: var(--bs-dropdown-spacer);
+	}
+}
