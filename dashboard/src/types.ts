@@ -125,3 +125,29 @@ export type CascadeProduct = {
 	is_published: number
 	blocked_reason: string
 }
+
+export type OverviewStat = {
+	key: string
+	label: string
+	value: number
+	format: "currency" | "number"
+	delta: number | null
+	note?: string
+}
+
+export type BlockedOption = {
+	variant: string
+	product: string
+	title: string
+	option: string
+	blockers: string[]
+}
+
+export type Overview = {
+	currency: string
+	window_days: number
+	stats: OverviewStat[]
+	recent_orders: OrderRow[]
+	running_low: InventoryRow[]
+	needs_attention: BlockedOption[]
+}

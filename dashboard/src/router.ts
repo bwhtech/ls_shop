@@ -3,7 +3,12 @@ import { createRouter, createWebHistory } from "vue-router"
 // Routes are grouped by top-level area (/store, /storefront, ...) so the shell can grow a
 // Rail later without reorganising the app.
 const routes = [
-	{ path: "/", redirect: "/store/products" },
+	{ path: "/", redirect: "/store/home" },
+	{
+		path: "/store/home",
+		name: "Home",
+		component: () => import("@/pages/Home.vue"),
+	},
 	{
 		path: "/store/products",
 		name: "Products",

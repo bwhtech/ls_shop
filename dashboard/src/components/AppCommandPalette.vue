@@ -78,6 +78,7 @@ const groups = computed(() => [
 	{
 		title: "Go to",
 		items: [
+			{ title: "Home", icon: "lucide-house", onClick: () => go("Home") },
 			{ title: "Orders", icon: "lucide-receipt", onClick: () => go("Orders") },
 			{
 				title: "Products",

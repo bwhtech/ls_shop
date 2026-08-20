@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AppCommandPalette from "@/components/AppCommandPalette.vue"
-import StoreDropdown from "@/components/StoreDropdown.vue"
 import { openSettings } from "@/components/settings"
 import AppSettingsDialog from "@/components/settings/AppSettingsDialog.vue"
 import {
@@ -8,11 +7,13 @@ import {
 	DesktopShell,
 	ScrollArea,
 	Sidebar,
+	SidebarHeader,
 	SidebarItem,
 	SidebarLabel,
 	useCall,
+	useTheme,
 } from "frappe-ui"
-import { computed } from "vue"
+import { computed, h } from "vue"
 
 const store = useCall<Record<string, string>>({
 	url: "/api/v2/method/ls_shop.api.admin.settings.get_store_settings",
@@ -20,11 +21,72 @@ const store = useCall<Record<string, string>>({
 
 const storeName = computed(() => store.data?.store_name || "Your store")
 
+const { currentTheme, setTheme } = useTheme()
+
+/** A tick against whichever theme is active, the way Gameplan marks the current choice. */
+function themeCheckmark(theme: string) {
+	if (currentTheme.value !== theme) return null
+	return h("span", { class: "lucide-check size-4 text-ink-gray-6" })
+}
+
+// SidebarHeader hands `menu-items` straight to Dropdown, so the nested theme submenu Dropdown
+// already supports survives the move off the hand-rolled trigger.
+const menuItems = computed(() => [
+	{
+		icon: "lucide-settings",
+		label: "Settings",
+		onClick: () => openSettings("store"),
+	},
+	{
+		icon: "lucide-moon",
+		label: "Toggle theme",
+		submenu: [
+			{
+				label: "Light Mode",
+				icon: "lucide-sun",
+				slots: { suffix: () => themeCheckmark("light") },
+				onClick: () => setTheme("light"),
+			},
+			{
+				label: "Dark Mode",
+				icon: "lucide-moon",
+				slots: { suffix: () => themeCheckmark("dark") },
+				onClick: () => setTheme("dark"),
+			},
+			{
+				label: "System Default",
+				icon: "lucide-monitor",
+				slots: { suffix: () => themeCheckmark("system") },
+				onClick: () => setTheme("system"),
+			},
+		],
+	},
+	{
+		icon: "lucide-external-link",
+		label: "View storefront",
+		onClick: () => window.open("/", "_blank"),
+	},
+	{
+		icon: "lucide-log-out",
+		label: "Log out",
+		onClick: () => {
+			window.location.href = "/api/method/logout"
+		},
+	},
+])
+
 const sections = [
 	{
-		label: "Store",
+		label: "Overview",
+		items: [{ label: "Home", route: "Home", icon: "lucide-house" }],
+	},
+	{
+		label: "Sales",
+		items: [{ label: "Orders", route: "Orders", icon: "lucide-receipt" }],
+	},
+	{
+		label: "Catalog",
 		items: [
-			{ label: "Orders", route: "Orders", icon: "lucide-receipt" },
 			{ label: "Products", route: "Products", icon: "lucide-package" },
 			{ label: "Inventory", route: "Inventory", icon: "lucide-boxes" },
 		],
@@ -42,33 +104,15 @@ const sections = [
 	<DesktopShell :scroll="false" class="app-shell">
 		<template #sidebar>
 			<Sidebar disable-collapse width="14rem">
-				<div class="shrink-0 p-1.5">
-					<StoreDropdown>
-						<template #trigger="{ open }">
-							<button
-								type="button"
-								class="flex w-full items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-surface-gray-2"
-								:class="{ 'bg-surface-gray-2': open }"
-							>
-								<div
-									class="grid size-7 shrink-0 place-items-center rounded bg-surface-gray-3 text-sm text-ink-gray-7"
-								>
-									{{ storeName.slice(0, 1) }}
-								</div>
-								<span class="truncate text-base font-medium text-ink-gray-8">
-									{{ storeName }}
-								</span>
-								<span
-									class="lucide-chevrons-up-down ml-auto size-4 shrink-0 text-ink-gray-5"
-									aria-hidden="true"
-								/>
-							</button>
-						</template>
-					</StoreDropdown>
-				</div>
+				<SidebarHeader
+					:title="storeName"
+					:subtitle="store.data?.contact_email || undefined"
+					:logo="store.data?.brand_logo || undefined"
+					:menu-items="menuItems"
+				/>
 
 				<ScrollArea class="min-h-0 flex-1" viewport-class="px-2 pb-6">
-					<template v-for="section in sections" :key="section.label">
+					<div v-for="section in sections" :key="section.label" class="mb-3">
 						<SidebarLabel>{{ section.label }}</SidebarLabel>
 						<nav class="mt-0.5 space-y-0.5">
 							<SidebarItem
@@ -85,7 +129,7 @@ const sections = [
 								<span class="truncate text-sm">{{ item.label }}</span>
 							</SidebarItem>
 						</nav>
-					</template>
+					</div>
 				</ScrollArea>
 
 				<div class="shrink-0 border-t border-outline-gray-1 p-2">

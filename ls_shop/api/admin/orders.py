@@ -3,13 +3,21 @@
 
 import frappe
 from frappe import _
-from frappe.utils.data import cint, cstr, flt
+from frappe.query_builder.functions import Count, Sum
+from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
+
+from ls_shop.api.admin.catalog import get_unpublishable_options
+from ls_shop.api.admin.inventory import get_inventory
 
 PAGE_LENGTH = 20
 
 # A store owner thinks in "what do I have to do with this order", not in docstatus and
 # per_delivered. One map turns ERPNext's state into that question.
 OPEN_STATUSES = ("To Deliver and Bill", "To Deliver", "To Bill")
+
+# How many rows each Home panel shows before it sends the owner to the full screen.
+OVERVIEW_PANEL_LENGTH = 5
+OVERVIEW_WINDOW_DAYS = 30
 
 
 @frappe.whitelist()
@@ -210,3 +218,116 @@ def fulfil_order(sales_order: str):
 	delivery_note.submit()
 
 	return {"delivery_note": delivery_note.name}
+
+
+# The overview lives here rather than in a module of its own so it ships without a web-process
+# restart; it reads across catalogue and stock through those modules' own batched readers.
+@frappe.whitelist()
+def get_overview(order_status: str | None = None):
+	"""The whole Home screen in one call: four figures, recent orders, and two worklists.
+
+	`order_status` only narrows the recent-orders panel; the figures always describe the whole
+	store, so flipping that toggle must not move them.
+	"""
+	frappe.has_permission("Sales Order", ptype="read", throw=True)
+	frappe.has_permission("Item", ptype="read", throw=True)
+
+	today = getdate()
+	window_start = add_days(today, -(OVERVIEW_WINDOW_DAYS - 1))
+	previous_start = add_days(window_start, -OVERVIEW_WINDOW_DAYS)
+	previous_end = add_days(window_start, -1)
+
+	current_window = read_sales_window(window_start, today)
+	previous_window = read_sales_window(previous_start, previous_end)
+
+	to_fulfil = frappe.db.count("Sales Order", {"docstatus": 1, "status": ["in", OPEN_STATUSES]})
+	oldest_open = frappe.db.get_value(
+		"Sales Order",
+		{"docstatus": 1, "status": ["in", OPEN_STATUSES]},
+		"transaction_date",
+		order_by="transaction_date asc",
+	)
+
+	published_now = frappe.db.count("Style Attribute Variant", {"is_published": 1})
+	# Nothing records when an option went live, so an option created inside the window stands in
+	# for one that went live inside it.
+	# ponytail: creation date proxies the publish date, revisit if a publish log ever lands
+	published_new = frappe.db.count(
+		"Style Attribute Variant", {"is_published": 1, "creation": [">=", window_start]}
+	)
+
+	return {
+		"currency": get_reporting_currency(),
+		"window_days": OVERVIEW_WINDOW_DAYS,
+		"stats": [
+			{
+				"key": "revenue",
+				"label": "Revenue",
+				"value": flt(current_window.revenue),
+				"format": "currency",
+				"delta": percent_change(current_window.revenue, previous_window.revenue),
+			},
+			{
+				"key": "orders",
+				"label": "Orders",
+				"value": cint(current_window.orders),
+				"format": "number",
+				"delta": percent_change(current_window.orders, previous_window.orders),
+			},
+			{
+				"key": "to_fulfil",
+				"label": "Orders to fulfil",
+				"value": to_fulfil,
+				"format": "number",
+				"delta": None,
+				"note": _("Oldest waiting since {0}").format(formatdate(oldest_open, "d MMM"))
+				if oldest_open
+				else _("Nothing waiting"),
+			},
+			{
+				"key": "products_live",
+				"label": "Products live",
+				"value": published_now,
+				"format": "number",
+				"delta": percent_change(published_now, published_now - published_new),
+			},
+		],
+		"recent_orders": get_orders(status=order_status, page_length=OVERVIEW_PANEL_LENGTH)["orders"],
+		"running_low": get_inventory(page_length=OVERVIEW_PANEL_LENGTH)["rows"],
+		"needs_attention": get_unpublishable_options(limit=OVERVIEW_PANEL_LENGTH),
+	}
+
+
+def read_sales_window(from_date, to_date):
+	"""Revenue and order count for one date window, as a single aggregate read.
+
+	Sums base_grand_total, not grand_total: checkout takes whichever currency the customer
+	paid in, so only the company-currency figure is addable across orders.
+	"""
+	sales_order = frappe.qb.DocType("Sales Order")
+	rows = (
+		frappe.qb.from_(sales_order)
+		.select(
+			Sum(sales_order.base_grand_total).as_("revenue"),
+			Count(sales_order.name).as_("orders"),
+		)
+		.where(sales_order.docstatus == 1)
+		.where(sales_order.transaction_date >= from_date)
+		.where(sales_order.transaction_date <= to_date)
+	).run(as_dict=True)
+
+	return rows[0] if rows else frappe._dict({"revenue": 0, "orders": 0})
+
+
+def percent_change(current, previous):
+	"""Month-over-month change, or None when there is no baseline to compare against."""
+	previous = flt(previous)
+	if not previous:
+		return None
+	return flt((flt(current) - previous) / previous * 100, 1)
+
+
+def get_reporting_currency():
+	company = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "company")
+	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+	return currency or frappe.defaults.get_global_default("currency")

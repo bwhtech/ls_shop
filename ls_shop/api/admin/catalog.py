@@ -565,3 +565,85 @@ def get_ready_variant_names(variant_names):
 		)
 	}
 	return with_images & with_sizes
+
+
+def get_unpublishable_options(limit: int = 5):
+	"""Options that cannot go live yet, with the reason, across the whole catalogue.
+
+	The per-product screen already answers this one product at a time; the overview needs it
+	across every product, so the same blocker rule is applied here over batched reads rather
+	than opening each product in turn.
+	"""
+	variants = frappe.get_all(
+		"Style Attribute Variant",
+		filters={"is_published": 0},
+		fields=["name", "configurator", "attribute_value", "display_name"],
+		order_by="modified desc",
+	)
+	if not variants:
+		return []
+
+	variant_names = [row.name for row in variants]
+	sized_variants = {
+		row.parent
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+			fields=["parent"],
+		)
+	}
+	imaged_variants = {
+		row.parent
+		for row in frappe.get_all(
+			"Website Slideshow Item",
+			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+			fields=["parent"],
+		)
+	}
+
+	templates_by_configurator = {
+		row.name: row.item_template
+		for row in frappe.get_all(
+			"Style Attribute Configurator",
+			filters={"name": ["in", list({row.configurator for row in variants if row.configurator})]},
+			fields=["name", "item_template"],
+		)
+	}
+	titles = {
+		row.name: row.item_name
+		for row in frappe.get_all(
+			"Item",
+			filters={"name": ["in", list(set(templates_by_configurator.values()))]},
+			fields=["name", "item_name"],
+		)
+	}
+
+	blocked = []
+	for row in variants:
+		# The blocker rule reads presence, not content, so membership sets stand in for the
+		# image/size lists get_publish_blockers() would otherwise be handed.
+		blockers = get_publish_blockers(
+			[1] if row.name in imaged_variants else [], [1] if row.name in sized_variants else []
+		)
+		if not blockers:
+			continue
+
+		template = templates_by_configurator.get(row.configurator)
+		if not template:
+			# An option whose configurator or template is gone has no product screen to send
+			# the owner to, so listing it would be a dead end.
+			continue
+
+		blocked.append(
+			{
+				"variant": row.name,
+				"product": template,
+				"title": titles.get(template) or template,
+				"option": row.attribute_value or row.display_name,
+				"blockers": blockers,
+			}
+		)
+		if len(blocked) >= cint(limit):
+			break
+
+	return blocked

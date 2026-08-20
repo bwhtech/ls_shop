@@ -44,3 +44,28 @@ export function availabilityTheme(availability: string) {
 		] ?? "gray"
 	)
 }
+
+/** Money is rendered in the store's own currency, which only the API knows. */
+export function formatMoney(amount: number, currency: string) {
+	try {
+		return new Intl.NumberFormat(undefined, {
+			style: "currency",
+			currency,
+			currencyDisplay: "narrowSymbol",
+		}).format(amount)
+	} catch {
+		// An unset or unrecognised currency code makes Intl throw; the figure still has to render.
+		return `${currency} ${amount.toFixed(2)}`
+	}
+}
+
+/** Short, readable dates for the overview's compact rows - the full date is on the detail screen. */
+export function formatShortDate(value: string) {
+	const parsed = new Date(value)
+	if (Number.isNaN(parsed.getTime())) return value
+	return new Intl.DateTimeFormat(undefined, {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	}).format(parsed)
+}
