@@ -27,7 +27,6 @@ declare module 'vue' {
     SettingsField: typeof import('./src/components/settings/SettingsField.vue')['default']
     SettingsLinkField: typeof import('./src/components/settings/SettingsLinkField.vue')['default']
     ShippingSettings: typeof import('./src/components/settings/ShippingSettings.vue')['default']
-    StoreDropdown: typeof import('./src/components/StoreDropdown.vue')['default']
     StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
   }
 }
