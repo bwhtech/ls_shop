@@ -8,6 +8,7 @@ import {
 	Button,
 	Dropdown,
 	LoadingText,
+	PageHeader,
 	Tree,
 	dialog,
 	toast,
@@ -222,9 +223,7 @@ const menuActions = computed(() => [
 
 <template>
 	<div class="flex h-full flex-col bg-surface-base">
-		<header
-			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
-		>
+		<PageHeader>
 			<Breadcrumbs :items="[{ label: 'Navigation', route: { name: 'Navigation' } }]" />
 			<div class="flex items-center gap-2">
 				<Dropdown :options="menuActions">
@@ -238,7 +237,7 @@ const menuActions = computed(() => [
 					@click="addEntry('')"
 				/>
 			</div>
-		</header>
+		</PageHeader>
 
 		<div class="flex min-h-0 flex-1">
 			<div class="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
