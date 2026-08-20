@@ -11,7 +11,11 @@ export default defineConfig({
 				// whatever webserver_port common_site_config says (8000 here) and routes by
 				// the request's Host, so browse the app at <site>:8080 to hit the right site.
 				port: 8080,
-				source: "^/(app|login|api|assets|files|private)",
+				// `en|ar` are the storefront's language prefixes, not Frappe internals: the
+				// navigation preview frames the real storefront, and X-Frame-Options is
+				// SAMEORIGIN, so it has to be served through this origin rather than the
+				// bench's. The SPA's own routes live under /dashboard and stay with Vite.
+				source: "^/(app|login|api|assets|files|private|en|ar)",
 			},
 			jinjaBootData: true,
 			lucideIcons: true,

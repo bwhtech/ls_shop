@@ -29,6 +29,11 @@ const routes = [
 		name: "Order",
 		component: () => import("@/pages/Order.vue"),
 	},
+	{
+		path: "/storefront/navigation",
+		name: "Navigation",
+		component: () => import("@/pages/Navigation.vue"),
+	},
 ]
 
 export default createRouter({

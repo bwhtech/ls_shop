@@ -9,17 +9,38 @@
 export {}
 
 /* prettier-ignore */
-declare module 'vue' {
-  export interface GlobalComponents {
-    AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
-    AppCommandPalette: typeof import('./src/components/AppCommandPalette.vue')['default']
-    AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
-    AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
-    OptionRow: typeof import('./src/components/OptionRow.vue')['default']
-    ProfileSettings: typeof import('./src/components/settings/ProfileSettings.vue')['default']
-    RouterLink: typeof import('vue-router')['RouterLink']
-    RouterView: typeof import('vue-router')['RouterView']
-    StoreDropdown: typeof import('./src/components/StoreDropdown.vue')['default']
-    StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
-  }
+declare module "vue" {
+	export interface GlobalComponents {
+		AddProductDialog: typeof import(
+			"./src/components/AddProductDialog.vue",
+		)["default"]
+		AppCommandPalette: typeof import(
+			"./src/components/AppCommandPalette.vue",
+		)["default"]
+		AppearanceSettings: typeof import(
+			"./src/components/settings/AppearanceSettings.vue",
+		)["default"]
+		AppSettingsDialog: typeof import(
+			"./src/components/settings/AppSettingsDialog.vue",
+		)["default"]
+		NavInspector: typeof import(
+			"./src/components/navigation/NavInspector.vue",
+		)["default"]
+		NavPreview: typeof import(
+			"./src/components/navigation/NavPreview.vue",
+		)["default"]
+		NavTree: typeof import("./src/components/navigation/NavTree.vue")["default"]
+		OptionRow: typeof import("./src/components/OptionRow.vue")["default"]
+		ProfileSettings: typeof import(
+			"./src/components/settings/ProfileSettings.vue",
+		)["default"]
+		RouterLink: typeof import("vue-router")["RouterLink"]
+		RouterView: typeof import("vue-router")["RouterView"]
+		StoreDropdown: typeof import(
+			"./src/components/StoreDropdown.vue",
+		)["default"]
+		StoreSettings: typeof import(
+			"./src/components/settings/StoreSettings.vue",
+		)["default"]
+	}
 }

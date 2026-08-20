@@ -29,6 +29,10 @@ const sections = [
 			{ label: "Inventory", route: "Inventory", icon: "lucide-boxes" },
 		],
 	},
+	{
+		label: "Storefront",
+		items: [{ label: "Navigation", route: "Navigation", icon: "lucide-menu" }],
+	},
 ]
 </script>
 

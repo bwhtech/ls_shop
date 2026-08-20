@@ -92,3 +92,34 @@ export type InventoryRow = {
 	is_published: boolean
 	availability: string
 }
+
+export type MenuLinkType = "" | "Item Group" | "Brand" | "URL"
+
+export type MenuNode = {
+	name: string
+	label: string
+	parent: string
+	route_slug: string
+	link_type: MenuLinkType
+	item_groups: string[]
+	brand: string
+	url: string
+	icon: string
+	image: string
+	meta_title: string
+	meta_description: string
+	og_image: string
+	noindex: number
+	visible: boolean
+	display_order: number
+	href: string | null
+	children: MenuNode[]
+}
+
+export type CascadeProduct = {
+	name: string
+	display_name: string
+	item_group: string
+	is_published: number
+	blocked_reason: string
+}
