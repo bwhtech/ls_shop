@@ -1,0 +1,50 @@
+{% extends "components/base.html" %}
+
+{# Bound once per render so the header include and the mobile drawer read the same menu; a
+   page controller may pre-supply it to avoid the second lookup. The chrome is named
+   site_header/site_footer rather than header/footer because a components/includes/header.html
+   may only ever be a one-line passthrough to templates/includes/header.html - Pixio ships its
+   own markup, and keeps the menu manager wired through header_data instead. #}
+{% set header_data = header_data if header_data is defined and header_data else get_header_data() %}
+
+{% block head %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Roboto:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+
+    {# The five icon fonts are @imported by style.css from ../icons/, so they are not linked
+       here - a second link would fetch iconly twice and still miss feather/fontawesome/themify. #}
+    <link rel="stylesheet" href="{{ shop_theme_asset_url('css/swiper-bundle.min.css') }}">
+    <link rel="stylesheet" href="{{ shop_theme_asset_url('css/animate.css') }}">
+
+    {# style.css carries Bootstrap and the 18 Lufga @font-face rules, so no separate bootstrap
+       or webfont stylesheet is vendored. It must win over animate.css, hence the order. #}
+    <link class="main-css" rel="stylesheet" href="{{ shop_theme_asset_url('css/style.css') }}">
+    <link class="skin" rel="stylesheet" href="{{ shop_theme_asset_url('css/skin-1.css') }}">
+    <link rel="stylesheet" href="{{ shop_theme_asset_url('css/pixio.css') }}">
+    <link rel="stylesheet" href="{{ shop_theme_asset_url('css/currency.css') }}">
+{% endblock %}
+
+{# The reference hangs its cream page colour on .page-content, a div the shared base does not
+   emit; bg-light is the same #FFFAF3 token, put on the element this theme does own. #}
+{% block body_class %}theme-pixio bg-light{% endblock %}
+
+{# #bg carries background-attachment/size for the body backdrop; .boxed and .frame size the
+   page off .page-wraper. Both come straight from the reference shell. #}
+{% block body_attributes %} id="bg"{% endblock %}
+
+{% block chrome_top %}
+<div class="page-wraper">
+    {% include "components/includes/site_header.html" %}
+{% endblock %}
+
+{# .page-wraper opens in chrome_top and closes here: it has to wrap header, main and footer,
+   and <main> is emitted by the base between the two blocks. #}
+{% block chrome_bottom %}
+    {% include "components/includes/site_footer.html" %}
+</div>
+{% endblock %}
+
+{% block script %}
+    <script defer src="{{ shop_theme_asset_url('js/pixio.js') }}"></script>
+{% endblock %}

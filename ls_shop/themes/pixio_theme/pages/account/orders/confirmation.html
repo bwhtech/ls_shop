@@ -1,0 +1,144 @@
+{# Reference: pixio-package/pixio/account-order-confirmation.html 1008-1086.
+
+   Two things the reference could not know about this route. First, it is the checkout return
+   URL (api/payments.py builds `?reference_id=...`), so the order number only exists after
+   confirm_payment has resolved the gateway - the card starts in a checking state and fills in.
+   Second, the reference's images/confirmation.png is not vendored with the theme, so the green
+   .cancel-btn badge style.css already ships stands in for it; that badge is scoped to
+   .confirmed-request, which carries the same 50px/30px card padding as .confirmation-card, so
+   the card takes that class instead of adding CSS. #}
+
+{% extends "components/theme_layout.html" %}
+{% from "components/core/account_shell.html" import account_shell %}
+
+{% set language = frappe.lang or "en" %}
+{% set orders_url = "/" ~ language ~ "/account/orders" %}
+{% set confirmation_config = {"order_id": order.name if order else None, "orders_url": orders_url} %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="{{ shop_theme_asset_url('css/account.css') }}">
+{% endblock %}
+
+{% block uncontained_body %}
+{% call account_shell(_("Order Confirmed"), [{"label": _("Orders"), "href": orders_url}]) %}
+<div class="account-card confirmed-request text-center" x-data='pixio_order_confirmation({{ confirmation_config | tojson }})'>
+
+	{% if not order %}
+	<div x-show="state === 'checking'">
+		<h4 class="mb-3">{{ _("Checking payment status") }}</h4>
+		<p class="mb-0">{{ _("Please do not refresh this page.") }}</p>
+	</div>
+	{% endif %}
+
+	<div x-show="state === 'confirmed'"{% if not order %} x-cloak{% endif %}>
+		<div class="cancel-btn mx-auto m-b30"><i class="flaticon flaticon-check-circle" aria-hidden="true"></i></div>
+		<h4 class="mb-3 text-capitalize">{{ _("Your order is completed!") }}</h4>
+		<p class="mb-2">{{ _("You will receive an order confirmation email with details of your order.") }}</p>
+		<p class="mb-0">
+			{{ _("Order ID") }}:
+			<strong class="text-black" x-text="order_id">{{ order.name | e if order else "" }}</strong>
+		</p>
+		{% if order %}
+		<p class="mb-0">
+			{{ _("Order Total") }}:
+			<strong class="text-black">{{ get_currency_symbol() }}{{ "%.2f" | format(order.rounded_total or 0) }}</strong>
+		</p>
+		{% endif %}
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+			<a class="btn my-1 btn-secondary" :href="order_detail_url">{{ _("View Order") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
+		</div>
+	</div>
+
+	{% if not order %}
+	<div x-show="state === 'unconfirmed'" x-cloak>
+		<h4 class="mb-3">{{ _("We could not confirm this order") }}</h4>
+		<p class="mb-0">{{ _("This confirmation link has expired. Your orders page shows the current status of every order you have placed.") }}</p>
+		<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+			<a class="btn my-1 btn-secondary" href="{{ orders_url }}">{{ _("My Orders") }}</a>
+			<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
+		</div>
+	</div>
+	{% endif %}
+</div>
+{% endcall %}
+{% endblock %}
+
+{% block script %}
+	{{ super() }}
+	<script>
+		function track_purchase(data, order_name) {
+			// The first-party `purchase` event is logged server-side at order creation; the
+			// capture endpoint rejects it from the client, so only the pixels fire here.
+			const dedup_key = "fb_purchase_" + order_name;
+			if (sessionStorage.getItem(dedup_key)) return;
+			sessionStorage.setItem(dedup_key, "1");
+
+			const order_value = parseFloat(data.grand_total || data.amount || 0) || 0;
+
+			// eventID lets Meta dedupe this browser hit against a future server-side Purchase.
+			if (window.fbq) fbq("track", "Purchase",
+				{ value: order_value, currency: data.currency || window.fb_currency },
+				{ eventID: order_name });
+
+			if (window.gtag) gtag("event", "purchase", {
+				transaction_id: order_name,
+				value: order_value,
+				currency: data.currency || window.ga4_currency
+			});
+		}
+
+		document.addEventListener("alpine:init", () => {
+			Alpine.data("pixio_order_confirmation", (config) => ({
+				order_id: config.order_id,
+				orders_url: config.orders_url,
+				state: config.order_id ? "confirmed" : "checking",
+
+				init() {
+					if (this.state !== "checking") return;
+					this.confirm_payment();
+				},
+
+				get order_detail_url() {
+					return `${this.orders_url}/detail?order_id=${encodeURIComponent(this.order_id || "")}`;
+				},
+
+				async confirm_payment() {
+					const url_params = new URLSearchParams(window.location.search);
+					// Legacy gateway redirects still come back with `payment_id` instead of `reference_id`, and
+					// Stripe substitutes its own session id into the success URL as `session_id`. All three
+					// resolve through Gateway Payment Request.order_ref, where the gateway session id is stored.
+					const reference_id = url_params.get("reference_id") || url_params.get("payment_id") || url_params.get("session_id");
+					if (!reference_id) {
+						this.state = "unconfirmed";
+						return;
+					}
+
+					const args = { reference_id };
+					const payment_mode = url_params.get("payment_mode");
+					if (payment_mode) args.payment_mode = payment_mode;
+
+					try {
+						const { data } = await frappe_call(
+							"/api/v2/method/ls_shop.api.payments.confirm_payment",
+							args,
+						);
+						if (data.status !== "Paid") {
+							this.state = "unconfirmed";
+							return;
+						}
+						this.order_id = data.order_name || data.ref_docname || reference_id;
+						track_purchase(data, this.order_id);
+						Alpine.store("cart").remove_selected();
+						this.state = "confirmed";
+					} catch (error) {
+						// A forged, expired or already-consumed reference throws; the shopper is
+						// standing on the page either way and still needs somewhere to go.
+						this.state = "unconfirmed";
+					}
+				},
+			}));
+		});
+	</script>
+{% endblock %}
