@@ -63,8 +63,10 @@ SHOP_BY_CATEGORY = (
 )
 
 COLLECTION_BANNERS = (
-	{"badge_label": "Summer", "heading": "New Summer Collection", "image": "collection/1.png"},
-	{"badge_label": "Sale Up to 50% Off", "heading": "Trendy and Classic", "image": "collection/2.png"},
+	# The first card centres a short heading in .sale-box, the second left-aligns a longer one
+	# in .product-content, so the copy is sized to its slot rather than shared between them.
+	{"badge_label": "Sale Up to 50% Off", "heading": "Summer Edit", "image": "collection/1.png"},
+	{"badge_label": "Sale Up to 50% Off", "heading": "New Summer Collection", "image": "collection/2.png"},
 )
 
 OFFER_BANNERS = (
