@@ -7,6 +7,10 @@ const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin.footer."
 const sections = ref<FooterSection[]>([])
 const pages = ref<FooterEditorData["pages"]>([])
 
+// The preview frames the rendered storefront footer, so it cannot be told the columns moved -
+// it has to fetch again. Every mutation bumps this.
+const previewToken = ref(0)
+
 const method = ref("get_editor_data")
 
 const request = useCall<FooterEditorData, Record<string, unknown>>({
@@ -31,6 +35,7 @@ async function call(name: string, params: Record<string, unknown> = {}) {
 /** Run a mutation and adopt the footer it returns. */
 async function mutate(name: string, params: Record<string, unknown> = {}) {
 	apply(await call(name, params))
+	previewToken.value += 1
 }
 
 async function load() {
@@ -49,6 +54,7 @@ export function useFooter() {
 	return {
 		sections,
 		pages,
+		previewToken,
 		loading: computed(() => request.loading),
 		load,
 		mutate,

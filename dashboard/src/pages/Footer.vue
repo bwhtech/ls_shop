@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import FooterLinkDialog from "@/components/footer/FooterLinkDialog.vue"
+import FooterPreview from "@/components/footer/FooterPreview.vue"
 import { useFooter } from "@/composables/useFooter"
 import type { FooterLink, FooterSection } from "@/types"
+import { useStorage } from "@vueuse/core"
 import {
 	Badge,
 	Breadcrumbs,
@@ -17,10 +19,12 @@ import {
 import { onMounted, ref } from "vue"
 import Draggable from "vuedraggable"
 
-const { sections, pages, loading, load, mutate, reordered } = useFooter()
+const { sections, pages, previewToken, loading, load, mutate, reordered } =
+	useFooter()
 
 onMounted(load)
 
+const previewCollapsed = useStorage("ls-shop-footer-preview-collapsed", false)
 const linkDialogOpen = ref(false)
 const linkDialogSection = ref<FooterSection | null>(null)
 const linkDialogLink = ref<FooterLink | null>(null)
@@ -486,6 +490,8 @@ function linkActions(
 				</template>
 			</Draggable>
 		</ScrollArea>
+
+		<FooterPreview v-model:collapsed="previewCollapsed" :token="previewToken" />
 
 		<FooterLinkDialog
 			v-model:open="linkDialogOpen"

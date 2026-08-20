@@ -18,6 +18,7 @@ declare module 'vue' {
     AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
     CollectionCombobox: typeof import('./src/components/CollectionCombobox.vue')['default']
     FooterLinkDialog: typeof import('./src/components/footer/FooterLinkDialog.vue')['default']
+    FooterPreview: typeof import('./src/components/footer/FooterPreview.vue')['default']
     FooterSettings: typeof import('./src/components/settings/FooterSettings.vue')['default']
     NavInspector: typeof import('./src/components/navigation/NavInspector.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
