@@ -9,6 +9,7 @@ import {
 	Dropdown,
 	LoadingText,
 	PageHeader,
+	ScrollArea,
 	Tooltip,
 	dialog,
 	toast,
@@ -342,7 +343,7 @@ function linkActions(
 			/>
 		</PageHeader>
 
-		<div class="min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-5">
+		<ScrollArea class="min-h-0 flex-1" viewport-class="px-3 py-3 sm:px-5">
 			<LoadingText v-if="loading && !sections.length" />
 
 			<div v-else-if="!sections.length" class="px-3 py-16 text-center">
@@ -398,6 +399,19 @@ function linkActions(
 							<span class="shrink-0 text-sm text-ink-gray-5">
 								{{ section.links.length }}
 							</span>
+
+							<Tooltip text="Add a link">
+								<Button
+									variant="ghost"
+									class="!size-5 shrink-0"
+									aria-label="Add a link to this column"
+									@click="openLinkDialog(section)"
+								>
+									<template #icon>
+										<span class="lucide-plus size-4 text-ink-gray-5" aria-hidden="true" />
+									</template>
+								</Button>
+							</Tooltip>
 
 							<Dropdown :options="columnActions(section, columnIndex)">
 								<Button variant="ghost" class="!size-5 shrink-0" aria-label="Column actions">
@@ -471,7 +485,7 @@ function linkActions(
 					</div>
 				</template>
 			</Draggable>
-		</div>
+		</ScrollArea>
 
 		<FooterLinkDialog
 			v-model:open="linkDialogOpen"
