@@ -8,6 +8,7 @@ import {
 	FormControl,
 	ListView,
 	TabButtons,
+	TextInput,
 	toast,
 	useCall,
 } from "frappe-ui"
@@ -110,16 +111,15 @@ const columns = [
 					:theme="availabilityTheme(row.availability)"
 					:label="row.availability"
 				/>
-				<input
+				<TextInput
 					v-else-if="column.key === 'receive'"
-					:value="receiveQuantities[row.item_code] ?? ''"
+					class="w-20 [&_[data-slot=control]]:text-right"
 					type="number"
 					placeholder="0"
-					class="w-20 rounded border border-outline-gray-2 bg-surface-base px-2 py-1 text-right text-base text-ink-gray-9"
+					:aria-label="`Receive stock for ${row.product} ${row.size}`"
+					:model-value="receiveQuantities[row.item_code] ?? ''"
 					@click.stop
-					@input="
-						receiveQuantities[row.item_code] = ($event.target as HTMLInputElement).value
-					"
+					@update:model-value="receiveQuantities[row.item_code] = $event"
 				/>
 				<span v-else class="truncate text-base text-ink-gray-7">{{ item }}</span>
 			</template>

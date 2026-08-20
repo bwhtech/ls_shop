@@ -5,11 +5,20 @@ import {
 	Button,
 	FileUploader,
 	Switch,
+	TextInput,
 	Tooltip,
 	dialog,
 	toast,
 	useCall,
 } from "frappe-ui"
+import {
+	List,
+	ListCell,
+	ListHeader,
+	ListHeaderCell,
+	ListRow,
+	ListRows,
+} from "frappe-ui/list"
 import { computed, ref } from "vue"
 
 const props = defineProps<{ variant: ProductVariant }>()
@@ -160,14 +169,14 @@ function confirmRemoveImage(fileUrl: string) {
 							alt=""
 							class="size-20 rounded border border-outline-gray-1 object-cover"
 						/>
-						<button
-							type="button"
-							class="absolute -right-1.5 -top-1.5 hidden size-5 place-items-center rounded-full bg-surface-gray-7 text-ink-white group-hover:grid"
+						<Button
+							class="absolute -right-1.5 -top-1.5 hidden rounded-full group-hover:inline-flex"
+							variant="subtle"
+							size="xs"
+							icon="lucide-x"
 							aria-label="Remove photo"
 							@click="confirmRemoveImage(image)"
-						>
-							<span class="lucide-x size-3" aria-hidden="true" />
-						</button>
+						/>
 					</div>
 
 					<FileUploader
@@ -197,45 +206,48 @@ function confirmRemoveImage(fileUrl: string) {
 
 			<div>
 				<h4 class="text-sm text-ink-gray-5">Sizes</h4>
-				<table class="mt-2 w-full max-w-md">
-					<thead>
-						<tr class="text-sm text-ink-gray-5">
-							<th class="pb-1.5 text-left font-normal">Size</th>
-							<th class="pb-1.5 text-right font-normal">Price</th>
-							<th class="pb-1.5 text-right font-normal">In stock</th>
-							<th class="pb-1.5 text-right font-normal">Add stock</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-outline-gray-1">
-						<tr v-for="size in variant.sizes" :key="size.item_code">
-							<td class="py-2 text-base text-ink-gray-9">{{ size.size }}</td>
-							<td class="py-2 text-right">
-								<input
-									:value="rateFor(size)"
+				<List
+					class="mt-2 max-w-md"
+					:columns="['minmax(0,1fr)', '7rem', '5rem', '6rem']"
+				>
+					<ListHeader>
+						<ListHeaderCell>Size</ListHeaderCell>
+						<ListHeaderCell class="justify-end">Price</ListHeaderCell>
+						<ListHeaderCell class="justify-end">In stock</ListHeaderCell>
+						<ListHeaderCell class="justify-end">Add stock</ListHeaderCell>
+					</ListHeader>
+					<ListRows :items="variant.sizes" row-key="item_code" v-slot="{ item: size }">
+						<ListRow class="py-2">
+							<ListCell>
+								<span class="truncate text-base text-ink-gray-9">{{ size.size }}</span>
+							</ListCell>
+							<ListCell class="justify-end">
+								<!-- The browser's own text-align on <input> beats the wrapper's, so the
+								     numeric alignment has to reach the control slot itself. -->
+								<TextInput
+									class="w-24 [&_[data-slot=control]]:text-right"
 									type="number"
-									class="w-24 rounded border border-outline-gray-2 bg-surface-base px-2 py-1 text-right text-base text-ink-gray-9"
-									@input="
-										rates[size.item_code] = ($event.target as HTMLInputElement).value
-									"
+									:aria-label="`Price for size ${size.size}`"
+									:model-value="rateFor(size)"
+									@update:model-value="rates[size.item_code] = $event"
 								/>
-							</td>
-							<td class="py-2 text-right text-base text-ink-gray-7">{{ size.stock }}</td>
-							<td class="py-2 text-right">
-								<input
-									:value="receiveQuantities[size.item_code] ?? ''"
+							</ListCell>
+							<ListCell class="justify-end">
+								<span class="text-base text-ink-gray-7">{{ size.stock }}</span>
+							</ListCell>
+							<ListCell class="justify-end">
+								<TextInput
+									class="w-20 [&_[data-slot=control]]:text-right"
 									type="number"
 									placeholder="0"
-									class="w-20 rounded border border-outline-gray-2 bg-surface-base px-2 py-1 text-right text-base text-ink-gray-9"
-									@input="
-										receiveQuantities[size.item_code] = (
-											$event.target as HTMLInputElement
-										).value
-									"
+									:aria-label="`Add stock for size ${size.size}`"
+									:model-value="receiveQuantities[size.item_code] ?? ''"
+									@update:model-value="receiveQuantities[size.item_code] = $event"
 								/>
-							</td>
-						</tr>
-					</tbody>
-				</table>
+							</ListCell>
+						</ListRow>
+					</ListRows>
+				</List>
 
 				<div class="mt-3 flex gap-2">
 					<Button :loading="savePrices.loading" label="Save prices" @click="submitPrices" />

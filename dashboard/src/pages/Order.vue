@@ -10,6 +10,14 @@ import {
 	toast,
 	useCall,
 } from "frappe-ui"
+import {
+	List,
+	ListCell,
+	ListHeader,
+	ListHeaderCell,
+	ListRow,
+	ListRows,
+} from "frappe-ui/list"
 import { computed } from "vue"
 import { useRoute } from "vue-router"
 
@@ -85,20 +93,27 @@ function confirmFulfil() {
 
 				<section class="mt-6">
 					<h2 class="text-md text-ink-gray-9">Items</h2>
-					<table class="mt-2 w-full">
-						<thead>
-							<tr class="text-sm text-ink-gray-5">
-								<th class="pb-1.5 text-left font-normal">Product</th>
-								<th class="pb-1.5 text-right font-normal">Qty</th>
-								<th class="pb-1.5 text-right font-normal">Shipped</th>
-								<th class="pb-1.5 text-right font-normal">Rate</th>
-								<th class="pb-1.5 text-right font-normal">Amount</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-outline-gray-1 border-y border-outline-gray-1">
-							<tr v-for="item in order.data.items" :key="item.item_code">
-								<td class="py-2.5">
-									<div class="flex items-center gap-2.5">
+					<!-- The trailing rule closes the block: the header draws the one on top,
+					     and row dividers only sit between rows. -->
+					<List
+						class="mt-2 border-b border-outline-gray-1"
+						:columns="['minmax(0,1fr)', '4rem', '5rem', '6rem', '6rem']"
+					>
+						<ListHeader>
+							<ListHeaderCell>Product</ListHeaderCell>
+							<ListHeaderCell class="justify-end">Qty</ListHeaderCell>
+							<ListHeaderCell class="justify-end">Shipped</ListHeaderCell>
+							<ListHeaderCell class="justify-end">Rate</ListHeaderCell>
+							<ListHeaderCell class="justify-end">Amount</ListHeaderCell>
+						</ListHeader>
+						<ListRows
+							:items="order.data.items"
+							row-key="item_code"
+							v-slot="{ item }"
+						>
+							<ListRow class="py-2.5">
+								<ListCell>
+									<div class="flex min-w-0 items-center gap-2.5">
 										<img
 											v-if="item.image"
 											:src="item.image"
@@ -120,16 +135,27 @@ function confirmFulfil() {
 											</div>
 										</div>
 									</div>
-								</td>
-								<td class="py-2.5 text-right text-base text-ink-gray-7">{{ item.qty }}</td>
-								<td class="py-2.5 text-right text-base" :class="item.delivered_qty >= item.qty ? 'text-ink-green-6' : 'text-ink-gray-5'">
-									{{ item.delivered_qty }}
-								</td>
-								<td class="py-2.5 text-right text-base text-ink-gray-7">{{ item.rate }}</td>
-								<td class="py-2.5 text-right text-base text-ink-gray-9">{{ item.amount }}</td>
-							</tr>
-						</tbody>
-					</table>
+								</ListCell>
+								<ListCell class="justify-end">
+									<span class="text-base text-ink-gray-7">{{ item.qty }}</span>
+								</ListCell>
+								<ListCell class="justify-end">
+									<span
+										class="text-base"
+										:class="item.delivered_qty >= item.qty ? 'text-ink-green-6' : 'text-ink-gray-5'"
+									>
+										{{ item.delivered_qty }}
+									</span>
+								</ListCell>
+								<ListCell class="justify-end">
+									<span class="text-base text-ink-gray-7">{{ item.rate }}</span>
+								</ListCell>
+								<ListCell class="justify-end">
+									<span class="text-base text-ink-gray-9">{{ item.amount }}</span>
+								</ListCell>
+							</ListRow>
+						</ListRows>
+					</List>
 
 					<div class="mt-3 flex justify-end gap-8 text-base">
 						<span class="text-ink-gray-5">Total</span>
