@@ -56,8 +56,14 @@ def install_demo_data():
 		publish_style_variants()
 
 		# Step 5: Create Website Items and Publish
-		print("\nStep 5: Creating and Publishing Website Items...")
-		create_website_items()
+		# Website Item ships with webshop, which this app no longer depends on. Skipping keeps the
+		# demo catalog installable on a bench without it - the storefront reads Style Attribute
+		# Variants, not Website Items.
+		if frappe.db.exists("DocType", "Website Item"):
+			print("\nStep 5: Creating and Publishing Website Items...")
+			create_website_items()
+		else:
+			print("\nStep 5: Skipped - webshop is not installed")
 
 		# Step 6: Fix routing
 		print("\nStep 6: Fixing Product Routes...")
@@ -284,6 +290,9 @@ def configure_lifestyle_settings():
 		settings = frappe.get_doc({"doctype": "Lifestyle Settings"})
 
 	# Configure settings
+	settings.company = frappe.defaults.get_user_default("Company") or frappe.db.get_value(
+		"Company", {}, "name"
+	)
 	settings.default_price_list = "Standard Selling"
 	settings.sale_price_list = "Sale Price List"
 	settings.ecommerce_warehouse = warehouse
@@ -743,8 +752,13 @@ def fix_product_routes():
 				frappe.db.set_value("Style Attribute Variant", sav.name, "route", clean_route)
 				sav_count += 1
 
-	# Fix Website Item routes
-	website_items = frappe.get_all("Website Item", fields=["name", "item_code", "route"])
+	# Fix Website Item routes. Website Item ships with webshop, which this app no longer
+	# depends on, so a bench without it simply has no rows to correct.
+	website_items = (
+		frappe.get_all("Website Item", fields=["name", "item_code", "route"])
+		if frappe.db.exists("DocType", "Website Item")
+		else []
+	)
 	wi_count = 0
 
 	for wi in website_items:
