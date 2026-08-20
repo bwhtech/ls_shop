@@ -10,6 +10,11 @@ from frappe.utils import getdate
 from frappe.utils.data import flt
 
 from ls_shop.analytics.events import log_purchase, set_attribution_fields
+from ls_shop.api.shipping import (
+	clear_delivery_option,
+	copy_delivery_option_to_order,
+	reprice_selected_option,
+)
 from ls_shop.core import _get_cart_quotation
 from ls_shop.utils import get_cod_configuration
 
@@ -160,6 +165,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 
 		sales_order = _make_sales_order(quotation.name, ignore_permissions=True)
 		sales_order.custom_ecommerce_payment_mode = payment_mode
+		copy_delivery_option_to_order(quotation.name, sales_order)
 		fix_payment_schedule_dates(sales_order)
 		set_attribution_fields(sales_order)
 		sales_order.flags.ignore_permissions = True
@@ -298,6 +304,9 @@ def update_quotation_address(address: dict):
 	if address.get("is_store_pickup", False):
 		quotation.custom_store = address.get("store_pickup_warehouse", "")
 		quotation.custom_is_store_pickup = True
+		# Nothing is being delivered any more, so a delivery option chosen before the shopper switched to
+		# store pickup has to go with it — otherwise its charge is still on the cart at payment time.
+		clear_delivery_option(quotation)
 		quotation.save(ignore_permissions=True)
 
 		return {"message": _("Addresses updated successfully")}
@@ -539,6 +548,11 @@ def update_delivery_charges(quotation):
 		quotation.taxes = []
 		quotation.calculate_taxes_and_totals()
 		quotation.save(ignore_permissions=True)
-	else:
+		return
+
+	# A chosen delivery option is repriced against the cart as it stands now, so an edit made after the
+	# option was picked is billed the delivery price its final contents earn. With no option chosen — or
+	# with bwh_shipping not installed — the flat Shipping Rule still applies.
+	if not reprice_selected_option(quotation):
 		set_charges(quotation)
-		quotation.save(ignore_permissions=True)
+	quotation.save(ignore_permissions=True)
