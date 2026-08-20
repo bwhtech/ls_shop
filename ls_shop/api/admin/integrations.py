@@ -33,7 +33,10 @@ SKIPPED_FIELDTYPES = frozenset({"Section Break", "Column Break", "Tab Break", "H
 # that fight over the same value.
 ENABLED_FIELDNAME = "enabled"
 
-DEFAULT_GROUP_LABEL = "Credentials"
+# The fields a provider declares before its first Section Break. They are behaviour flags as often
+# as credentials, so the fallback label has to stay neutral - calling it "Credentials" put Razorpay's
+# Test Mode switch under a heading that promised API keys.
+DEFAULT_GROUP_LABEL = "General"
 
 
 def is_available(integration) -> bool:
