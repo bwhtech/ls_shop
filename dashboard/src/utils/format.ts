@@ -46,12 +46,8 @@ const unknownOrderStateBadge = {
 	icon: "lucide-circle-dashed",
 }
 
-export function orderStateTheme(state: OrderState) {
-	return (orderStateBadges[state.key] ?? unknownOrderStateBadge).theme
-}
-
-export function orderStateIcon(state: OrderState) {
-	return (orderStateBadges[state.key] ?? unknownOrderStateBadge).icon
+export function orderStateBadge(state: OrderState) {
+	return orderStateBadges[state.key] ?? unknownOrderStateBadge
 }
 
 export function availabilityTheme(availability: string) {

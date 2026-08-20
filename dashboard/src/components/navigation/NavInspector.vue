@@ -74,9 +74,11 @@ const LINK_OPTIONS_URL =
 const itemGroupSearch = useLinkSearch<LinkOption>(LINK_OPTIONS_URL, () => ({
 	doctype: "Item Group",
 }))
-const brandSearch = useLinkSearch<LinkOption>(LINK_OPTIONS_URL, () => ({
-	doctype: "Brand",
-}))
+const brandSearch = useLinkSearch<LinkOption>(
+	LINK_OPTIONS_URL,
+	() => ({ doctype: "Brand" }),
+	() => form.brand,
+)
 
 // Already-linked values are merged into the options: a search only returns what matches the
 // current query, and without this a saved group vanishes from the control as soon as someone types.

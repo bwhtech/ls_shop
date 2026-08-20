@@ -38,6 +38,9 @@ const { setColorScheme, toggleColorScheme } = useColorScheme()
 const searchQuery = ref("")
 
 function go(route: string) {
+	// A navigation shortcut is reachable from inside the palette, so the palette has to get out
+	// of the way once it has been used to leave the current screen.
+	showPalette.value = false
 	router.push({ name: route })
 }
 
@@ -270,8 +273,9 @@ useKeyboardShortcut([
 		combo: "Mod+Slash",
 		description: "Show keyboard shortcuts",
 		group: "General",
-		// The palette and the settings dialog are both `[role=dialog]`, and help should still
-		// answer from inside them.
+		// The palette and the settings dialog are both `[role=dialog]`, and the palette holds
+		// focus in its own input, so help needs both gates open to answer from inside them.
+		allowInInput: true,
 		allowInDialog: true,
 		handler: () => {
 			showShortcuts.value = true
@@ -289,47 +293,67 @@ useKeyboardShortcut([
 		group: "General",
 		handler: () => toggleColorScheme(),
 	},
+	// Every combo below is drawn as a chip on its own palette row, and the palette holds focus in
+	// its own input inside a dialog - so both gates stay open, or the chip would advertise a
+	// shortcut that cannot fire from where it is being read.
 	{
 		combo: "Mod+Shift+H",
 		description: "Go to Home",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Home"),
 	},
 	{
 		combo: "Mod+Shift+O",
 		description: "Go to Orders",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Orders"),
 	},
 	{
 		combo: "Mod+Shift+P",
 		description: "Go to Products",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Products"),
 	},
 	{
 		combo: "Mod+Shift+I",
 		description: "Go to Inventory",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Inventory"),
 	},
 	{
 		combo: "Mod+Shift+M",
 		description: "Go to Navigation",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Navigation"),
 	},
 	{
 		combo: "Mod+Shift+F",
 		description: "Go to Footer",
 		group: "Navigation",
+		allowInInput: true,
+		allowInDialog: true,
 		handler: () => go("Footer"),
 	},
 	{
 		combo: "Mod+Shift+A",
 		description: "Add product",
 		group: "Catalog",
-		handler: () => openAddProduct(),
+		allowInInput: true,
+		allowInDialog: true,
+		handler: () => {
+			showPalette.value = false
+			openAddProduct()
+		},
 	},
 ])
 </script>
@@ -353,7 +377,6 @@ useKeyboardShortcut([
 					v-for="item in group.items"
 					:key="item.name"
 					:value="item"
-					:label="item.title"
 				>
 					<template #prefix>
 						<span

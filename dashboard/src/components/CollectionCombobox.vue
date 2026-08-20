@@ -11,6 +11,8 @@ const collection = defineModel<string>({ required: true })
 
 const { open, query, results } = useLinkSearch<string>(
 	"/api/v2/method/ls_shop.api.admin.catalog.get_collections",
+	() => ({}),
+	() => collection.value,
 )
 
 const options = computed(() => results.data ?? [])

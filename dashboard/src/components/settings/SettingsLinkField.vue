@@ -17,6 +17,7 @@ const emit = defineEmits<{ "update:modelValue": [value: string | null] }>()
 const { open, query, results } = useLinkSearch<LinkOption>(
 	"/api/v2/method/ls_shop.api.admin.settings.get_link_options",
 	() => ({ doctype: props.doctype }),
+	() => props.modelValue,
 )
 
 const options = computed(() => results.data ?? [])

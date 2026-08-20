@@ -1,3 +1,5 @@
+import type { BadgeProps } from "frappe-ui"
+
 export type ProductSize = {
 	size: string
 	item_code: string
@@ -40,8 +42,8 @@ export type ProductRow = {
 	stock: number
 }
 
-/** The Badge themes frappe-ui actually ships; anything else silently degrades to gray. */
-export type BadgeTheme = "gray" | "blue" | "green" | "amber" | "red" | "violet"
+/** Taken from the Badge component itself, so our map cannot drift from what frappe-ui ships. */
+export type BadgeTheme = NonNullable<BadgeProps["theme"]>
 
 /** A stable key for the icon and colour, plus the label the store owner reads. */
 export type OrderState = {

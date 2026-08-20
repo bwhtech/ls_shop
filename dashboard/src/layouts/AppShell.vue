@@ -85,20 +85,27 @@ const menuItems = computed(() => [
 	},
 ])
 
+type SidebarSection = {
+	id: string
+	/** Omitted for the pinned top-level run, which carries no group heading. */
+	label?: string
+	items: { label: string; route: string; icon: string }[]
+}
+
 // Grouped by the job the owner came to do, not by which doctype backs the page. A section
 // without a label renders as pinned top-level items, the way CRM and Gameplan pin their
 // everyday destinations above the first group header.
-const sections = [
+// ponytail: the daily run has no Analytics row, add it here once /store/analytics ships
+const sections: SidebarSection[] = [
 	{
-		label: "",
+		id: "daily",
 		items: [
 			{ label: "Home", route: "Home", icon: "lucide-house" },
 			{ label: "Orders", route: "Orders", icon: "lucide-receipt" },
-			// Analytics joins this daily run once /store/analytics ships:
-			// { label: "Analytics", route: "Analytics", icon: "lucide-chart-line" },
 		],
 	},
 	{
+		id: "catalog",
 		label: "Catalog",
 		items: [
 			{ label: "Products", route: "Products", icon: "lucide-package" },
@@ -106,6 +113,7 @@ const sections = [
 		],
 	},
 	{
+		id: "storefront",
 		label: "Storefront",
 		items: [
 			{ label: "Navigation", route: "Navigation", icon: "lucide-menu" },
@@ -129,28 +137,23 @@ const sections = [
 				/>
 
 				<ScrollArea class="min-h-0 flex-1" viewport-class="px-2 pb-6">
-					<div
-						v-for="section in sections"
-						:key="section.items[0].route"
-						class="mb-3"
-					>
-						<SidebarLabel v-if="section.label">{{ section.label }}</SidebarLabel>
-						<nav class="mt-0.5 space-y-0.5">
-							<SidebarItem
-								v-for="item in section.items"
-								:key="item.route"
-								:to="{ name: item.route }"
-							>
-								<template #prefix>
-									<span
-										:class="[item.icon, 'size-4 shrink-0 text-ink-gray-6']"
-										aria-hidden="true"
-									/>
-								</template>
-								<span class="truncate text-sm">{{ item.label }}</span>
-							</SidebarItem>
-						</nav>
-					</div>
+					<!-- One landmark for the whole sidebar: a <nav> per section would announce as
+					     several unnamed "navigation" regions, and the pinned first section has no
+					     heading to name itself with. -->
+					<nav aria-label="Main">
+						<div v-for="section in sections" :key="section.id" class="mb-3">
+							<SidebarLabel v-if="section.label">{{ section.label }}</SidebarLabel>
+							<div class="mt-0.5 space-y-0.5">
+								<SidebarItem
+									v-for="item in section.items"
+									:key="item.route"
+									:to="{ name: item.route }"
+									:icon="item.icon"
+									:label="item.label"
+								/>
+							</div>
+						</div>
+					</nav>
 				</ScrollArea>
 
 				<div class="shrink-0 space-y-0.5 border-t border-outline-gray-1 p-2">

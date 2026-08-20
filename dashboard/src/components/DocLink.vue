@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { refDebounced } from "@vueuse/core"
 import { Combobox, useCall } from "frappe-ui"
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 
 type LinkSearchResult = {
 	value: string
@@ -13,30 +13,38 @@ const props = defineProps<{
 	doctype: string
 	label?: string
 	description?: string
+	error?: string
 	required?: boolean
 	disabled?: boolean
 	placeholder?: string
 }>()
 
-const linked_document = defineModel<string | null>({ default: null })
+const linked_document = defineModel<string>({ default: "" })
 
 const open = ref(false)
 const query = ref("")
 
-// The combobox keeps the input showing the committed label while it is closed, so a closed
-// picker must not search for its own value - only a query typed into an open popover counts.
-watch(open, (isOpen) => {
-	if (isOpen) query.value = ""
-})
+// A Link docfield with no `options` has nothing to search, and Frappe's own guard treats "" as
+// falsy - it would run an unscoped search_widget rather than reject the request. Holding the
+// search term still keeps the request URL constant, so `refetch` never fires either.
+const searchable = computed(() => Boolean(props.doctype))
 
+// In the combobox's input mode the query IS the value display, so it still reads the committed
+// link while the popover is open and nothing has been typed yet. Searching for that text would
+// filter the list down to the value already chosen, so only a genuinely different query counts.
 const searchText = refDebounced(
-	computed(() => (open.value ? query.value : "")),
+	computed(() =>
+		searchable.value && open.value && query.value !== linked_document.value
+			? query.value
+			: "",
+	),
 	300,
 )
 
 const results = useCall<LinkSearchResult[]>({
 	url: "/api/v2/method/frappe.desk.search.search_link",
 	params: () => ({ doctype: props.doctype, txt: searchText.value }),
+	immediate: searchable.value,
 	refetch: true,
 })
 
@@ -67,6 +75,7 @@ const selected = computed({
 		v-model:query="query"
 		:label="props.label"
 		:description="props.description"
+		:error="props.error"
 		:required="props.required"
 		:disabled="props.disabled"
 		:placeholder="placeholderText"
