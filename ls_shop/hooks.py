@@ -5,7 +5,10 @@ app_description = "Ecommerce extension for ERPNext"
 app_email = "rahul@buildwithhussain.com"
 app_license = "agpl-3.0"
 
-required_apps = ["frappe/erpnext", "frappe/payments", "Rl0007/bwh_payments"]
+# frappe/payments is not listed: nothing here imports it and no field or fixture links its doctypes
+# (braintree/gocardless/mpesa settings). bwh_payments ships its own Payment Gateway Profile and
+# base_class contract rather than extending payments' PaymentGatewayController.
+required_apps = ["frappe/erpnext", "bwhtech/bwh_payments"]
 
 
 website_redirects = [
@@ -443,6 +446,11 @@ fixtures = [
 ]
 
 scheduler_events = {
+	# Long queue, not the short one: sync_status() is a gateway round-trip per pending request, so a
+	# slow gateway would otherwise sit on a worker the whole storefront shares.
+	"hourly_long": [
+		"ls_shop.jobs.sync_pending_gateway_payments",
+	],
 	"daily": [
 		"ls_shop.jobs.delete_notified_oos",
 		"ls_shop.jobs.delete_old_draft_quotations",
