@@ -190,3 +190,48 @@ def delete_old_draft_quotations():
 			frappe.delete_doc("Quotation", quotation)
 		except Exception as e:
 			frappe.log_error(title=frappe._("Error in deleting the quotation {0}: {1}").format(quotation, e))
+
+
+def sync_pending_gateway_payments():
+	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order.
+
+	The confirmation page is what normally re-reads the gateway, and it never runs when the shopper
+	closes the tab, pays on a second device or comes back without a session. sync_status() writes the
+	authoritative status and the Gateway Payment Request on_update hook places the Sales Order from
+	there, so this sweep needs no order logic of its own.
+	"""
+	# ponytail: a request older than the lookback is left to manual reconciliation - delete_old_draft_
+	# quotations already removes the draft cart it points at after 6 hours, so the order can no longer
+	# be placed from it. Widen both windows together, never this one alone.
+	now = now_datetime()
+	pending_requests = frappe.get_all(
+		"Gateway Payment Request",
+		filters={
+			"status": "Pending",
+			# The upper bound skips requests too new to have settled: the shopper is most likely still
+			# on the gateway's own page, where the status reads Pending anyway.
+			"creation": ("between", [add_to_date(now, hours=-6), add_to_date(now, minutes=-10)]),
+		},
+		# Oldest money first: those are the requests closest to losing the draft cart they point at.
+		order_by="creation asc",
+		pluck="name",
+	)
+
+	for payment_request in pending_requests:
+		# Scoped to a savepoint rather than a bare rollback: sync_status() places the Sales Order
+		# through the on_update hook, so a failure half way through has accounting documents to undo,
+		# and a full rollback would also discard every order the sweep has already placed.
+		savepoint = f"sweep_{payment_request}"
+		try:
+			frappe.db.savepoint(savepoint)
+			frappe.get_doc("Gateway Payment Request", payment_request).sync_status()
+			frappe.db.commit()
+		except Exception:
+			# One unreachable gateway session must not cost the rest of the sweep their orders.
+			frappe.db.rollback(save_point=savepoint)
+			frappe.log_error(
+				title="Pending gateway payment sweep failed",
+				reference_doctype="Gateway Payment Request",
+				reference_name=payment_request,
+			)
+			frappe.db.commit()

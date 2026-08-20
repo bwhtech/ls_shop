@@ -13,11 +13,12 @@ from bwh_payments.bwh_payments.doctype.gateway_payment_request.test_gateway_paym
 from bwh_payments.bwh_payments.doctype.stripe_gateway_settings import stripe_gateway_settings
 from bwh_payments.tests.fake_stripe import FakeStripeClient
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_year_ending, get_year_start, getdate
+from frappe.utils import add_to_date, get_year_ending, get_year_start, getdate, now_datetime
 from frappe.utils.data import flt
 
 from ls_shop.api.payment_hooks import on_payment_request_update
 from ls_shop.api.payments import confirm_payment
+from ls_shop.jobs import sync_pending_gateway_payments
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
@@ -243,10 +244,10 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 
 	# -- queries ----------------------------------------------------------------------------------
 
-	def submitted_sales_orders(self):
+	def submitted_sales_orders(self, quotation_name=None):
 		return frappe.get_all(
 			"Sales Order Item",
-			filters={"prevdoc_docname": self.quotation.name, "docstatus": 1},
+			filters={"prevdoc_docname": quotation_name or self.quotation.name, "docstatus": 1},
 			pluck="parent",
 			distinct=True,
 		)
@@ -476,3 +477,84 @@ class TestPaymentHookIdempotency(IntegrationTestCase):
 		)
 		self.assertEqual(reference.ref_doctype, "Sales Order")
 		self.assertEqual(reference.ref_docname, self.submitted_sales_orders()[0])
+
+	# -- pending payment sweep --------------------------------------------------------------------
+
+	def sweep_pending_gateway_payments(self):
+		# The job commits per request so one unreachable gateway cannot cost the rest their orders.
+		# Inside a test that commit would escape the rollback and leave the fixtures on the dev site.
+		with patch.object(frappe.db, "commit"):
+			sync_pending_gateway_payments()
+
+	def age_payment_request(self, payment_request, minutes):
+		"""Push a request back past the settle floor, which is what the sweep filters on."""
+		frappe.db.set_value(
+			"Gateway Payment Request",
+			payment_request.name,
+			"creation",
+			add_to_date(now_datetime(), minutes=-minutes),
+			update_modified=False,
+		)
+
+	def test_the_sweep_places_an_order_the_shopper_never_came_back_to_confirm(self):
+		quotation = self.create_cart_quotation()
+		payment_request = self.create_pending_payment_request(quotation)
+		self.age_payment_request(payment_request, minutes=30)
+
+		self.sweep_pending_gateway_payments()
+
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", payment_request.name, "status"), "Paid"
+		)
+		self.assertEqual(frappe.db.get_value("Quotation", quotation.name, "docstatus"), 1)
+		self.assertEqual(len(self.submitted_sales_orders(quotation.name)), 1)
+
+	def test_the_sweep_leaves_a_request_too_new_to_have_settled_alone(self):
+		"""A shopper still on the gateway's own page reads Pending; touching it buys nothing."""
+		quotation = self.create_cart_quotation()
+		payment_request = self.create_pending_payment_request(quotation)
+
+		self.sweep_pending_gateway_payments()
+
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", payment_request.name, "status"), "Pending"
+		)
+		self.assertEqual(self.submitted_sales_orders(quotation.name), [])
+
+	def test_the_sweep_leaves_a_request_older_than_the_lookback_alone(self):
+		quotation = self.create_cart_quotation()
+		payment_request = self.create_pending_payment_request(quotation)
+		self.age_payment_request(payment_request, minutes=60 * 24)
+
+		self.sweep_pending_gateway_payments()
+
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", payment_request.name, "status"), "Pending"
+		)
+
+	def test_one_unreachable_gateway_session_does_not_strand_the_rest_of_the_sweep(self):
+		unreachable_quotation = self.create_cart_quotation()
+		unreachable_request = self.create_pending_payment_request(unreachable_quotation)
+		# The fake transport raises for a session it never issued, which is what an expired or
+		# mistyped gateway reference does in production.
+		frappe.db.set_value("Gateway Payment Request", unreachable_request.name, "order_ref", "cs_test_gone")
+		# Strictly older, so the sweep's oldest-first ordering reaches it before the healthy one.
+		self.age_payment_request(unreachable_request, minutes=60)
+
+		healthy_quotation = self.create_cart_quotation()
+		healthy_request = self.create_pending_payment_request(healthy_quotation)
+		self.age_payment_request(healthy_request, minutes=30)
+
+		self.sweep_pending_gateway_payments()
+
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", unreachable_request.name, "status"), "Pending"
+		)
+		self.assertEqual(
+			frappe.db.get_value("Gateway Payment Request", healthy_request.name, "status"), "Paid"
+		)
+		self.assertEqual(len(self.submitted_sales_orders(healthy_quotation.name)), 1)
+		self.assertTrue(
+			frappe.db.exists("Error Log", {"reference_name": unreachable_request.name}),
+			"the failing request must be logged, not swallowed",
+		)
