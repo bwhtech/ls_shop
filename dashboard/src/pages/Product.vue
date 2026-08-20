@@ -150,14 +150,16 @@ function saveDetails() {
 		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
 			<!-- Main pane: the options are the work surface, so they get the width. -->
 			<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
+				<!-- Alert has no default slot and no orange theme in beta-37: body text passed as
+				     children is dropped and an unknown theme leaves it unstyled and icon-less. -->
 				<Alert
 					v-if="blockedOptions.length"
 					class="mb-5"
-					theme="orange"
+					theme="yellow"
+					:dismissible="false"
 					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
-				>
-					{{ blockedOptions.join(", ") }} still needs a photo before it can go live.
-				</Alert>
+					:description="`${blockedOptions.join(', ')} still needs a photo before it can go live.`"
+				/>
 
 				<div class="flex items-baseline justify-between">
 					<h2 class="text-md text-ink-gray-9">Options</h2>

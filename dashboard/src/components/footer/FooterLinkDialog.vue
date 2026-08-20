@@ -24,7 +24,6 @@ const source = ref("url")
 const page = ref("")
 const label = ref("")
 const url = ref("")
-const saving = ref(false)
 const error = ref("")
 
 const isEdit = computed(() => Boolean(props.link))
@@ -64,15 +63,12 @@ async function save() {
 		return
 	}
 
-	saving.value = true
 	try {
 		await props.submit({ label: label.value, url: url.value })
 		open.value = false
 		toast.success(isEdit.value ? "Link saved" : "Link added")
 	} catch (exception) {
 		error.value = (exception as Error).message
-	} finally {
-		saving.value = false
 	}
 }
 </script>
@@ -81,19 +77,20 @@ async function save() {
 	<Dialog
 		v-model:open="open"
 		:title="isEdit ? 'Edit link' : 'Add a link'"
-		:message="section ? `In the ${section.title} column.` : undefined"
 		:actions="[
 			{
 				label: isEdit ? 'Save' : 'Add',
 				variant: 'solid',
 				theme: 'gray',
-				loading: saving,
 				onClick: save,
 			},
 		]"
 	>
 		<template #default>
 			<div class="space-y-4">
+				<p v-if="section" class="text-p-sm text-ink-gray-5">
+					In the {{ section.title }} column.
+				</p>
 				<FormControl
 					v-if="!isEdit"
 					v-model="source"

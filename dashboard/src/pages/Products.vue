@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListSkeleton from "@/components/ListSkeleton.vue"
 import AddProductDialog from "@/components/AddProductDialog.vue"
 import type { ProductRow } from "@/types"
 import { formatRowPrice, publishTheme } from "@/utils/format"
@@ -98,12 +99,14 @@ const listOptions = {
 			/>
 		</div>
 
+		<ListSkeleton v-if="products.loading && !rows.length" class="px-3 sm:px-5" />
+
 		<ListView
+			v-else
 			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="name"
 			:columns="columns"
 			:rows="rows"
-			:loading="products.loading"
 			:options="listOptions"
 		>
 			<!-- The #cell slot replaces ListView's default rendering for every column, a column's

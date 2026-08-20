@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListSkeleton from "@/components/ListSkeleton.vue"
 import type { InventoryRow } from "@/types"
 import { availabilityTheme } from "@/utils/format"
 import {
@@ -88,12 +89,14 @@ const columns = [
 			<span class="ml-auto text-sm text-ink-gray-5">{{ inventory.data?.total ?? 0 }} sizes</span>
 		</div>
 
+		<ListSkeleton v-if="inventory.loading && !rows.length" class="px-3 sm:px-5" />
+
 		<ListView
+			v-else
 			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="item_code"
 			:columns="columns"
 			:rows="rows"
-			:loading="inventory.loading"
 			:options="{
 				selectable: false,
 				showTooltip: false,
