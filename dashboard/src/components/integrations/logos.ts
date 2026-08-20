@@ -54,6 +54,14 @@ export const integrationLogos: Record<string, IntegrationLogo> = {
 		background: "#12100E",
 		svg: `${wordmark("tabby", "#3BFFC3", 16)}${accentBar("#3BFFC3")}`,
 	},
+	shiprocket: {
+		background: "#5B2EDB",
+		svg: wordmark("Shiprocket", "#FFFFFF", 13),
+	},
+	aftership: {
+		background: "#0B1B34",
+		svg: wordmark("AfterShip", "#FFFFFF", 13),
+	},
 }
 
 const FALLBACK_BACKGROUND = "#525B66"

@@ -7,6 +7,7 @@ import {
 	SettingsRow,
 } from "frappe-ui"
 import { computed } from "vue"
+import IntegrationList from "../integrations/IntegrationList.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
 import { useSettingsForm } from "./useSettingsForm"
 
@@ -32,12 +33,23 @@ const returnReasons = computed(
 <template>
 	<SettingsHeader
 		title="Shipping & returns"
-		description="How orders reach customers and how long they have to send them back"
+		description="The carriers that deliver your orders, and how long customers have to send them back"
 	/>
 
 	<SettingsBody>
 		<div class="pt-6">
-			<div class="divide-y divide-outline-gray-1">
+			<h3 class="text-base font-medium text-ink-gray-8">Delivery partners</h3>
+			<p class="mt-1 text-p-sm text-ink-gray-5">
+				Turn on a carrier and add its credentials to quote live rates and book shipments.
+			</p>
+			<IntegrationList
+				class="mt-2"
+				list-url="/api/v2/method/ls_shop.api.admin.shipping.get_shipping_integrations"
+				save-url="/api/v2/method/ls_shop.api.admin.shipping.save_shipping_integration"
+			/>
+
+			<h3 class="mt-8 text-base font-medium text-ink-gray-8">Rates &amp; returns</h3>
+			<div class="mt-2 divide-y divide-outline-gray-1">
 				<SettingsRow
 					title="Shipping rule"
 					description="Decides the delivery charge applied at checkout"
