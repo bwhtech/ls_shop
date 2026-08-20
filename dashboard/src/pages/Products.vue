@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import ListSkeleton from "@/components/ListSkeleton.vue"
 import AddProductDialog from "@/components/AddProductDialog.vue"
+import ListSkeleton from "@/components/ListSkeleton.vue"
+import { showAddProduct } from "@/components/addProduct"
 import type { ProductRow } from "@/types"
 import { formatRowPrice, publishTheme } from "@/utils/format"
 import {
@@ -15,7 +16,6 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
-const showAddProduct = ref(false)
 const search = ref("")
 
 const products = useCall<{ products: ProductRow[]; total: number }>({

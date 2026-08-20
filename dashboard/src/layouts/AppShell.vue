@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import AppCommandPalette from "@/components/AppCommandPalette.vue"
+import { showPalette, showShortcuts } from "@/components/commandPalette"
 import { openSettings } from "@/components/settings"
 import AppSettingsDialog from "@/components/settings/AppSettingsDialog.vue"
 import {
 	Button,
 	DesktopShell,
+	KeyboardShortcut,
 	ScrollArea,
 	Sidebar,
 	SidebarHeader,
@@ -60,6 +62,13 @@ const menuItems = computed(() => [
 				onClick: () => setTheme("system"),
 			},
 		],
+	},
+	{
+		icon: "lucide-keyboard",
+		label: "Keyboard shortcuts",
+		onClick: () => {
+			showShortcuts.value = true
+		},
 	},
 	{
 		icon: "lucide-external-link",
@@ -135,7 +144,18 @@ const sections = [
 					</div>
 				</ScrollArea>
 
-				<div class="shrink-0 border-t border-outline-gray-1 p-2">
+				<div class="shrink-0 space-y-0.5 border-t border-outline-gray-1 p-2">
+					<Button
+						class="w-full !justify-start"
+						variant="ghost"
+						icon-left="lucide-search"
+						@click="showPalette = true"
+					>
+						<span class="flex-1 text-left">Search</span>
+						<template #suffix>
+							<KeyboardShortcut combo="Mod+K" bg />
+						</template>
+					</Button>
 					<Button
 						class="w-full !justify-start"
 						variant="ghost"
