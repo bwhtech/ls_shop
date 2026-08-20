@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListSkeleton from "@/components/ListSkeleton.vue"
 import type { OrderRow } from "@/types"
 import { orderStateTheme } from "@/utils/format"
 import {
@@ -84,12 +85,14 @@ const listOptions = {
 			/>
 		</div>
 
+		<ListSkeleton v-if="orders.loading && !rows.length" class="px-3 sm:px-5" />
+
 		<ListView
+			v-else
 			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="name"
 			:columns="columns"
 			:rows="rows"
-			:loading="orders.loading"
 			:options="listOptions"
 		>
 			<template #cell="{ item, row, column }">
