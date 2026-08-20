@@ -5,8 +5,6 @@ from bwh_payments.bwh_payments.utils import resolve_payment_mode
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.pricing_rule.utils import validate_coupon_code
-from erpnext.selling.doctype.quotation.mapper import _make_sales_order
-from erpnext.selling.doctype.sales_order.mapper import make_sales_invoice
 from frappe import _
 from frappe.utils import getdate
 from frappe.utils.data import flt
@@ -14,6 +12,19 @@ from frappe.utils.data import flt
 from ls_shop.analytics.events import log_purchase, set_attribution_fields
 from ls_shop.core import _get_cart_quotation
 from ls_shop.utils import get_cod_configuration
+
+# ERPNext moved its transaction mappers out of the doctype module into a sibling `mapper`
+# module. Both layouts are in the wild across the versions this app runs against, so resolve
+# whichever one is installed rather than pinning to a single import path.
+try:
+	from erpnext.selling.doctype.quotation.mapper import _make_sales_order
+except ImportError:
+	from erpnext.selling.doctype.quotation.quotation import _make_sales_order
+
+try:
+	from erpnext.selling.doctype.sales_order.mapper import make_sales_invoice
+except ImportError:
+	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 COD_PAYMENT_MODE = "COD"
 
