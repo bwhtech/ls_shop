@@ -114,6 +114,8 @@ export type MenuNode = {
 	display_order: number
 	href: string | null
 	children: MenuNode[]
+	/** Owned by frappe-ui's Tree, which reads and writes open state on the node itself. */
+	expanded?: boolean
 }
 
 export type CascadeProduct = {

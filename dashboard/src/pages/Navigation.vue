@@ -1,22 +1,31 @@
 <script setup lang="ts">
 import NavInspector from "@/components/navigation/NavInspector.vue"
-import NavPreview from "@/components/navigation/NavPreview.vue"
-import NavTree from "@/components/navigation/NavTree.vue"
 import { useNavMenu } from "@/composables/useNavMenu"
 import type { MenuNode } from "@/types"
 import {
+	Badge,
 	Breadcrumbs,
 	Button,
 	Dropdown,
 	LoadingText,
+	Tree,
 	dialog,
 	toast,
 	useCall,
 } from "frappe-ui"
 import { computed, onMounted } from "vue"
 
-const { menu, selected, selectedName, loading, load, call, mutate } =
-	useNavMenu()
+const {
+	menu,
+	selected,
+	selectedName,
+	loading,
+	load,
+	call,
+	mutate,
+	depthOf,
+	canNest,
+} = useNavMenu()
 
 const itemGroups = useCall<{ name: string }[]>({
 	url: "/api/v2/document/Item Group",
@@ -32,6 +41,35 @@ const itemGroupOptions = computed(() =>
 )
 
 onMounted(load)
+
+/**
+ * Domain rule for a drop. Tree already rejects dropping onto itself or into its own descendant,
+ * so this only has to answer the depth question the server would otherwise throw on.
+ */
+function canDrop({
+	node,
+	target,
+	position,
+}: { node: MenuNode; target: MenuNode; position: string }) {
+	const parentDepth =
+		position === "inside" ? depthOf(target.name) : depthOf(target.name) - 1
+	return canNest(node, parentDepth)
+}
+
+async function onDragEnd(
+	info: { node: MenuNode; to: string | null; newIndex: number } | null,
+) {
+	// Null means the drag was cancelled or never landed anywhere valid.
+	if (!info) return
+
+	// `move_node` reparents and positions in one call, so a reorder within one parent and a
+	// move across parents are the same request - `to` is simply unchanged in the first case.
+	await mutate("move_node", {
+		name: info.node.name,
+		to_parent: info.to ?? "",
+		target_index: info.newIndex,
+	})
+}
 
 function addEntry(parent = "") {
 	dialog.prompt({
@@ -49,6 +87,13 @@ function addEntry(parent = "") {
 			await mutate("add_node", { parent, display_name: values.display_name })
 		},
 	})
+}
+
+function countEntries(nodes: MenuNode[]): number {
+	return nodes.reduce(
+		(total, node) => total + 1 + countEntries(node.children),
+		0,
+	)
 }
 
 function importGroups() {
@@ -86,13 +131,6 @@ function importGroups() {
 			)
 		},
 	})
-}
-
-function countEntries(nodes: MenuNode[]): number {
-	return nodes.reduce(
-		(total, node) => total + 1 + countEntries(node.children),
-		0,
-	)
 }
 
 async function removeEntry(node: MenuNode) {
@@ -136,29 +174,30 @@ async function toggleVisible(node: MenuNode) {
 	})
 }
 
-async function onMove(payload: {
-	node: MenuNode
-	parent: string
-	index: number
-	siblings: MenuNode[]
-	crossedParent: boolean
-}) {
-	// Landing in a different list is a re-parent; staying put is only a change of order. They
-	// are different endpoints because moving a branch has to revalidate depth and rebuild the
-	// nested set, and reordering never does.
-	if (payload.crossedParent) {
-		await mutate("move_node", {
-			name: payload.node.name,
-			to_parent: payload.parent,
-			target_index: payload.index,
-		})
-		return
-	}
-
-	await mutate("reorder_nodes", {
-		parent: payload.parent,
-		ordered_names: payload.siblings.map((node) => node.name),
-	})
+function rowActions(node: MenuNode) {
+	return [
+		{
+			label: "Add entry inside",
+			icon: "corner-down-right",
+			onClick: () => addEntry(node.name),
+		},
+		{
+			label: node.visible ? "Hide from menu" : "Show in menu",
+			icon: node.visible ? "eye-off" : "eye",
+			onClick: () => toggleVisible(node),
+		},
+		{
+			group: "Danger",
+			items: [
+				{
+					label: "Delete",
+					icon: "trash-2",
+					theme: "red" as const,
+					onClick: () => removeEntry(node),
+				},
+			],
+		},
+	]
 }
 
 const menuActions = computed(() => [
@@ -202,41 +241,74 @@ const menuActions = computed(() => [
 		</header>
 
 		<div class="flex min-h-0 flex-1">
-			<div class="flex w-80 shrink-0 flex-col border-r border-outline-gray-1">
-				<div class="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-					<LoadingText v-if="loading && !menu.length" />
+			<div class="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
+				<LoadingText v-if="loading && !menu.length" />
 
-					<div v-else-if="!menu.length" class="px-3 py-10 text-center">
-						<p class="text-base text-ink-gray-6">No menu yet</p>
-						<p class="mt-1 text-p-sm text-ink-gray-5">
-							Add a section, or build one from your item groups.
-						</p>
-						<Button
-							class="mt-4"
-							variant="subtle"
-							theme="gray"
-							label="Import from item groups"
-							@click="importGroups"
-						/>
-					</div>
-
-					<NavTree
-						v-else
-						:items="menu"
-						@move="onMove"
-						@add="addEntry"
-						@remove="removeEntry"
-						@toggle-visible="toggleVisible"
+				<div v-else-if="!menu.length" class="px-3 py-16 text-center">
+					<p class="text-base text-ink-gray-6">No menu yet</p>
+					<p class="mt-1 text-p-sm text-ink-gray-5">
+						Add a section, or build one from your item groups.
+					</p>
+					<Button
+						class="mt-4"
+						variant="subtle"
+						theme="gray"
+						label="Import from item groups"
+						@click="importGroups"
 					/>
 				</div>
+
+				<Tree
+					v-else
+					:nodes="menu"
+					node-key="name"
+					draggable
+					:move="canDrop"
+					@drag-end="onDragEnd"
+				>
+					<template #item-label="{ node }">
+						<button
+							type="button"
+							class="min-w-0 flex-1 truncate text-left text-base"
+							:class="[
+								node.visible ? 'text-ink-gray-8' : 'text-ink-gray-4',
+								selectedName === node.name ? 'font-medium' : '',
+							]"
+							@click.stop="selectedName = node.name"
+						>
+							{{ node.label }}
+						</button>
+					</template>
+
+					<template #item-suffix="{ node }">
+						<div class="flex items-center gap-2">
+							<Badge v-if="!node.visible" variant="subtle" theme="orange" label="Hidden" />
+							<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
+								{{ node.item_groups.length ? `${node.item_groups.length} groups` : "" }}
+							</span>
+							<span @click.stop>
+								<Dropdown :options="rowActions(node)">
+									<Button
+										variant="ghost"
+										class="!size-5 shrink-0"
+										aria-label="Entry actions"
+									>
+										<template #icon>
+											<span
+												class="lucide-ellipsis size-4 text-ink-gray-5"
+												aria-hidden="true"
+											/>
+										</template>
+									</Button>
+								</Dropdown>
+							</span>
+						</div>
+					</template>
+				</Tree>
 			</div>
 
-			<div class="flex w-96 shrink-0 flex-col border-r border-outline-gray-1">
+			<div class="flex w-96 shrink-0 flex-col border-l border-outline-gray-1">
 				<NavInspector @remove="removeEntry" />
-			</div>
-
-			<div class="min-w-0 flex-1">
-				<NavPreview />
 			</div>
 		</div>
 	</div>

@@ -16,8 +16,6 @@ declare module 'vue' {
     AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
     AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
     NavInspector: typeof import('./src/components/navigation/NavInspector.vue')['default']
-    NavPreview: typeof import('./src/components/navigation/NavPreview.vue')['default']
-    NavTree: typeof import('./src/components/navigation/NavTree.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
     ProfileSettings: typeof import('./src/components/settings/ProfileSettings.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

@@ -5,23 +5,13 @@ import { computed, ref } from "vue"
 interface EditorData {
 	menu: MenuNode[]
 	max_depth: number
-	preview_url: string
 }
 
 const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin.navigation."
 
 const menu = ref<MenuNode[]>([])
 const maxDepth = ref(0)
-const previewUrl = ref("/")
 const selectedName = ref<string | null>(null)
-
-// The preview frames the real storefront, so it cannot be told the menu changed - it has to be
-// asked to render again. Every mutation bumps this and the pane reloads off the new value.
-const previewToken = ref(0)
-
-// Tree-wide, not per-list: a drag starting in one list changes how every other list renders
-// (empty ones open a drop zone) and freezes them all against the incoming tree.
-const dragActive = ref(false)
 
 const method = ref("get_editor_data")
 
@@ -83,11 +73,40 @@ function canNest(node: MenuNode, parentDepth: number): boolean {
 	return parentDepth + 1 + subtreeHeight(node) <= maxDepth.value
 }
 
+/**
+ * Carry expansion across a refresh.
+ *
+ * `Tree` keeps each node's open state on the node itself, and every mutation replaces the whole
+ * tree with the server's answer - so without this, moving one entry would collapse the branch
+ * the owner is working in.
+ */
+function rememberExpansion() {
+	const state = new Map<string, boolean>()
+	walk(menu.value, (node) => state.set(node.name, node.expanded !== false))
+	return state
+}
+
+function applyExpansion(
+	nodes: MenuNode[],
+	state: Map<string, boolean>,
+	depth = 1,
+) {
+	for (const node of nodes) {
+		// Unseen branches start closed below the top level, so a deep menu opens as an
+		// overview rather than as every row at once.
+		node.expanded = state.get(node.name) ?? depth === 1
+		applyExpansion(node.children, state, depth + 1)
+	}
+}
+
 function apply(data: EditorData | undefined) {
 	if (!data) return
-	menu.value = data.menu ?? []
+
+	const expansion = rememberExpansion()
+	const nodes = data.menu ?? []
+	applyExpansion(nodes, expansion)
+	menu.value = nodes
 	if (data.max_depth) maxDepth.value = data.max_depth
-	if (data.preview_url) previewUrl.value = data.preview_url
 
 	// A deleted node must not stay selected - the inspector would render a stale copy of a
 	// row that is no longer in the tree.
@@ -108,7 +127,6 @@ async function call<T = EditorData>(
 async function mutate(name: string, params: Record<string, unknown> = {}) {
 	const data = await call(name, params)
 	apply(data as EditorData)
-	previewToken.value += 1
 	return data
 }
 
@@ -120,9 +138,6 @@ export function useNavMenu() {
 	return {
 		menu,
 		maxDepth,
-		dragActive,
-		previewUrl,
-		previewToken,
 		selectedName,
 		selected,
 		loading: computed(() => request.loading),

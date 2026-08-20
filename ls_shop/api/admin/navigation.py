@@ -29,7 +29,6 @@ delete_all_nodes = navbar_manager.delete_all_nodes
 get_delete_preview = navbar_manager.get_delete_preview
 get_delete_all_preview = navbar_manager.get_delete_all_preview
 move_node = navbar_manager.move_node
-reorder_nodes = navbar_manager.reorder_nodes
 import_from_item_group = navbar_manager.import_from_item_group
 set_visibility = navbar_manager.set_visibility
 get_cascade_products = navbar_manager.get_cascade_products
@@ -43,15 +42,10 @@ def get_editor_data():
 
 	`max_depth` lets the tree refuse a drop the server would reject anyway, and keeps the limit
 	in one place when it changes.
-
-	`preview_url` carries the language prefix rather than leaving the root to redirect onto it.
-	The preview frames this URL, and only the prefixed paths are proxied to the bench in
-	development - the bare root belongs to the dashboard's own dev server.
 	"""
 	frappe.has_permission("Ecommerce Category", "read", throw=True)
 
 	return {
 		**navbar_manager.get_menu_editor_data(),
 		"max_depth": MAX_MENU_DEPTH,
-		"preview_url": f"/{frappe.local.lang or 'en'}",
 	}
