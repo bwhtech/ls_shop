@@ -102,8 +102,8 @@
 					<div class="form-group m-b25">
 						<label class="label-title" for="address_type">{{ _("Address Type") }}</label>
 						<select id="address_type" class="form-control" required x-model="form.address_type">
-							{% for address_type, address_type_label in address_type_labels.items() %}
-							<option value="{{ address_type }}">{{ address_type_label }}</option>
+							{% for address_type in address_type_labels %}
+							<option value="{{ address_type }}">{{ _(address_type) }}</option>
 							{% endfor %}
 						</select>
 					</div>
