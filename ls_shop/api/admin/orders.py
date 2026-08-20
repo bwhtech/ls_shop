@@ -1,10 +1,12 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
+import re
+
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count, Sum
-from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate
+from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate, strip_html
 
 from ls_shop.api.admin.catalog import get_unpublishable_options
 from ls_shop.api.admin.inventory import get_inventory
@@ -123,6 +125,20 @@ def get_orders(
 		],
 		"total": total,
 	}
+
+
+def get_address_lines(address_display):
+	"""ERPNext builds address_display as HTML, but the dashboard renders it as plain text, so its
+	<br> tags used to show up literally on the order screen. Newlines survive the trip because the
+	element they land in is whitespace-pre-line."""
+	if not address_display:
+		return None
+
+	lines = [
+		strip_html(part).strip()
+		for part in re.split(r"<br\s*/?>", cstr(address_display), flags=re.IGNORECASE)
+	]
+	return "\n".join(line for line in lines if line) or None
 
 
 def describe_state(order, lifecycle=None):
@@ -302,7 +318,7 @@ def get_order(sales_order: str):
 		"total": flt(order.total),
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
-		"shipping_address": order.address_display,
+		"shipping_address": get_address_lines(order.address_display),
 		"can_fulfil": cint(order.docstatus) == 1 and flt(order.per_delivered) < 100,
 		"items": [
 			{

@@ -6,7 +6,12 @@
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
 
-from ls_shop.api.admin.orders import STAGE_LABELS, describe_state, read_order_lifecycles
+from ls_shop.api.admin.orders import (
+	STAGE_LABELS,
+	describe_state,
+	get_address_lines,
+	read_order_lifecycles,
+)
 
 
 def make_order(**values):
@@ -59,6 +64,31 @@ class TestFulfilmentLadder(UnitTestCase):
 	def test_a_status_the_ladder_has_no_rung_for_keeps_erpnexts_own_word(self):
 		state = describe_state(make_order(status="On Hold"))
 		self.assertEqual(state, {"key": "On Hold", "label": "On Hold"})
+
+
+
+class TestAddressLines(UnitTestCase):
+	"""ERPNext hands over address_display as HTML; the dashboard renders text, so the <br> tags
+	used to appear literally on the order screen."""
+
+	def test_break_tags_become_newlines(self):
+		self.assertEqual(
+			get_address_lines("12 King Fahd Road<br>Near Mall<br>Riyadh"),
+			"12 King Fahd Road\nNear Mall\nRiyadh",
+		)
+
+	def test_the_self_closing_and_uppercase_spellings_break_too(self):
+		self.assertEqual(get_address_lines("A<br/>B<BR />C"), "A\nB\nC")
+
+	def test_surrounding_markup_is_stripped_rather_than_shown(self):
+		self.assertEqual(get_address_lines("<div>Riyadh</div><br><span>SA</span>"), "Riyadh\nSA")
+
+	def test_blank_segments_do_not_become_empty_lines(self):
+		self.assertEqual(get_address_lines("Riyadh<br><br>   <br>SA"), "Riyadh\nSA")
+
+	def test_an_address_with_nothing_in_it_reads_as_absent(self):
+		for empty in (None, "", "<br><br>"):
+			self.assertIsNone(get_address_lines(empty))
 
 
 class TestOrderLifecycleReader(IntegrationTestCase):
