@@ -32,10 +32,17 @@ def _get_default_territory() -> str:
 	return frappe.db.get_single_value("Selling Settings", "territory") or get_root_of("Territory")
 
 
+def get_default_customer_group() -> str:
+	# Was reading a customer_group field off Lifestyle Settings that has never existed, so party
+	# creation threw and every checkout failed at the quotation step. Selling Settings is where
+	# erpnext keeps this default, mirroring _get_default_territory above.
+	return frappe.db.get_single_value("Selling Settings", "customer_group") or get_root_of("Customer Group")
+
+
 def _create_party_for_user(user: str):
 	fullname = get_fullname(user) or user
 	customer = frappe.new_doc("Customer")
-	customer_group = frappe.db.get_single_value("Lifestyle Settings", "Lifestyle Settings", "customer_group")
+	customer_group = get_default_customer_group()
 	customer.update(
 		{
 			"customer_name": fullname,
