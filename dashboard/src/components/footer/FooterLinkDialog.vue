@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { FooterNode, FooterPage } from "@/types"
+import type { FooterLink, FooterPage, FooterSection } from "@/types"
 import { Combobox, Dialog, ErrorMessage, FormControl, toast } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
 const props = defineProps<{
 	/** The column the link belongs to. */
-	section: FooterNode | null
+	section: FooterSection | null
 	/** The link being edited, or null when adding a new one. */
-	link: FooterNode | null
+	link: FooterLink | null
 	pages: FooterPage[]
 	/** Runs the server call. Awaited, so the dialog only closes once the save lands. */
 	submit: (payload: { label: string; url: string }) => Promise<void>
@@ -46,8 +46,8 @@ watch(open, (isOpen) => {
 	// overwrite a label the owner may have deliberately changed.
 	source.value = "url"
 	page.value = ""
-	label.value = props.link?.label ?? ""
-	url.value = props.link?.url ?? ""
+	label.value = props.link?.link_label ?? ""
+	url.value = props.link?.link_url ?? ""
 })
 
 watch(page, (name) => {
@@ -81,7 +81,7 @@ async function save() {
 	<Dialog
 		v-model:open="open"
 		:title="isEdit ? 'Edit link' : 'Add a link'"
-		:message="section ? `In the ${section.label} column.` : undefined"
+		:message="section ? `In the ${section.title} column.` : undefined"
 		:actions="[
 			{
 				label: isEdit ? 'Save' : 'Add',

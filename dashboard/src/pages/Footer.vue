@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import FooterLinkDialog from "@/components/footer/FooterLinkDialog.vue"
 import { useFooter } from "@/composables/useFooter"
-import type { FooterNode } from "@/types"
+import type { FooterLink, FooterSection } from "@/types"
 import {
 	Badge,
 	Breadcrumbs,
@@ -9,68 +9,43 @@ import {
 	Dropdown,
 	LoadingText,
 	PageHeader,
-	Tree,
+	Tooltip,
 	dialog,
 	toast,
 } from "frappe-ui"
-import type { DropInfo, MoveContext } from "frappe-ui"
 import { onMounted, ref } from "vue"
+import Draggable from "vuedraggable"
 
-const { sections, pages, nodes, loading, load, mutate, sectionOf, reordered } =
-	useFooter()
+const { sections, pages, loading, load, mutate, reordered } = useFooter()
 
 onMounted(load)
 
 const linkDialogOpen = ref(false)
-const linkDialogSection = ref<FooterNode | null>(null)
-const linkDialogLink = ref<FooterNode | null>(null)
+const linkDialogSection = ref<FooterSection | null>(null)
+const linkDialogLink = ref<FooterLink | null>(null)
 
-/**
- * Domain rule for a drop. The footer is exactly two levels deep, so a column stays a column and
- * a link can only ever land inside one - anything else would ask the server for a shape the
- * doctypes cannot hold.
- */
-function canDrop({ node, target, position }: MoveContext) {
-	const dragged = node as FooterNode
-	const onto = target as FooterNode
-	if (dragged.kind === "section")
-		return onto.kind === "section" && position !== "inside"
-	return onto.kind === "section" ? position === "inside" : position !== "inside"
+/** A drag on the board is already applied to the local lists, so the server is told the result. */
+async function onColumnDrop() {
+	await mutate("reorder_sections", {
+		ordered_names: sections.value.map((section) => section.name),
+	})
 }
 
-async function onDragEnd(info: DropInfo | null) {
-	// Null means the drag was cancelled or never landed anywhere valid.
-	if (!info) return
+type DragEndEvent = {
+	from: HTMLElement
+	to: HTMLElement
+	item: HTMLElement
+	newIndex: number
+}
 
-	const node = info.node as FooterNode
-
-	if (node.kind === "section") {
-		await mutate("reorder_sections", {
-			ordered_names: reordered(
-				sections.value.map((section) => section.name),
-				info.oldIndex,
-				info.newIndex,
-			),
-		})
-		return
-	}
-
-	const fromSection = sectionOf(info.from)
-	const toSection = sectionOf(info.to)
-	if (!fromSection || !toSection) return
+async function onLinkDrop(event: DragEndEvent) {
+	const fromSection = event.from.dataset.section
+	const toSection = event.to.dataset.section
+	const linkRowName = event.item.dataset.name
+	if (!fromSection || !toSection || !linkRowName) return
 
 	if (fromSection === toSection) {
-		const column = sections.value.find(
-			(section) => section.name === fromSection,
-		)
-		await mutate("reorder_links", {
-			section_name: fromSection,
-			ordered_row_names: reordered(
-				(column?.links ?? []).map((link) => link.name),
-				info.oldIndex,
-				info.newIndex,
-			),
-		})
+		await reorderLinks(fromSection)
 		return
 	}
 
@@ -79,8 +54,69 @@ async function onDragEnd(info: DropInfo | null) {
 	await mutate("move_link", {
 		from_section: fromSection,
 		to_section: toSection,
-		link_row_name: node.name,
-		target_index: info.newIndex,
+		link_row_name: linkRowName,
+		target_index: event.newIndex,
+	})
+}
+
+function columnOf(name: string) {
+	return sections.value.find((section) => section.name === name)
+}
+
+async function reorderLinks(sectionName: string) {
+	const column = columnOf(sectionName)
+	if (!column) return
+	await mutate("reorder_links", {
+		section_name: sectionName,
+		ordered_row_names: column.links.map((link) => link.name),
+	})
+}
+
+/**
+ * Menu-driven equivalents of the drags. Dragging is a pointer-only gesture, so every move the
+ * board offers also has to be reachable from a card's or column's menu.
+ */
+async function moveLinkWithinColumn(
+	section: FooterSection,
+	linkIndex: number,
+	offset: number,
+) {
+	await mutate("reorder_links", {
+		section_name: section.name,
+		ordered_row_names: reordered(
+			section.links.map((link) => link.name),
+			linkIndex,
+			linkIndex + offset,
+		),
+	})
+}
+
+async function moveLinkToColumn(
+	section: FooterSection,
+	link: FooterLink,
+	columnIndex: number,
+	offset: number,
+) {
+	const target = sections.value[columnIndex + offset]
+	if (!target) return
+	await mutate("move_link", {
+		from_section: section.name,
+		to_section: target.name,
+		link_row_name: link.name,
+		// Appended rather than kept at the same row: the target column is a different length,
+		// so the "same position" the owner sees would not survive the move.
+		target_index: target.links.length,
+	})
+	toast.success(`Moved to ${target.title}`)
+}
+
+async function moveSection(columnIndex: number, offset: number) {
+	await mutate("reorder_sections", {
+		ordered_names: reordered(
+			sections.value.map((section) => section.name),
+			columnIndex,
+			columnIndex + offset,
+		),
 	})
 }
 
@@ -103,21 +139,21 @@ function addSection() {
 	})
 }
 
-function renameSection(node: FooterNode) {
+function renameSection(section: FooterSection) {
 	dialog.prompt({
 		title: "Rename column",
 		fields: [
 			{
 				name: "title",
 				label: "Column title",
-				defaultValue: node.label,
+				defaultValue: section.title,
 				required: true,
 			},
 		],
 		confirmLabel: "Rename",
 		onConfirm: async ({ values }) => {
 			await mutate("rename_section", {
-				old_name: node.name,
+				old_name: section.name,
 				new_name: values.title,
 			})
 			toast.success("Column renamed")
@@ -125,37 +161,40 @@ function renameSection(node: FooterNode) {
 	})
 }
 
-function removeSection(node: FooterNode) {
-	const count = node.children.length
+function removeSection(section: FooterSection) {
+	const count = section.links.length
 	dialog.danger({
-		title: `Delete "${node.label}"?`,
+		title: `Delete "${section.title}"?`,
 		message: count
 			? `The ${count} ${count === 1 ? "link" : "links"} in this column go with it. Pages are not deleted.`
 			: "Pages are not deleted - only this footer column.",
 		confirmLabel: "Delete column",
 		onConfirm: async () => {
-			await mutate("delete_section", { name: node.name })
+			await mutate("delete_section", { name: section.name })
 			toast.success("Column deleted")
 		},
 	})
 }
 
-function removeLink(node: FooterNode) {
+function removeLink(section: FooterSection, link: FooterLink) {
 	dialog.danger({
-		title: `Remove "${node.label}"?`,
+		title: `Remove "${link.link_label}"?`,
 		message: "The page it points at is not deleted - only this footer link.",
 		confirmLabel: "Remove link",
 		onConfirm: async () => {
 			await mutate("delete_link", {
-				section_name: node.section,
-				link_row_name: node.name,
+				section_name: section.name,
+				link_row_name: link.name,
 			})
 			toast.success("Link removed")
 		},
 	})
 }
 
-function openLinkDialog(section: FooterNode, link: FooterNode | null = null) {
+function openLinkDialog(
+	section: FooterSection,
+	link: FooterLink | null = null,
+) {
 	linkDialogSection.value = section
 	linkDialogLink.value = link
 	linkDialogOpen.value = true
@@ -176,51 +215,105 @@ async function saveLink({ label, url }: { label: string; url: string }) {
 	else await mutate("add_link", { section_name: section.name, label, url })
 }
 
-async function toggleEnabled(node: FooterNode) {
-	const enabled = node.enabled ? 0 : 1
-	if (node.kind === "section")
-		await mutate("set_section_enabled", { name: node.name, enabled })
-	else
-		await mutate("set_link_enabled", {
-			section_name: node.section,
-			link_row_name: node.name,
-			enabled,
-		})
+async function toggleSection(section: FooterSection) {
+	await mutate("set_section_enabled", {
+		name: section.name,
+		enabled: section.enabled ? 0 : 1,
+	})
 }
 
-function editLink(node: FooterNode) {
-	const parent = nodes.value.find((section) => section.name === node.section)
-	if (parent) openLinkDialog(parent, node)
+async function toggleLink(section: FooterSection, link: FooterLink) {
+	await mutate("set_link_enabled", {
+		section_name: section.name,
+		link_row_name: link.name,
+		enabled: link.enabled ? 0 : 1,
+	})
 }
 
-function rowActions(node: FooterNode) {
-	const visibility = {
-		label: node.enabled ? "Hide from footer" : "Show in footer",
-		icon: node.enabled ? "eye-off" : "eye",
-		onClick: () => toggleEnabled(node),
-	}
-
-	if (node.kind === "section")
-		return [
-			{ label: "Add link", icon: "plus", onClick: () => openLinkDialog(node) },
-			{ label: "Rename", icon: "pencil", onClick: () => renameSection(node) },
-			visibility,
-			{
-				group: "Danger",
-				items: [
-					{
-						label: "Delete column",
-						icon: "trash-2",
-						theme: "red" as const,
-						onClick: () => removeSection(node),
-					},
-				],
-			},
-		]
-
+function columnActions(section: FooterSection, columnIndex: number) {
 	return [
-		{ label: "Edit", icon: "pencil", onClick: () => editLink(node) },
-		visibility,
+		{
+			label: "Add link",
+			icon: "plus",
+			onClick: () => openLinkDialog(section),
+		},
+		{
+			label: "Rename",
+			icon: "pencil",
+			onClick: () => renameSection(section),
+		},
+		{
+			label: "Move left",
+			icon: "arrow-left",
+			disabled: columnIndex === 0,
+			onClick: () => moveSection(columnIndex, -1),
+		},
+		{
+			label: "Move right",
+			icon: "arrow-right",
+			disabled: columnIndex === sections.value.length - 1,
+			onClick: () => moveSection(columnIndex, 1),
+		},
+		{
+			label: section.enabled ? "Hide from footer" : "Show in footer",
+			icon: section.enabled ? "eye-off" : "eye",
+			onClick: () => toggleSection(section),
+		},
+		{
+			group: "Danger",
+			items: [
+				{
+					label: "Delete column",
+					icon: "trash-2",
+					theme: "red" as const,
+					onClick: () => removeSection(section),
+				},
+			],
+		},
+	]
+}
+
+function linkActions(
+	section: FooterSection,
+	columnIndex: number,
+	link: FooterLink,
+	linkIndex: number,
+) {
+	return [
+		{
+			label: "Edit",
+			icon: "pencil",
+			onClick: () => openLinkDialog(section, link),
+		},
+		{
+			label: "Move up",
+			icon: "arrow-up",
+			disabled: linkIndex === 0,
+			onClick: () => moveLinkWithinColumn(section, linkIndex, -1),
+		},
+		{
+			label: "Move down",
+			icon: "arrow-down",
+			disabled: linkIndex === section.links.length - 1,
+			onClick: () => moveLinkWithinColumn(section, linkIndex, 1),
+		},
+		{
+			label: "Move to previous column",
+			icon: "arrow-left",
+			disabled: columnIndex === 0,
+			onClick: () => moveLinkToColumn(section, link, columnIndex, -1),
+		},
+		{
+			label: "Move to next column",
+			icon: "arrow-right",
+			disabled: columnIndex === sections.value.length - 1,
+			onClick: () => moveLinkToColumn(section, link, columnIndex, 1),
+		},
+		{
+			label: link.enabled ? "Hide from footer" : "Show in footer",
+			icon: link.enabled ? "eye-off" : "eye",
+			onClick: () => toggleLink(section, link),
+		},
 		{
 			group: "Danger",
 			items: [
@@ -228,7 +321,7 @@ function rowActions(node: FooterNode) {
 					label: "Remove link",
 					icon: "trash-2",
 					theme: "red" as const,
-					onClick: () => removeLink(node),
+					onClick: () => removeLink(section, link),
 				},
 			],
 		},
@@ -249,10 +342,10 @@ function rowActions(node: FooterNode) {
 			/>
 		</PageHeader>
 
-		<div class="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
-			<LoadingText v-if="loading && !nodes.length" />
+		<div class="min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-5">
+			<LoadingText v-if="loading && !sections.length" />
 
-			<div v-else-if="!nodes.length" class="px-3 py-16 text-center">
+			<div v-else-if="!sections.length" class="px-3 py-16 text-center">
 				<p class="text-base text-ink-gray-6">No footer columns yet</p>
 				<p class="mt-1 text-p-sm text-ink-gray-5">
 					Add a column, then fill it with links to your pages.
@@ -266,67 +359,118 @@ function rowActions(node: FooterNode) {
 				/>
 			</div>
 
-			<Tree
+			<Draggable
 				v-else
-				:nodes="nodes"
-				node-key="key"
-				draggable
-				:move="canDrop"
-				@drag-end="onDragEnd"
+				:list="sections"
+				item-key="name"
+				handle=".footer-column-handle"
+				class="flex items-start gap-3"
+				@end="onColumnDrop"
 			>
-				<!-- A section is a plain label: renaming lives in its row menu, so a stray click on
-				     a column heading cannot start an edit nobody asked for. -->
-				<template #item-label="{ node }">
-					<span
-						v-if="node.kind === 'section'"
-						class="min-w-0 flex-1 truncate text-base font-medium"
-						:class="node.enabled ? 'text-ink-gray-8' : 'text-ink-gray-4'"
+				<template #item="{ element: section, index: columnIndex }">
+					<div
+						class="flex w-72 shrink-0 flex-col rounded-lg border border-outline-gray-1 bg-surface-gray-1"
 					>
-						{{ node.label }}
-					</span>
-					<button
-						v-else
-						type="button"
-						class="flex min-w-0 flex-1 items-baseline gap-2 text-left"
-						@click.stop="editLink(node as FooterNode)"
-					>
-						<span
-							class="shrink-0 truncate text-base"
-							:class="node.enabled ? 'text-ink-gray-8' : 'text-ink-gray-4'"
-						>
-							{{ node.label }}
-						</span>
-						<span class="truncate text-sm text-ink-gray-5">{{ node.url }}</span>
-					</button>
-				</template>
+						<div class="flex items-center gap-2 px-2 py-2">
+							<Tooltip text="Drag to reorder columns">
+								<button
+									type="button"
+									class="footer-column-handle cursor-grab text-ink-gray-4 hover:text-ink-gray-6 active:cursor-grabbing"
+									aria-label="Drag to reorder column"
+								>
+									<span class="lucide-grip-vertical size-4 block" aria-hidden="true" />
+								</button>
+							</Tooltip>
 
-				<template #item-suffix="{ node }">
-					<div class="flex items-center gap-2">
-						<Badge
-							v-if="!node.enabled"
-							variant="subtle"
-							theme="orange"
-							label="Hidden"
-						/>
-						<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
-							{{
-								node.kind === "section"
-									? `${node.children.length} ${node.children.length === 1 ? "link" : "links"}`
-									: ""
-							}}
-						</span>
-						<span @click.stop>
-							<Dropdown :options="rowActions(node as FooterNode)">
-								<Button variant="ghost" class="!size-5 shrink-0" aria-label="Row actions">
+							<span
+								class="min-w-0 flex-1 truncate text-base font-medium"
+								:class="section.enabled ? 'text-ink-gray-8' : 'text-ink-gray-4'"
+							>
+								{{ section.title }}
+							</span>
+
+							<Badge
+								v-if="!section.enabled"
+								variant="subtle"
+								theme="orange"
+								label="Hidden"
+							/>
+							<span class="shrink-0 text-sm text-ink-gray-5">
+								{{ section.links.length }}
+							</span>
+
+							<Dropdown :options="columnActions(section, columnIndex)">
+								<Button variant="ghost" class="!size-5 shrink-0" aria-label="Column actions">
 									<template #icon>
 										<span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
 									</template>
 								</Button>
 							</Dropdown>
-						</span>
+						</div>
+
+						<Draggable
+							:list="section.links"
+							group="footer-links"
+							item-key="name"
+							:data-section="section.name"
+							class="flex min-h-16 flex-col gap-2 px-2 pb-2"
+							@end="onLinkDrop"
+						>
+							<template #item="{ element: link, index: linkIndex }">
+								<div
+									:data-name="link.name"
+									class="group flex cursor-grab items-start gap-2 rounded-md border border-outline-gray-1 bg-surface-base px-2 py-2 shadow-sm active:cursor-grabbing"
+								>
+									<button
+										type="button"
+										class="min-w-0 flex-1 text-left"
+										@click="openLinkDialog(section, link)"
+									>
+										<span
+											class="block truncate text-base"
+											:class="link.enabled ? 'text-ink-gray-8' : 'text-ink-gray-4'"
+										>
+											{{ link.link_label }}
+										</span>
+										<span class="mt-0.5 block truncate text-sm text-ink-gray-5">
+											{{ link.link_url }}
+										</span>
+									</button>
+
+									<div class="flex shrink-0 items-center gap-1">
+										<Badge
+											v-if="!link.enabled"
+											variant="subtle"
+											theme="orange"
+											label="Hidden"
+										/>
+										<Dropdown
+											:options="linkActions(section, columnIndex, link, linkIndex)"
+										>
+											<Button variant="ghost" class="!size-5" aria-label="Link actions">
+												<template #icon>
+													<span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
+												</template>
+											</Button>
+										</Dropdown>
+									</div>
+								</div>
+							</template>
+						</Draggable>
+
+						<div class="px-2 pb-2">
+							<Button
+								class="w-full"
+								variant="ghost"
+								theme="gray"
+								icon-left="lucide-plus"
+								label="Add link"
+								@click="openLinkDialog(section)"
+							/>
+						</div>
 					</div>
 				</template>
-			</Tree>
+			</Draggable>
 		</div>
 
 		<FooterLinkDialog
