@@ -7,6 +7,7 @@ import {
 	SettingsHeader,
 	SettingsRow,
 } from "frappe-ui"
+import IntegrationList from "../integrations/IntegrationList.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
 import { useSettingsForm } from "./useSettingsForm"
 
@@ -27,14 +28,25 @@ const { form, changed, save, submit } = useSettingsForm(
 <template>
 	<SettingsHeader
 		title="Payments"
-		description="Cash on delivery and the account its charge is booked to"
+		description="The gateways customers can pay with, and how cash on delivery is charged"
 	/>
 
 	<SettingsBody>
 		<div class="pt-6">
-			<div class="divide-y divide-outline-gray-1">
+			<h3 class="text-base font-medium text-ink-gray-8">Payment gateways</h3>
+			<p class="mt-1 text-p-sm text-ink-gray-5">
+				Turn on a provider and add its credentials to take online payments.
+			</p>
+			<IntegrationList
+				class="mt-2"
+				list-url="/api/v2/method/ls_shop.api.admin.payments.get_payment_integrations"
+				save-url="/api/v2/method/ls_shop.api.admin.payments.save_payment_integration"
+			/>
+
+			<h3 class="mt-8 text-base font-medium text-ink-gray-8">Cash on delivery</h3>
+			<div class="mt-2 divide-y divide-outline-gray-1">
 				<SettingsRow
-					title="Cash on delivery"
+					title="Accept cash on delivery"
 					description="Let customers pay when the order arrives"
 				>
 					<Checkbox v-model="form.cod_enabled" />
