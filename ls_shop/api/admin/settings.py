@@ -44,9 +44,12 @@ FOOTER_FIELDS = (
 CURATED_FIELDS = frozenset(STORE_DETAIL_FIELDS + SHIPPING_FIELDS + PAYMENT_FIELDS + FOOTER_FIELDS)
 
 # Layout-only, action-only, or child-table fieldtypes the generic renderer cannot express as
-# a single input.
+# a single input. Color is skipped for a different reason: the storefront is moving to
+# theme-owned colour, so these fields are on their way out - format_theme_css() still reads
+# them and must keep working, but offering them here would invite edits to a mechanism being
+# replaced.
 ADVANCED_SKIPPED_FIELDTYPES = frozenset(
-	{"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Table"}
+	{"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Table", "Color"}
 )
 
 NUMERIC_FIELDTYPES = frozenset({"Currency", "Float", "Percent"})
