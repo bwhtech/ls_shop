@@ -23,17 +23,34 @@ const language = ref("en")
 const reloadToken = ref(0)
 
 const stage = ref<HTMLElement | null>(null)
-const { width: stageWidth, height: stageHeight } = useElementSize(stage)
+const { width: stageWidth } = useElementSize(stage)
+
+// Until the frame reports its own height. A themed footer runs past 500px, so a smaller guess
+// would crop the first paint of every load.
+const FALLBACK_FRAME_HEIGHT = 560
+// Past this the pane would own the screen, so it scrolls instead.
+const MAX_STAGE_HEIGHT = 420
+
+const contentHeight = ref(0)
 
 const scale = computed(() =>
 	stageWidth.value ? Math.min(1, stageWidth.value / FRAME_WIDTH) : 1,
 )
 
-// The frame is as tall as the stage divided by the scale, so the scaled result exactly fills
-// the band rather than leaving a gap or overflowing it.
-const frameHeight = computed(() =>
-	scale.value ? Math.max(stageHeight.value / scale.value, 240) : 240,
+// Driven by the rendered footer, not by the pane. Sizing the frame to the pane instead cropped
+// whatever did not fit - which was the whole footer-bottom strip, including the copyright line
+// and payment images this very editor edits.
+const frameHeight = computed(() => contentHeight.value || FALLBACK_FRAME_HEIGHT)
+
+const stageHeight = computed(() =>
+	Math.min(frameHeight.value * scale.value, MAX_STAGE_HEIGHT),
 )
+
+function measureFrame(event: Event) {
+	const frame = event.target as HTMLIFrameElement
+	contentHeight.value =
+		frame.contentDocument?.documentElement?.scrollHeight ?? 0
+}
 
 const source = computed(
 	() =>
@@ -65,7 +82,8 @@ const source = computed(
 		<div v-if="!collapsed" class="px-3 pb-3 sm:px-5">
 			<div
 				ref="stage"
-				class="h-64 overflow-hidden rounded border border-outline-gray-2 bg-surface-base"
+				class="overflow-y-auto rounded border border-outline-gray-2 bg-surface-base"
+				:style="{ height: `${stageHeight}px` }"
 			>
 				<iframe
 					:key="language"
@@ -77,6 +95,7 @@ const source = computed(
 						height: `${frameHeight}px`,
 						transform: `scale(${scale})`,
 					}"
+					@load="measureFrame"
 				/>
 			</div>
 		</div>

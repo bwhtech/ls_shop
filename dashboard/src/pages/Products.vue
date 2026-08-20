@@ -99,7 +99,11 @@ const listOptions = {
 			/>
 		</div>
 
-		<ListSkeleton v-if="products.loading && !rows.length" class="px-3 sm:px-5" />
+		<ListSkeleton
+			v-if="products.loading && !products.data"
+			class="px-3 sm:px-5"
+			:columns="columns"
+		/>
 
 		<ListView
 			v-else

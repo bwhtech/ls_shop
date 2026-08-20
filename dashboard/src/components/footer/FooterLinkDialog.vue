@@ -88,7 +88,7 @@ async function save() {
 	>
 		<template #default>
 			<div class="space-y-4">
-				<p v-if="section" class="text-p-sm text-ink-gray-5">
+				<p v-if="section" class="text-p-base text-ink-gray-7">
 					In the {{ section.title }} column.
 				</p>
 				<FormControl
