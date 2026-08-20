@@ -67,7 +67,7 @@ function formatStat(stat: Overview["stats"][number]) {
 					>
 						<div class="text-xs text-ink-gray-5">{{ stat.label }}</div>
 						<div
-							class="mt-1 truncate text-xl font-semibold"
+							class="mt-1 truncate text-3xl font-semibold"
 							:class="stat.value < 0 ? 'text-ink-red-5' : 'text-ink-gray-9'"
 						>
 							{{ formatStat(stat) }}
@@ -107,7 +107,7 @@ function formatStat(stat: Overview["stats"][number]) {
 					<List
 						v-if="recentOrders.length"
 						class="list-row-px-0"
-						:columns="['6.5rem', 'minmax(0,1fr)', '9rem', '7rem']"
+						:columns="['6.5rem', 'minmax(0,1fr)', '10.5rem', '7rem']"
 						:row-height="44"
 					>
 						<ListRows :items="recentOrders" v-slot="{ item }">

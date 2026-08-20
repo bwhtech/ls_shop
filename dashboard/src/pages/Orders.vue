@@ -2,6 +2,7 @@
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import type { OrderRow } from "@/types"
+import { cellAlignClass } from "@/utils/format"
 import { Breadcrumbs, FormControl, TabButtons, useCall } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
@@ -99,7 +100,12 @@ const listOptions = {
 					class="truncate text-base text-ink-gray-9"
 					>{{ row.name }}</span
 				>
-				<span v-else class="truncate text-base text-ink-gray-7">{{ item }}</span>
+				<span
+					v-else
+					class="truncate text-base text-ink-gray-7"
+					:class="cellAlignClass(column.align)"
+					>{{ item }}</span
+				>
 			</template>
 		</ListView>
 	</div>

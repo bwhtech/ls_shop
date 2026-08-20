@@ -44,6 +44,7 @@ export type ProductRow = {
 
 /** Taken from the Badge component itself, so our map cannot drift from what frappe-ui ships. */
 export type BadgeTheme = NonNullable<BadgeProps["theme"]>
+export type BadgeVariant = NonNullable<BadgeProps["variant"]>
 
 /** A stable key for the icon and colour, plus the label the store owner reads. */
 export type OrderState = {

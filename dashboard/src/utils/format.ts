@@ -1,4 +1,10 @@
-import type { BadgeTheme, OrderState, ProductRow, ProductSize } from "@/types"
+import type {
+	BadgeTheme,
+	BadgeVariant,
+	OrderState,
+	ProductRow,
+	ProductSize,
+} from "@/types"
 
 /** One place that decides how a price range reads, so the list and the detail agree. */
 export function formatPriceRange(rates: (number | null)[]) {
@@ -28,21 +34,35 @@ export function publishTheme(publishedCount: number) {
 /**
  * One badge per rung of the fulfilment ladder, keyed by the stage key the API returns rather than
  * by its English label, so every order badge in the app agrees and translation cannot break it.
+ *
+ * Badge ships six themes for nine stages, so the ladder is separated on the theme x variant grid:
+ * within one hue, `outline` reads lighter than `subtle`, which reads lighter than `solid`. Hue
+ * carries the meaning - gray/amber before anything leaves the shelf, violet while the warehouse
+ * works, blue once goods are moving, green only for the terminal success, red for the two states
+ * that need attention - and every (theme, variant) pair is used once, so no two stages look alike.
  */
-const orderStateBadges: Record<string, { theme: BadgeTheme; icon: string }> = {
-	to_fulfil: { theme: "amber", icon: "lucide-inbox" },
-	delivery_note_drafted: { theme: "gray", icon: "lucide-file-text" },
-	partly_fulfilled: { theme: "blue", icon: "lucide-package-open" },
-	fulfilled: { theme: "blue", icon: "lucide-package-check" },
-	packed: { theme: "violet", icon: "lucide-package" },
-	shipped: { theme: "blue", icon: "lucide-truck" },
-	delivered: { theme: "green", icon: "lucide-circle-check" },
-	returned: { theme: "amber", icon: "lucide-undo-2" },
-	cancelled: { theme: "red", icon: "lucide-circle-x" },
+const orderStateBadges: Record<
+	string,
+	{ theme: BadgeTheme; variant: BadgeVariant; icon: string }
+> = {
+	to_fulfil: { theme: "amber", variant: "subtle", icon: "lucide-inbox" },
+	delivery_note_drafted: {
+		theme: "gray",
+		variant: "subtle",
+		icon: "lucide-file-text",
+	},
+	packed: { theme: "violet", variant: "subtle", icon: "lucide-archive" },
+	partly_fulfilled: { theme: "blue", variant: "outline", icon: "lucide-split" },
+	fulfilled: { theme: "blue", variant: "subtle", icon: "lucide-check-check" },
+	shipped: { theme: "blue", variant: "solid", icon: "lucide-truck" },
+	delivered: { theme: "green", variant: "solid", icon: "lucide-circle-check" },
+	returned: { theme: "red", variant: "subtle", icon: "lucide-undo-2" },
+	cancelled: { theme: "red", variant: "solid", icon: "lucide-circle-x" },
 }
 
 const unknownOrderStateBadge = {
 	theme: "gray" as BadgeTheme,
+	variant: "outline" as BadgeVariant,
 	icon: "lucide-circle-dashed",
 }
 
@@ -81,4 +101,13 @@ export function formatShortDate(value: string) {
 		month: "short",
 		year: "numeric",
 	}).format(parsed)
+}
+
+/**
+ * ListView puts a right-aligned column's cell in a block-level wrapper that still carries
+ * `justify-end`, which does nothing outside a flex box - so the value has to right-align itself or
+ * it drifts left, out from under its own header.
+ */
+export function cellAlignClass(align?: string) {
+	return align === "right" || align === "end" ? "block w-full text-right" : ""
 }

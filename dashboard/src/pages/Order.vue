@@ -79,7 +79,7 @@ function confirmFulfil() {
 		<div v-else-if="order.data" class="min-h-0 flex-1 overflow-y-auto">
 			<div class="body-container pb-40 pt-5">
 				<div class="flex items-center gap-3">
-					<h1 class="text-md text-ink-gray-9">{{ order.data.name }}</h1>
+					<h1 class="text-2xl font-semibold text-ink-gray-9">{{ order.data.name }}</h1>
 					<OrderStateBadge :state="order.data.state" />
 				</div>
 				<p class="mt-1 text-p-sm text-ink-gray-5">

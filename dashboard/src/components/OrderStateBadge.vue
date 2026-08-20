@@ -12,9 +12,11 @@ const badge = computed(() => orderStateBadge(props.state))
 </script>
 
 <template>
-	<Badge variant="subtle" :theme="badge.theme" :label="state.label">
+	<Badge :variant="badge.variant" :theme="badge.theme" :label="state.label">
 		<template #prefix>
-			<span :class="badge.icon" class="size-full" aria-hidden="true" />
+			<!-- Badge sizes its own prefix box at 10px, which is too small to tell one glyph from
+			     another; the icon overrides that to 12px and overflows into the badge's padding. -->
+			<span :class="badge.icon" class="size-3 shrink-0" aria-hidden="true" />
 		</template>
 	</Badge>
 </template>

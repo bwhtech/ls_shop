@@ -3,7 +3,7 @@ import AddProductDialog from "@/components/AddProductDialog.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import { showAddProduct } from "@/components/addProduct"
 import type { ProductRow } from "@/types"
-import { formatRowPrice, publishTheme } from "@/utils/format"
+import { cellAlignClass, formatRowPrice, publishTheme } from "@/utils/format"
 import { Badge, Breadcrumbs, Button, FormControl, useCall } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
@@ -129,7 +129,12 @@ const listOptions = {
 					:label="row.status"
 				/>
 
-				<span v-else class="truncate text-base text-ink-gray-7">{{ item }}</span>
+				<span
+					v-else
+					class="truncate text-base text-ink-gray-7"
+					:class="cellAlignClass(column.align)"
+					>{{ item }}</span
+				>
 			</template>
 		</ListView>
 

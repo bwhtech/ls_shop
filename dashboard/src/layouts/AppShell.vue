@@ -189,6 +189,12 @@ const sections: SidebarSection[] = [
 /* The sidebar column is painted by the app root (bg-surface-sidebar over bg-surface-base),
    which in dark mode resolves to the same colour as the pages. The rule gives the content
    area its own surface plus the divider that separates it from the sidebar. */
+/* SidebarLabel hardcodes text-base (14px) on its heading, which renders a group label larger
+   than the 13px links it groups. A group name should be the quieter of the two. */
+.app-shell :deep([data-slot="sidebar-label"] h3) {
+	@apply text-xs font-medium text-ink-gray-5;
+}
+
 .app-shell :deep([data-slot="desktop-shell-content"]) {
 	@apply border-l border-outline-gray-1 bg-surface-base;
 }

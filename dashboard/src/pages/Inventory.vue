@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import type { InventoryRow } from "@/types"
-import { availabilityTheme } from "@/utils/format"
+import { availabilityTheme, cellAlignClass } from "@/utils/format"
 import {
 	Badge,
 	Breadcrumbs,
@@ -116,7 +116,7 @@ const columns = [
 				/>
 				<TextInput
 					v-else-if="column.key === 'receive'"
-					class="w-20 [&_[data-slot=control]]:text-right"
+					class="ms-auto w-20 [&_[data-slot=control]]:text-right"
 					type="number"
 					placeholder="0"
 					:aria-label="`Receive stock for ${row.product} ${row.size}`"
@@ -124,7 +124,12 @@ const columns = [
 					@click.stop
 					@update:model-value="receiveQuantities[row.item_code] = $event"
 				/>
-				<span v-else class="truncate text-base text-ink-gray-7">{{ item }}</span>
+				<span
+					v-else
+					class="truncate text-base text-ink-gray-7"
+					:class="cellAlignClass(column.align)"
+					>{{ item }}</span
+				>
 			</template>
 		</ListView>
 

@@ -71,7 +71,7 @@ const destinations: PaletteItem[] = [
 	{
 		name: "inventory",
 		title: "Inventory",
-		shortcut: "Mod+Shift+I",
+		shortcut: "Mod+Shift+U",
 		icon: "lucide-boxes",
 		action: () => go("Inventory"),
 	},
@@ -321,7 +321,9 @@ useKeyboardShortcut([
 		handler: () => go("Products"),
 	},
 	{
-		combo: "Mod+Shift+I",
+		// Not Mod+Shift+I: that is the browser's own devtools shortcut on every platform, so the
+		// keystroke is swallowed before the app ever sees it.
+		combo: "Mod+Shift+U",
 		description: "Go to Inventory",
 		group: "Navigation",
 		allowInInput: true,
