@@ -33,10 +33,24 @@ def _get_default_territory() -> str:
 
 
 def get_default_customer_group() -> str:
-	# Was reading a customer_group field off Lifestyle Settings that has never existed, so party
-	# creation threw and every checkout failed at the quotation step. Selling Settings is where
-	# erpnext keeps this default, mirroring _get_default_territory above.
-	return frappe.db.get_single_value("Selling Settings", "customer_group") or get_root_of("Customer Group")
+	"""Resolve a leaf Customer Group for storefront party creation.
+
+	Was reading a customer_group field off Lifestyle Settings that has never existed, so party
+	creation threw and every checkout failed at the quotation step. The obvious fix - falling back
+	to get_root_of() the way _get_default_territory does - is wrong here: the Customer Group root is
+	is_group=1 and Customer rejects a group, so an unset Selling Setting still broke checkout. Fall
+	through to frappe's own default, then to any leaf group.
+	"""
+	configured = frappe.db.get_single_value("Selling Settings", "customer_group") or frappe.db.get_default(
+		"customer_group"
+	)
+	if configured and not frappe.db.get_value("Customer Group", configured, "is_group"):
+		return configured
+
+	leaf_group = frappe.get_all(
+		"Customer Group", filters={"is_group": 0}, order_by="lft", limit=1, pluck="name"
+	)
+	return leaf_group[0] if leaf_group else ""
 
 
 def _create_party_for_user(user: str):
