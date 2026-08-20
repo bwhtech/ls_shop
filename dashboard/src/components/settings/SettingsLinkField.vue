@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { FormControl, useCall } from "frappe-ui"
+import { useLinkSearch } from "@/composables/useLinkSearch"
+import { Combobox } from "frappe-ui"
 import { computed } from "vue"
 
 type LinkOption = { label: string; value: string }
@@ -13,28 +14,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "update:modelValue": [value: string | null] }>()
 
-const links = useCall<LinkOption[]>({
-	url: "/api/v2/method/ls_shop.api.admin.settings.get_link_options",
-	params: { doctype: props.doctype },
-})
+const { open, query, results } = useLinkSearch<LinkOption>(
+	"/api/v2/method/ls_shop.api.admin.settings.get_link_options",
+	() => ({ doctype: props.doctype }),
+)
 
-// A blank entry so an optional link can be cleared without leaving the dropdown.
-const options = computed(() => [
-	{ label: "", value: "" },
-	...(links.data ?? []),
-])
+const options = computed(() => results.data ?? [])
 
+// Emptying the input clears the selection, so an optional link no longer needs a blank option.
 const selected = computed({
-	get: () => props.modelValue ?? "",
-	set: (value: string) => emit("update:modelValue", value || null),
+	get: () => props.modelValue,
+	set: (value: string | null) => emit("update:modelValue", value || null),
 })
 </script>
 
 <template>
-	<FormControl
+	<Combobox
 		v-model="selected"
-		type="select"
+		v-model:open="open"
+		v-model:query="query"
+		class="w-72"
 		:options="options"
-		:disabled="props.disabled || links.loading"
+		:filterable="false"
+		:loading="results.loading"
+		:disabled="props.disabled"
+		:placeholder="`Search ${props.doctype}`"
 	/>
 </template>

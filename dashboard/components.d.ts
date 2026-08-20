@@ -16,6 +16,7 @@ declare module 'vue' {
     AppCommandPalette: typeof import('./src/components/AppCommandPalette.vue')['default']
     AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
     AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
+    CollectionCombobox: typeof import('./src/components/CollectionCombobox.vue')['default']
     FooterSettings: typeof import('./src/components/settings/FooterSettings.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
     PaymentSettings: typeof import('./src/components/settings/PaymentSettings.vue')['default']

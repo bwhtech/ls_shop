@@ -244,8 +244,8 @@ def get_link_options(doctype: str, search_text: str | None = None):
 	if search_text:
 		filters["name"] = ("like", f"%{cstr(search_text)}%")
 
-	# ponytail: first 100 names only, add server-side search paging if a linked doctype
-	# outgrows a single dropdown
+	# ponytail: first 100 matches only - the picker searches server-side, so anything further
+	# down is reachable by typing; paginate if a doctype outgrows even a searched list
 	records = frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", limit=100)
 	return [{"label": name, "value": name} for name in records]
 

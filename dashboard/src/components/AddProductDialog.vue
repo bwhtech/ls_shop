@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import CollectionCombobox from "@/components/CollectionCombobox.vue"
 import {
 	Button,
 	Dialog,
 	ErrorMessage,
 	FormControl,
-	Select,
 	toast,
 	useCall,
 } from "frappe-ui"
-import { computed, ref } from "vue"
+import { ref } from "vue"
 
 const emit = defineEmits<{ created: [name: string] }>()
 const open = defineModel<boolean>("open", { required: true })
@@ -19,12 +19,6 @@ const options = ref("")
 const sizes = ref("")
 const price = ref("")
 const salePrice = ref("")
-
-// A store owner cannot be expected to type an Item Group's exact name, so offer the real list
-// rather than validating a free-text guess after the fact.
-const collections = useCall<string[]>({
-	url: "/api/v2/method/ls_shop.api.admin.catalog.get_collections",
-})
 
 const createProduct = useCall<{ name: string }>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.create_product",
@@ -38,8 +32,6 @@ const createProduct = useCall<{ name: string }>({
 	onError: (error: { message?: string }) =>
 		toast.error(error?.message ?? "Could not create product"),
 })
-
-const collectionOptions = computed(() => collections.data ?? [])
 
 function splitValues(value: string) {
 	return value
@@ -81,13 +73,7 @@ function submit() {
 					required
 					placeholder="Merino Wool Jacket"
 				/>
-				<FormControl
-					v-model="collection"
-					type="select"
-					label="Collection"
-					required
-					:options="collectionOptions"
-				/>
+				<CollectionCombobox v-model="collection" required />
 				<FormControl
 					v-model="options"
 					label="Colours"

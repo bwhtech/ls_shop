@@ -279,10 +279,17 @@ def get_publish_blockers(images, sizes):
 
 
 @frappe.whitelist()
-def get_collections():
+def get_collections(search_text: str | None = None):
 	"""The collections a product can be filed under, for the create form's picker."""
 	frappe.has_permission("Item Group", ptype="read", throw=True)
-	return frappe.get_all("Item Group", fields=["name"], order_by="name", pluck="name")
+
+	filters = {}
+	if search_text:
+		filters["name"] = ("like", f"%{cstr(search_text)}%")
+
+	# ponytail: first 100 matches only, paginate the picker if a store keeps more collections
+	# than a searched dropdown can show
+	return frappe.get_all("Item Group", filters=filters, order_by="name", pluck="name", limit=100)
 
 
 @frappe.whitelist(methods=["POST"])

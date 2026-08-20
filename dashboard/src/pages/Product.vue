@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CollectionCombobox from "@/components/CollectionCombobox.vue"
 import OptionRow from "@/components/OptionRow.vue"
 import type { ProductDetail, ProductVariant } from "@/types"
 import { formatPriceRange, publishTheme, sumStock } from "@/utils/format"
@@ -22,10 +23,6 @@ const product = useCall<ProductDetail>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.get_product",
 	params: () => ({ item_template: productName.value }),
 	refetch: true,
-})
-
-const collections = useCall<string[]>({
-	url: "/api/v2/method/ls_shop.api.admin.catalog.get_collections",
 })
 
 const details = reactive({ title: "", collection: "", description: "" })
@@ -229,12 +226,7 @@ function saveDetails() {
 
 				<div class="space-y-4 px-4 py-4">
 					<FormControl v-model="details.title" label="Title" required />
-					<FormControl
-						v-model="details.collection"
-						type="select"
-						label="Collection"
-						:options="collections.data ?? []"
-					/>
+					<CollectionCombobox v-model="details.collection" />
 					<FormControl
 						v-model="details.description"
 						type="textarea"
