@@ -22,6 +22,18 @@
 
 {% block uncontained_body %}
 {% call account_shell(_("Order Confirmed"), [{"label": _("Orders"), "href": orders_url}]) %}
+{% if login_url %}
+{# The gateway has already taken the money by the time this page loads, so the shopper is told
+   that first - a bare login form here reads as a payment that vanished. #}
+<div class="account-card confirmed-request text-center">
+	<h4 class="mb-3">{{ _("Your payment has been received") }}</h4>
+	<p class="mb-0">{{ _("Please sign in to confirm this order. You will come straight back to this page.") }}</p>
+	<div class="mt-4 d-sm-flex gap-3 justify-content-center">
+		<a class="btn my-1 btn-secondary" href="{{ login_url }}">{{ _("Sign In To Confirm") }}</a>
+		<a class="btn btn-outline-secondary my-1 btnhover20" href="/{{ language }}/products">{{ _("Continue Shopping") }}</a>
+	</div>
+</div>
+{% else %}
 <div class="account-card confirmed-request text-center" x-data='pixio_order_confirmation({{ confirmation_config | tojson }})'>
 
 	{% if not order %}
@@ -62,11 +74,13 @@
 	</div>
 	{% endif %}
 </div>
+{% endif %}
 {% endcall %}
 {% endblock %}
 
 {% block script %}
 	{{ super() }}
+	{% if not login_url %}
 	<script>
 		function track_purchase(data, order_name) {
 			// The first-party `purchase` event is logged server-side at order creation; the
@@ -141,4 +155,5 @@
 			}));
 		});
 	</script>
+	{% endif %}
 {% endblock %}

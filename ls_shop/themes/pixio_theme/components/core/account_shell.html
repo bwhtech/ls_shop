@@ -20,6 +20,10 @@
 
 {% macro account_shell(page_title, parent_crumbs=None) %}
 {% set language = frappe.lang or "en" %}
+{# The order confirmation is the one account route a logged-out shopper can reach - it is the
+   gateway return URL. The sidebar reads the signed-in User and offers a Log Out link, both
+   meaningless there, so it stands down and the content column takes the full width. #}
+{% set is_signed_in = frappe.session.user != "Guest" %}
 
 {# The banner is left on .dz-bnr-inr's light fill rather than the reference's dark bg1.jpg:
    header-transparent keeps the nav links dark and they are unreadable over a dark band. #}
@@ -43,8 +47,8 @@
 <div class="content-inner-1 account-page">
 	<div class="container">
 		<div class="row">
-			{% include "components/core/account_sidebar.html" %}
-			<section class="col-xl-9 account-wrapper">{{ caller() }}</section>
+			{% if is_signed_in %}{% include "components/core/account_sidebar.html" %}{% endif %}
+			<section class="{{ 'col-xl-9' if is_signed_in else 'col-xl-12' }} account-wrapper">{{ caller() }}</section>
 		</div>
 	</div>
 </div>

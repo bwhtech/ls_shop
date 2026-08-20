@@ -49,10 +49,13 @@ DEFAULT_ROUTES = [
 		"template_path": "pages/account/orders/detail.html",
 		"requires_auth": 1,
 	},
+	# The only account route open to a logged-out shopper: it is the gateway return URL, so the money
+	# is already taken by the time it loads. Refusing it outright leaves the shopper on a 403 with no
+	# way back; the page asks for the login itself and shows nothing until it has one.
 	{
 		"url_pattern": rf"^{LANG}/account/orders/confirmation$",
 		"template_path": "pages/account/orders/confirmation.html",
-		"requires_auth": 1,
+		"requires_auth": 0,
 	},
 	{
 		"url_pattern": rf"^{LANG}/account/wishlist$",

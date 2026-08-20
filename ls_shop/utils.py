@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import quote
 
 import frappe
 from erpnext.selling.doctype.customer.customer import (
@@ -401,6 +402,19 @@ def get_local_lang_url(path: str) -> str:
 		return path.replace("/en/", "/ar/")
 
 	return path
+
+
+def get_login_url_for_current_page() -> str:
+	"""Login link that lands the shopper back on the page that refused them, query string intact.
+
+	The login page reads `redirect-to` off its own query string, so an unencoded return URL loses
+	everything from its first `&` onwards - on the gateway return URL that is the payment_mode and
+	session_id the confirmation needs to resolve the payment.
+	"""
+	request = getattr(frappe.local, "request", None)
+	# werkzeug always appends the separator to full_path, even with nothing after it.
+	return_to = request.full_path.removesuffix("?") if request else "/"
+	return f"/login?redirect-to={quote(return_to, safe='')}"
 
 
 def get_current_page():

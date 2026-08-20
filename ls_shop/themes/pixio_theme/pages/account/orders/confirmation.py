@@ -5,12 +5,20 @@ no_cache = True
 
 import frappe
 
+from ls_shop.utils import get_login_url_for_current_page
 from ls_shop.www.account.orders.index import get_orders_list
 
 
 def get_context(context):
+	context.no_cache = 1
+	# Unlike every other account page this one is the gateway return URL, so a shopper whose session
+	# expired during checkout lands here having already been charged. confirm_payment cannot be opened
+	# to Guest - it scopes the lookup to frappe.session.user - so the page asks for the login instead
+	# of letting the API refuse with a bare "not whitelisted".
 	if frappe.session.user == "Guest":
-		raise frappe.PermissionError
+		context.login_url = get_login_url_for_current_page()
+		return context
+
 	context.order = get_owned_order(frappe.form_dict.get("order_id"))
 	return context
 
