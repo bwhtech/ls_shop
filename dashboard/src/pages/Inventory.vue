@@ -82,18 +82,19 @@ const columns = [
 				v-model="search"
 				type="text"
 				placeholder="Search products"
-				class="max-w-xs"
+				class="w-56"
 			/>
 			<span class="ml-auto text-sm text-ink-gray-5">{{ inventory.data?.total ?? 0 }} sizes</span>
 		</div>
 
 		<ListView
-			class="min-h-0 flex-1"
+			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="item_code"
 			:columns="columns"
 			:rows="rows"
 			:loading="inventory.loading"
 			:options="{
+				selectable: false,
 				showTooltip: false,
 				resizeColumn: true,
 				emptyState: {

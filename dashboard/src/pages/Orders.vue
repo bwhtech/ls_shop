@@ -37,7 +37,7 @@ const rows = computed(() =>
 	(orders.data?.orders ?? []).map((order) => ({
 		...order,
 		items: `${order.item_count}`,
-		amount: `${order.total}`,
+		amount: `${order.currency} ${order.total}`,
 	})),
 )
 
@@ -46,7 +46,7 @@ const columns = [
 	{ label: "Customer", key: "customer", width: 2 },
 	{ label: "Placed", key: "placed_on", width: 1.2 },
 	{ label: "Items", key: "items", width: 0.7, align: "right" },
-	{ label: "Total", key: "amount", width: 1, align: "right" },
+	{ label: "Total", key: "amount", width: 1.3, align: "right" },
 	{ label: "Status", key: "state", width: 1.2 },
 ]
 
@@ -55,6 +55,8 @@ const listOptions = {
 		name: "Order",
 		params: { name: row.name },
 	}),
+	// No bulk action exists for orders yet, and a checkbox that does nothing is just noise.
+	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,
 	emptyState: {
@@ -77,13 +79,13 @@ const listOptions = {
 			<FormControl
 				v-model="search"
 				type="text"
-				placeholder="Search by order number"
-				class="max-w-xs"
+				placeholder="Search orders"
+				class="w-56"
 			/>
 		</div>
 
 		<ListView
-			class="min-h-0 flex-1"
+			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="name"
 			:columns="columns"
 			:rows="rows"

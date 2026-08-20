@@ -1,4 +1,4 @@
-import { FrappeUI } from "frappe-ui"
+import { Dialog, FrappeUI } from "frappe-ui"
 import { createApp } from "vue"
 
 import App from "./App.vue"
@@ -12,5 +12,10 @@ const app = createApp(App)
 // imperative dialog/toast portals.
 app.use(router)
 app.use(FrappeUI)
+
+// frappe-ui's own CommandPalette renders <Dialog> without importing it, so it only resolves
+// through a global registration. Our components import what they use - this single entry
+// exists for the library, not for our templates.
+app.component("Dialog", Dialog)
 
 app.mount("#app")

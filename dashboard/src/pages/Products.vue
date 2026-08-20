@@ -53,7 +53,8 @@ const listOptions = {
 		name: "Product",
 		params: { name: row.name },
 	}),
-	selectable: true,
+	// Selection stays off until a bulk action consumes it.
+	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,
 	emptyState: {
@@ -61,7 +62,10 @@ const listOptions = {
 		description: "Add your first product to start selling.",
 		button: {
 			label: "Add product",
-			variant: "solid",
+			// Subtle, not solid: the page header already carries the one solid primary, and a
+			// second solid gray button inverts to near-white in dark mode.
+			variant: "subtle",
+			theme: "gray",
 			onClick: () => {
 				showAddProduct.value = true
 			},
@@ -90,12 +94,12 @@ const listOptions = {
 				v-model="search"
 				type="text"
 				placeholder="Search products"
-				class="max-w-xs"
+				class="w-56"
 			/>
 		</div>
 
 		<ListView
-			class="min-h-0 flex-1"
+			class="min-h-0 flex-1 px-3 sm:px-5"
 			row-key="name"
 			:columns="columns"
 			:rows="rows"
