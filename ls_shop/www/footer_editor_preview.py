@@ -10,6 +10,16 @@ import frappe
 from frappe.utils import cstr, escape_html, validate_url
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import SAFE_URL_SCHEMES
+from ls_shop.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
+from ls_shop.shop_themes.jinja_helpers import shop_theme_asset_url
+from ls_shop.shop_themes.render import render_themed_template
+from ls_shop.shop_themes.theme_resolver import find_theme_file
+from ls_shop.utils import format_theme_css
+
+# What a themed page includes. A theme that ships its own footer is the one the shopper sees, so
+# previewing the base template instead would show markup the storefront never renders.
+THEMED_FOOTER = "components/includes/footer.html"
+BASE_FOOTER = "templates/includes/footer.html"
 
 no_cache = True
 
@@ -81,16 +91,27 @@ def get_context(context):
 	if lang not in PREVIEW_LANGUAGES:
 		lang = frappe.local.lang or "en"
 
-	footer_html = frappe.render_template(
-		"templates/includes/footer.html",
-		frappe._dict(preview_settings=settings, lang=lang, is_rtl=lang == "ar"),
-	)
+	footer_context = frappe._dict(preview_settings=settings, lang=lang, is_rtl=lang == "ar")
+
+	theme_context = get_theme_context(resolve_active_theme())
+	if theme_context["dirs"] and find_theme_file(theme_context["dirs"], THEMED_FOOTER):
+		footer_html = render_themed_template(THEMED_FOOTER, footer_context)
+		# The theme's own stylesheet, the way its base.html loads it - without this the theme's
+		# markup renders against base tailwind alone and looks nothing like the storefront.
+		theme_styles = (
+			f'<link rel="stylesheet" href="{escape_html(shop_theme_asset_url("tailwind.output.css"))}">'
+			f"{format_theme_css()}"
+		)
+	else:
+		footer_html = frappe.render_template(BASE_FOOTER, footer_context)
+		theme_styles = ""
 
 	context.rendered_html = f"""<!DOCTYPE html>
 <html lang="{escape_html(lang)}">
 <head>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/assets/ls_shop/css/tailwind.css">
+{theme_styles}
 {settings.generate_theme_css()}
 </head>
 <body>
