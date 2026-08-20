@@ -56,12 +56,13 @@ function formatStat(stat: Overview["stats"][number]) {
 
 		<ScrollArea class="min-h-0 flex-1" viewport-class="pb-40">
 			<div class="mx-auto max-w-4xl space-y-6 px-3 pt-5 sm:px-5">
-				<!-- KPI strip: no cards, just thin dividers, so the four figures read as one row. -->
-				<div class="grid grid-cols-4 divide-x divide-outline-gray-2">
+				<!-- One card per figure, reflowing 4 -> 2 -> 1 across the breakpoints so a KPI
+				     never gets squeezed narrower than its own value. -->
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 					<div
 						v-for="stat in stats"
 						:key="stat.key"
-						class="px-4 first:pl-0 last:pr-0"
+						class="rounded-lg border border-outline-gray-1 bg-surface-base p-4"
 					>
 						<div class="text-xs text-ink-gray-5">{{ stat.label }}</div>
 						<div
@@ -100,8 +101,8 @@ function formatStat(stat: Overview["stats"][number]) {
 							@click="$router.push({ name: 'Orders' })"
 						/>
 					</div>
-					<!-- list-row-px-0 drops the row inset so the cells line up with the KPI
-					     strip above rather than sitting 12px inside it. -->
+					<!-- list-row-px-0 drops the row inset so the cells sit flush with this
+					     section's own heading rather than 12px inside it. -->
 					<List
 						v-if="recentOrders.length"
 						class="list-row-px-0"
@@ -133,11 +134,11 @@ function formatStat(stat: Overview["stats"][number]) {
 					</p>
 				</section>
 
-				<div class="border-t border-outline-gray-2" />
-
-				<div class="grid grid-cols-2 gap-8">
+				<div class="grid gap-3 sm:grid-cols-2">
 					<!-- Running low -->
-					<section class="space-y-2">
+					<section
+						class="space-y-2 rounded-lg border border-outline-gray-1 bg-surface-base p-4"
+					>
 						<div class="flex h-7 items-center justify-between">
 							<h3 class="text-sm font-semibold text-ink-gray-8">Running low</h3>
 							<Button
@@ -174,7 +175,9 @@ function formatStat(stat: Overview["stats"][number]) {
 					</section>
 
 					<!-- Needs attention -->
-					<section class="space-y-2">
+					<section
+						class="space-y-2 rounded-lg border border-outline-gray-1 bg-surface-base p-4"
+					>
 						<div class="flex h-7 items-center justify-between">
 							<h3 class="text-sm font-semibold text-ink-gray-8">
 								Needs attention
