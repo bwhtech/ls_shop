@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useLinkSearch } from "@/composables/useLinkSearch"
 import { useNavMenu } from "@/composables/useNavMenu"
 import type { MenuLinkType, MenuNode } from "@/types"
 import {
@@ -9,7 +10,6 @@ import {
 	MultiSelect,
 	Switch,
 	toast,
-	useCall,
 } from "frappe-ui"
 import { computed, reactive, ref, watch } from "vue"
 
@@ -64,47 +64,37 @@ watch(
 	{ immediate: true },
 )
 
-const itemGroupQuery = ref("")
-const brandQuery = ref("")
+type LinkOption = { label: string; value: string }
 
-/** Name-only lookup against a doctype, narrowed by whatever the picker has been typed into. */
-function nameSearchParams(query: string) {
-	return {
-		fields: JSON.stringify(["name"]),
-		filters: JSON.stringify(query ? [["name", "like", `%${query}%`]] : []),
-		limit: 20,
-		order_by: "name asc",
+const LINK_OPTIONS_URL =
+	"/api/v2/method/ls_shop.api.admin.navigation.get_link_options"
+
+// The same server-side search the settings pickers use: the endpoint decides what matches, not
+// the client, so a large catalog stays searchable rather than being capped at a first page.
+const itemGroupSearch = useLinkSearch<LinkOption>(LINK_OPTIONS_URL, () => ({
+	doctype: "Item Group",
+}))
+const brandSearch = useLinkSearch<LinkOption>(LINK_OPTIONS_URL, () => ({
+	doctype: "Brand",
+}))
+
+// Already-linked values are merged into the options: a search only returns what matches the
+// current query, and without this a saved group vanishes from the control as soon as someone types.
+function withSelected(options: LinkOption[], selected: string[]) {
+	const merged = new Map(options.map((option) => [option.value, option]))
+	for (const value of selected) {
+		if (value && !merged.has(value)) merged.set(value, { label: value, value })
 	}
+	return [...merged.values()]
 }
 
-const itemGroups = useCall<{ name: string }[]>({
-	url: "/api/v2/document/Item Group",
-	params: () => nameSearchParams(itemGroupQuery.value),
-	refetch: true,
-})
+const itemGroupOptions = computed(() =>
+	withSelected(itemGroupSearch.results.data ?? [], form.item_groups),
+)
 
-const brands = useCall<{ name: string }[]>({
-	url: "/api/v2/document/Brand",
-	params: () => nameSearchParams(brandQuery.value),
-	refetch: true,
-})
-
-// The picker must be able to show what is already linked, not just what the current search
-// returned, or saved groups vanish from the trigger the moment someone types.
-const itemGroupOptions = computed(() => {
-	const names = new Set([
-		...form.item_groups,
-		...(itemGroups.data ?? []).map((row) => row.name),
-	])
-	return [...names].map((name) => ({ label: name, value: name }))
-})
-
-const brandOptions = computed(() => {
-	const names = new Set(
-		[form.brand, ...(brands.data ?? []).map((row) => row.name)].filter(Boolean),
-	)
-	return [...names].map((name) => ({ label: name, value: name }))
-})
+const brandOptions = computed(() =>
+	withSelected(brandSearch.results.data ?? [], [form.brand]),
+)
 
 function linkTarget() {
 	if (form.link_type === "Item Group") return form.item_groups
@@ -190,8 +180,11 @@ async function save() {
 				<MultiSelect
 					v-if="form.link_type === 'Item Group'"
 					v-model="form.item_groups"
-					v-model:query="itemGroupQuery"
+					v-model:open="itemGroupSearch.open.value"
+					v-model:query="itemGroupSearch.query.value"
 					:options="itemGroupOptions"
+					:filterable="false"
+					:loading="itemGroupSearch.results.loading"
 					label="Item groups"
 					description="Products from every group listed here appear together under this entry."
 					placeholder="Search item groups"
@@ -200,8 +193,11 @@ async function save() {
 				<Combobox
 					v-else-if="form.link_type === 'Brand'"
 					v-model="form.brand"
-					v-model:query="brandQuery"
+					v-model:open="brandSearch.open.value"
+					v-model:query="brandSearch.query.value"
 					:options="brandOptions"
+					:filterable="false"
+					:loading="brandSearch.results.loading"
 					label="Brand"
 					placeholder="Search brands"
 				/>

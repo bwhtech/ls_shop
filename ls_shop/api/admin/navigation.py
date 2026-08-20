@@ -13,6 +13,7 @@ response rather than patching a local copy and hoping the two agree.
 """
 
 import frappe
+from frappe.utils import cstr
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import (
 	MAX_MENU_DEPTH,
@@ -49,3 +50,29 @@ def get_editor_data():
 		**navbar_manager.get_menu_editor_data(),
 		"max_depth": MAX_MENU_DEPTH,
 	}
+
+
+# What a menu entry is allowed to point at. `settings.get_link_options` is deliberately bounded
+# to doctypes linked from Lifestyle Settings, and neither of these is - so the menu carries its
+# own bound rather than widening that one.
+LINK_TARGET_DOCTYPES = ("Item Group", "Brand")
+
+
+@frappe.whitelist()
+def get_link_options(doctype: str, search_text: str | None = None):
+	"""Options for the link picker on a menu entry."""
+	frappe.has_permission("Ecommerce Category", ptype="read", throw=True)
+
+	if doctype not in LINK_TARGET_DOCTYPES:
+		frappe.throw(frappe._("A menu entry cannot link to {0}.").format(doctype))
+
+	frappe.has_permission(doctype, ptype="read", throw=True)
+
+	filters = {}
+	if search_text:
+		filters["name"] = ("like", f"%{cstr(search_text)}%")
+
+	# ponytail: first 100 matches only - the picker searches server-side, so anything further
+	# down is reachable by typing; paginate if a catalog outgrows even a searched list
+	records = frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", limit=100)
+	return [{"label": name, "value": name} for name in records]
