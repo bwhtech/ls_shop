@@ -19,6 +19,10 @@ const selectedName = ref<string | null>(null)
 // asked to render again. Every mutation bumps this and the pane reloads off the new value.
 const previewToken = ref(0)
 
+// Tree-wide, not per-list: a drag starting in one list changes how every other list renders
+// (empty ones open a drop zone) and freezes them all against the incoming tree.
+const dragActive = ref(false)
+
 const method = ref("get_editor_data")
 
 const request = useCall<EditorData, Record<string, unknown>>({
@@ -116,6 +120,7 @@ export function useNavMenu() {
 	return {
 		menu,
 		maxDepth,
+		dragActive,
 		previewUrl,
 		previewToken,
 		selectedName,

@@ -2,7 +2,7 @@
 import { useNavMenu } from "@/composables/useNavMenu"
 import type { MenuNode } from "@/types"
 import { useStorage } from "@vueuse/core"
-import { Badge, Dropdown } from "frappe-ui"
+import { Badge, Button, Dropdown } from "frappe-ui"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import draggable from "vuedraggable"
 
@@ -33,10 +33,10 @@ const emit = defineEmits<{
 	toggleVisible: [node: MenuNode]
 }>()
 
-const { selectedName, canNest, maxDepth } = useNavMenu()
+const { selectedName, canNest, maxDepth, dragActive } = useNavMenu()
 
-// A node one level short of the cap can still take children, so it gets a caret even while
-// empty - opening it is how you reveal a drop target for the first child.
+// Whether a node at this level is allowed to take children at all. Gates the drop zone, so a
+// row at the depth cap never offers a target the server would refuse.
 const acceptsChildren = computed(() => props.level + 1 < maxDepth.value)
 
 const expanded = useStorage<Record<string, boolean>>("ls-shop-nav-expanded", {})
@@ -45,13 +45,12 @@ const expanded = useStorage<Record<string, boolean>>("ls-shop-nav-expanded", {})
 // the incoming prop is ignored: the server answers every move with a whole new tree, and
 // adopting it mid-gesture yanks the row out from under the pointer.
 const rows = ref<MenuNode[]>([...props.items])
-const dragging = ref(false)
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
 	() => props.items,
 	(items) => {
-		if (dragging.value) return
+		if (dragActive.value) return
 		rows.value = [...items]
 	},
 )
@@ -69,7 +68,7 @@ function select(node: MenuNode) {
 }
 
 function onStart() {
-	dragging.value = true
+	dragActive.value = true
 	if (settleTimer) clearTimeout(settleTimer)
 }
 
@@ -77,9 +76,28 @@ function onEnd() {
 	if (settleTimer) clearTimeout(settleTimer)
 	// The tree arrives from the server a moment after the drop; hold the local copy until then.
 	settleTimer = setTimeout(() => {
-		dragging.value = false
+		dragActive.value = false
 		settleTimer = null
 	}, 800)
+}
+
+// Dragging over a collapsed branch opens it, so its children become reachable without
+// dropping first. Desk's editor does the same; without it a collapsed branch is a dead end.
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+
+function onRowDragOver(node: MenuNode) {
+	if (!dragActive.value || !node.children.length || isExpanded(node.name))
+		return
+	if (hoverTimer) return
+	hoverTimer = setTimeout(() => {
+		expanded.value[node.name] = true
+		hoverTimer = null
+	}, 500)
+}
+
+function onRowDragLeave() {
+	if (hoverTimer) clearTimeout(hoverTimer)
+	hoverTimer = null
 }
 
 /**
@@ -138,6 +156,7 @@ function options(node: MenuNode) {
 
 onBeforeUnmount(() => {
 	if (settleTimer) clearTimeout(settleTimer)
+	if (hoverTimer) clearTimeout(hoverTimer)
 })
 </script>
 
@@ -152,8 +171,11 @@ onBeforeUnmount(() => {
 		ghost-class="nav-row-ghost"
 		:animation="150"
 		:move="onMove"
-		class="min-h-2"
-		:class="{ 'min-h-9': level > 0 }"
+		:class="
+			level > 0 && !rows.length
+				? 'mb-1 ml-6 rounded border border-dashed border-outline-gray-2 py-3 text-center text-sm text-ink-gray-5'
+				: 'min-h-2'
+		"
 		@start="onStart"
 		@end="onEnd"
 		@change="onChange"
@@ -165,30 +187,36 @@ onBeforeUnmount(() => {
 					:class="selectedName === element.name ? 'bg-surface-gray-3' : 'cursor-pointer'"
 					:style="{ paddingLeft: `${level * 14 + 6}px` }"
 					@click="select(element)"
+					@dragover="onRowDragOver(element)"
+					@dragleave="onRowDragLeave"
 				>
-					<button
-						type="button"
-						class="drag-handle cursor-grab rounded p-0.5 opacity-0 hover:bg-surface-gray-3 group-hover:opacity-100 active:cursor-grabbing"
+					<Button
+						variant="ghost"
+						class="drag-handle !size-5 shrink-0 cursor-grab opacity-0 group-hover:opacity-100 active:cursor-grabbing"
 						aria-label="Reorder"
 						@click.stop
 					>
-						<span class="lucide-grip-vertical size-4 text-ink-gray-4" aria-hidden="true" />
-					</button>
+						<template #icon>
+							<span class="lucide-grip-vertical size-4 text-ink-gray-4" aria-hidden="true" />
+						</template>
+					</Button>
 
-					<button
-						v-if="element.children.length || acceptsChildren"
-						type="button"
-						class="rounded p-0.5 hover:bg-surface-gray-3"
+					<Button
+						v-if="element.children.length"
+						variant="ghost"
+						class="!size-5 shrink-0"
 						:aria-label="isExpanded(element.name) ? 'Collapse' : 'Expand'"
 						@click.stop="toggle(element.name)"
 					>
-						<span
-							class="lucide-chevron-right size-4 text-ink-gray-5 transition-transform"
-							:class="{ 'rotate-90': isExpanded(element.name) }"
-							aria-hidden="true"
-						/>
-					</button>
-					<span v-else class="w-5 shrink-0" />
+						<template #icon>
+							<span
+								class="lucide-chevron-right size-4 text-ink-gray-5 transition-transform duration-200"
+								:class="{ 'rotate-90': isExpanded(element.name) }"
+								aria-hidden="true"
+							/>
+						</template>
+					</Button>
+					<span v-else class="size-5 shrink-0" />
 
 					<span
 						class="truncate text-base"
@@ -207,18 +235,26 @@ onBeforeUnmount(() => {
 
 					<span @click.stop>
 						<Dropdown :options="options(element)">
-							<button
-								type="button"
-								class="rounded p-0.5 opacity-0 hover:bg-surface-gray-3 group-hover:opacity-100"
+							<Button
+								variant="ghost"
+								class="!size-5 shrink-0 opacity-0 group-hover:opacity-100"
 								aria-label="Entry actions"
 							>
-								<span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
-							</button>
+								<template #icon>
+									<span class="lucide-ellipsis size-4 text-ink-gray-5" aria-hidden="true" />
+								</template>
+							</Button>
 						</Dropdown>
 					</span>
 				</div>
 
-				<div v-show="isExpanded(element.name)">
+				<div
+					v-show="
+						element.children.length
+							? isExpanded(element.name)
+							: dragActive && acceptsChildren
+					"
+				>
 					<NavTree
 						:items="element.children"
 						:level="level + 1"
