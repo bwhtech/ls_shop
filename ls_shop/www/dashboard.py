@@ -21,4 +21,12 @@ def get_context(context):
 	if not frappe.has_permission("Item", ptype="write"):
 		frappe.throw(_("You do not have access to the store dashboard."), frappe.PermissionError)
 
+	# The page template writes every key of `boot` onto `window`, which is where frappe-ui's
+	# fetch layer reads the CSRF token from. Without it the app still renders and every read
+	# still works - only writes fail, because GET is not CSRF-checked and POST is.
+	# `get_csrf_token` issues the token into the session, so it has to be committed to outlive
+	# this request.
+	context.boot = frappe._dict({"csrf_token": frappe.sessions.get_csrf_token()})
+	frappe.db.commit()  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+
 	context.no_cache = 1
