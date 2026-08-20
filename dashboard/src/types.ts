@@ -40,12 +40,21 @@ export type ProductRow = {
 	stock: number
 }
 
+/** The Badge themes frappe-ui actually ships; anything else silently degrades to gray. */
+export type BadgeTheme = "gray" | "blue" | "green" | "amber" | "red" | "violet"
+
+/** A stable key for the icon and colour, plus the label the store owner reads. */
+export type OrderState = {
+	key: string
+	label: string
+}
+
 export type OrderRow = {
 	name: string
 	customer: string
 	placed_on: string
 	status: string
-	state: string
+	state: OrderState
 	total: number
 	currency: string
 	item_count: number
@@ -70,7 +79,7 @@ export type OrderDetail = {
 	phone: string | null
 	placed_on: string
 	status: string
-	state: string
+	state: OrderState
 	currency: string
 	total: number
 	grand_total: number

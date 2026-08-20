@@ -11,9 +11,41 @@ from ls_shop.api.admin.inventory import get_inventory
 
 PAGE_LENGTH = 20
 
+# A page of orders drives four batched lifecycle reads, each with an IN list built from the page.
+# Capped so a caller asking for "everything" cannot turn those into IN lists the database chokes on.
+MAX_PAGE_LENGTH = 100
+
 # A store owner thinks in "what do I have to do with this order", not in docstatus and
 # per_delivered. One map turns ERPNext's state into that question.
 OPEN_STATUSES = ("To Deliver and Bill", "To Deliver", "To Bill")
+
+# The fulfilment ladder, read from the top down: an order is described by the furthest rung it has
+# reached, so a delivered order never reads back as merely "Packed". Keys are the contract the
+# dashboard maps to an icon and a colour; the labels are only ever shown to a person.
+STAGE_LABELS = {
+	"cancelled": "Cancelled",
+	"returned": "Returned",
+	"delivered": "Delivered",
+	"shipped": "Shipped",
+	"fulfilled": "Fulfilled",
+	"partly_fulfilled": "Partly fulfilled",
+	"packed": "Packed",
+	"delivery_note_drafted": "Delivery note drafted",
+	"to_fulfil": "To fulfil",
+}
+
+# bwh_shipping tracks a parcel in the carrier's vocabulary; the dashboard only cares which rung of
+# the ladder that vocabulary lands on. Anything unlisted (Draft, Ready To Ship, Cancelled) is a
+# shipment that has not physically moved, so it leaves the stage to the documents underneath it.
+SHIPMENT_STAGES = {
+	"Delivered": "delivered",
+	"RTO": "returned",
+	"Pickup Scheduled": "shipped",
+	"In Transit": "shipped",
+	"Out For Delivery": "shipped",
+	"Undelivered": "shipped",
+	"Lost": "shipped",
+}
 
 # How many rows each Home panel shows before it sends the owner to the full screen.
 OVERVIEW_PANEL_LENGTH = 5
@@ -26,8 +58,8 @@ def get_orders(
 ):
 	"""The whole Orders screen in one call.
 
-	Item counts, payment mode and fulfilment progress are all batched across the page, so the
-	list costs the same three queries whether it shows one order or a hundred.
+	Item counts, payment mode and fulfilment stage are all batched across the page, so the list
+	costs the same handful of queries whether it shows one order or a hundred.
 	"""
 	frappe.has_permission("Sales Order", ptype="read", throw=True)
 
@@ -58,7 +90,7 @@ def get_orders(
 		],
 		order_by="creation desc",
 		start=cint(start),
-		page_length=cint(page_length) or PAGE_LENGTH,
+		page_length=min(cint(page_length) or PAGE_LENGTH, MAX_PAGE_LENGTH),
 	)
 	if not orders:
 		return {"orders": [], "total": total}
@@ -72,6 +104,8 @@ def get_orders(
 	):
 		item_counts[row.parent] = item_counts.get(row.parent, 0) + flt(row.qty)
 
+	lifecycles = read_order_lifecycles(order_names)
+
 	return {
 		"orders": [
 			{
@@ -79,7 +113,7 @@ def get_orders(
 				"customer": row.customer,
 				"placed_on": row.transaction_date,
 				"status": row.status,
-				"state": describe_state(row),
+				"state": describe_state(row, lifecycles.get(cstr(row.name))),
 				"total": flt(row.grand_total),
 				"currency": row.currency,
 				"item_count": item_counts.get(row.name, 0),
@@ -91,17 +125,119 @@ def get_orders(
 	}
 
 
-def describe_state(order):
-	"""What the owner has to do next, in their words."""
+def describe_state(order, lifecycle=None):
+	"""Where this order sits on the fulfilment ladder: a stable key plus the owner-facing label.
+
+	The single source of truth behind every order badge in the dashboard. `lifecycle` carries the
+	paperwork found for this order by `read_order_lifecycles`; without it the stage is derived from
+	the Sales Order alone, which is all the coarse pre-fulfilment rungs need.
+	"""
+	lifecycle = lifecycle or frappe._dict()
+	key = pick_stage(order, lifecycle)
+	label = STAGE_LABELS.get(key)
+	return {"key": key, "label": _(label) if label else cstr(order.status)}
+
+
+def pick_stage(order, lifecycle) -> str:
+	"""The furthest rung this order has reached, tried from the top of the ladder down."""
 	if cint(order.docstatus) == 2:
-		return "Cancelled"
-	if order.status == "Completed":
-		return "Fulfilled"
+		return "cancelled"
+	if lifecycle.get("stage_from_shipment"):
+		return lifecycle.stage_from_shipment
+	if lifecycle.get("has_return"):
+		return "returned"
+	if order.status == "Completed" or flt(order.per_delivered) >= 100:
+		return "fulfilled"
 	if flt(order.per_delivered) > 0:
-		return "Partly fulfilled"
+		return "partly_fulfilled"
+	# Below fulfilment, not above it: ERPNext refuses a Packing Slip against anything but a draft
+	# Delivery Note, so packing is what happens on the way to shipping, never after it.
+	if lifecycle.get("has_packing_slip"):
+		return "packed"
+	if lifecycle.get("has_draft_delivery_note"):
+		return "delivery_note_drafted"
 	if order.status in OPEN_STATUSES:
-		return "To fulfil"
-	return order.status
+		return "to_fulfil"
+	# An order in a status the ladder has no rung for (On Hold, Closed) keeps ERPNext's own word
+	# for it rather than being flattened into a rung it never reached.
+	return cstr(order.status)
+
+
+def read_order_lifecycles(order_names: list) -> dict:
+	"""The fulfilment paperwork behind a page of orders, in a fixed number of queries.
+
+	Four reads for the whole page - delivery notes, their headers, packing slips, shipments - rather
+	than four per order. Keyed by `cstr(name)` throughout, because an autoincrement-named Sales
+	Order comes back as an int here and as a string from the request.
+	"""
+	if not order_names:
+		return {}
+
+	lifecycles = {cstr(name): frappe._dict(delivery_notes=[]) for name in order_names}
+
+	delivery_note_links = frappe.get_all(
+		"Delivery Note Item",
+		filters={"against_sales_order": ["in", order_names], "docstatus": ["<", 2]},
+		fields=["parent", "against_sales_order"],
+	)
+	orders_by_delivery_note = {}
+	for row in delivery_note_links:
+		orders_by_delivery_note.setdefault(cstr(row.parent), set()).add(cstr(row.against_sales_order))
+
+	delivery_note_names = list(orders_by_delivery_note)
+	if delivery_note_names:
+		for note in frappe.get_all(
+			"Delivery Note",
+			filters={"name": ["in", delivery_note_names]},
+			fields=["name", "docstatus", "is_return"],
+		):
+			for order_name in orders_by_delivery_note.get(cstr(note.name), ()):
+				lifecycle = lifecycles.setdefault(order_name, frappe._dict(delivery_notes=[]))
+				if cint(note.docstatus) == 1:
+					lifecycle.delivery_notes.append(cstr(note.name))
+					if cint(note.is_return):
+						lifecycle.has_return = True
+				else:
+					lifecycle.has_draft_delivery_note = True
+
+		for slip in frappe.get_all(
+			"Packing Slip",
+			filters={"delivery_note": ["in", delivery_note_names], "docstatus": ["<", 2]},
+			fields=["delivery_note"],
+		):
+			for order_name in orders_by_delivery_note.get(cstr(slip.delivery_note), ()):
+				lifecycles[order_name].has_packing_slip = True
+
+	read_shipment_stages(order_names, lifecycles)
+
+	for lifecycle in lifecycles.values():
+		lifecycle.delivery_notes = sorted(set(lifecycle.delivery_notes))
+	return lifecycles
+
+
+def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
+	"""Fold each order's latest carrier status into its lifecycle, in one read.
+
+	Same query shape as `ls_shop.api.shipping.get_order_tracking`, which is what the customer's own
+	tracking page reads, so the two screens can never disagree about where a parcel is.
+	"""
+	from ls_shop.api.shipping import is_connector_installed
+
+	if not is_connector_installed():
+		return
+
+	# Newest first, and only the first shipment seen per order counts: an order rebooked after a
+	# failed pickup carries a stale older request that would otherwise outrank the live one.
+	for request in frappe.get_all(
+		"Shipping Request",
+		filters={"ref_doctype": "Sales Order", "ref_docname": ["in", order_names], "docstatus": ["<", 2]},
+		fields=["ref_docname", "status", "awb"],
+		order_by="creation desc",
+	):
+		lifecycle = lifecycles.get(cstr(request.ref_docname))
+		if lifecycle is None or "stage_from_shipment" in lifecycle:
+			continue
+		lifecycle.stage_from_shipment = SHIPMENT_STAGES.get(cstr(request.status))
 
 
 @frappe.whitelist()
@@ -152,11 +288,7 @@ def get_order(sales_order: str):
 		):
 			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
 
-	deliveries = frappe.get_all(
-		"Delivery Note Item",
-		filters={"against_sales_order": sales_order, "docstatus": 1},
-		fields=["parent", "item_code", "qty"],
-	)
+	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
 
 	return {
 		"name": order.name,
@@ -165,7 +297,7 @@ def get_order(sales_order: str):
 		"phone": order.contact_phone,
 		"placed_on": order.transaction_date,
 		"status": order.status,
-		"state": describe_state(order),
+		"state": describe_state(order, lifecycle),
 		"currency": order.currency,
 		"total": flt(order.total),
 		"grand_total": flt(order.grand_total),
@@ -185,7 +317,7 @@ def get_order(sales_order: str):
 			}
 			for row in items
 		],
-		"deliveries": sorted({row.parent for row in deliveries}),
+		"deliveries": lifecycle.get("delivery_notes") or [],
 	}
 
 

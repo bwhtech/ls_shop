@@ -1,4 +1,4 @@
-import type { ProductRow, ProductSize } from "@/types"
+import type { BadgeTheme, OrderState, ProductRow, ProductSize } from "@/types"
 
 /** One place that decides how a price range reads, so the list and the detail agree. */
 export function formatPriceRange(rates: (number | null)[]) {
@@ -25,16 +25,33 @@ export function publishTheme(publishedCount: number) {
 	return publishedCount ? "green" : "gray"
 }
 
-/** Order state themes live beside the publish map, so every badge in the app agrees. */
-export function orderStateTheme(state: string) {
-	return (
-		{
-			"To fulfil": "orange",
-			"Partly fulfilled": "blue",
-			Fulfilled: "green",
-			Cancelled: "red",
-		}[state] ?? "gray"
-	)
+/**
+ * One badge per rung of the fulfilment ladder, keyed by the stage key the API returns rather than
+ * by its English label, so every order badge in the app agrees and translation cannot break it.
+ */
+const orderStateBadges: Record<string, { theme: BadgeTheme; icon: string }> = {
+	to_fulfil: { theme: "amber", icon: "lucide-inbox" },
+	delivery_note_drafted: { theme: "gray", icon: "lucide-file-text" },
+	partly_fulfilled: { theme: "blue", icon: "lucide-package-open" },
+	fulfilled: { theme: "blue", icon: "lucide-package-check" },
+	packed: { theme: "violet", icon: "lucide-package" },
+	shipped: { theme: "blue", icon: "lucide-truck" },
+	delivered: { theme: "green", icon: "lucide-circle-check" },
+	returned: { theme: "amber", icon: "lucide-undo-2" },
+	cancelled: { theme: "red", icon: "lucide-circle-x" },
+}
+
+const unknownOrderStateBadge = {
+	theme: "gray" as BadgeTheme,
+	icon: "lucide-circle-dashed",
+}
+
+export function orderStateTheme(state: OrderState) {
+	return (orderStateBadges[state.key] ?? unknownOrderStateBadge).theme
+}
+
+export function orderStateIcon(state: OrderState) {
+	return (orderStateBadges[state.key] ?? unknownOrderStateBadge).icon
 }
 
 export function availabilityTheme(availability: string) {

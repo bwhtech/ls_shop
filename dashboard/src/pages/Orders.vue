@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ListSkeleton from "@/components/ListSkeleton.vue"
+import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import type { OrderRow } from "@/types"
-import { orderStateTheme } from "@/utils/format"
-import { Badge, Breadcrumbs, FormControl, TabButtons, useCall } from "frappe-ui"
+import { Breadcrumbs, FormControl, TabButtons, useCall } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
 
@@ -42,7 +42,7 @@ const columns = [
 	{ label: "Placed", key: "placed_on", width: 1.2 },
 	{ label: "Items", key: "items", width: 0.7, align: "right" },
 	{ label: "Total", key: "amount", width: 1.3, align: "right" },
-	{ label: "Status", key: "state", width: 1.2 },
+	{ label: "Status", key: "state", width: 1.8 },
 ]
 
 const listOptions = {
@@ -70,7 +70,7 @@ const listOptions = {
 		</header>
 
 		<div class="flex items-center gap-3 px-3 py-3 sm:px-5">
-			<TabButtons v-model="status" :buttons="statusTabs" />
+			<TabButtons v-model="status" :options="statusTabs" />
 			<FormControl
 				v-model="search"
 				type="text"
@@ -90,11 +90,9 @@ const listOptions = {
 			:options="listOptions"
 		>
 			<template #cell="{ item, row, column }">
-				<Badge
+				<OrderStateBadge
 					v-if="column.key === 'state'"
-					variant="subtle"
-					:theme="orderStateTheme(row.state)"
-					:label="row.state"
+					:state="row.state"
 				/>
 				<span
 					v-else-if="column.key === 'name'"

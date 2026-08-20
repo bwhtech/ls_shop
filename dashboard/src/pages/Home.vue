@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import type { Overview } from "@/types"
 import { formatMoney, formatShortDate } from "@/utils/format"
 import {
@@ -106,7 +107,7 @@ function formatStat(stat: Overview["stats"][number]) {
 					<List
 						v-if="recentOrders.length"
 						class="list-row-px-0"
-						:columns="['8rem', 'minmax(0,1fr)', '8rem']"
+						:columns="['6.5rem', 'minmax(0,1fr)', '9rem', '7rem']"
 						:row-height="44"
 					>
 						<ListRows :items="recentOrders" v-slot="{ item }">
@@ -120,6 +121,9 @@ function formatStat(stat: Overview["stats"][number]) {
 									<span class="truncate text-sm text-ink-gray-8">
 										{{ item.customer }}
 									</span>
+								</ListCell>
+								<ListCell>
+									<OrderStateBadge :state="item.state" />
 								</ListCell>
 								<ListCell class="justify-end">
 									<span class="text-sm text-ink-gray-8">

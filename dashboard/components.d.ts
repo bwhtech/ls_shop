@@ -9,33 +9,78 @@
 export {}
 
 /* prettier-ignore */
-declare module 'vue' {
-  export interface GlobalComponents {
-    AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
-    AdvancedSettings: typeof import('./src/components/settings/AdvancedSettings.vue')['default']
-    AppCommandPalette: typeof import('./src/components/AppCommandPalette.vue')['default']
-    AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
-    AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
-    CollectionCombobox: typeof import('./src/components/CollectionCombobox.vue')['default']
-    DocLink: typeof import('./src/components/DocLink.vue')['default']
-    FooterLinkDialog: typeof import('./src/components/footer/FooterLinkDialog.vue')['default']
-    FooterPreview: typeof import('./src/components/footer/FooterPreview.vue')['default']
-    FooterSettings: typeof import('./src/components/settings/FooterSettings.vue')['default']
-    IntegrationCard: typeof import('./src/components/integrations/IntegrationCard.vue')['default']
-    IntegrationDialog: typeof import('./src/components/integrations/IntegrationDialog.vue')['default']
-    IntegrationList: typeof import('./src/components/integrations/IntegrationList.vue')['default']
-    IntegrationLogo: typeof import('./src/components/integrations/IntegrationLogo.vue')['default']
-    ListSkeleton: typeof import('./src/components/ListSkeleton.vue')['default']
-    NavInspector: typeof import('./src/components/navigation/NavInspector.vue')['default']
-    OptionRow: typeof import('./src/components/OptionRow.vue')['default']
-    PaymentSettings: typeof import('./src/components/settings/PaymentSettings.vue')['default']
-    ProfileSettings: typeof import('./src/components/settings/ProfileSettings.vue')['default']
-    RouterLink: typeof import('vue-router')['RouterLink']
-    RouterView: typeof import('vue-router')['RouterView']
-    SettingsAttach: typeof import('./src/components/settings/SettingsAttach.vue')['default']
-    SettingsField: typeof import('./src/components/settings/SettingsField.vue')['default']
-    SettingsLinkField: typeof import('./src/components/settings/SettingsLinkField.vue')['default']
-    ShippingSettings: typeof import('./src/components/settings/ShippingSettings.vue')['default']
-    StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
-  }
+declare module "vue" {
+	export interface GlobalComponents {
+		AddProductDialog: typeof import(
+			"./src/components/AddProductDialog.vue",
+		)["default"]
+		AdvancedSettings: typeof import(
+			"./src/components/settings/AdvancedSettings.vue",
+		)["default"]
+		AppCommandPalette: typeof import(
+			"./src/components/AppCommandPalette.vue",
+		)["default"]
+		AppearanceSettings: typeof import(
+			"./src/components/settings/AppearanceSettings.vue",
+		)["default"]
+		AppSettingsDialog: typeof import(
+			"./src/components/settings/AppSettingsDialog.vue",
+		)["default"]
+		CollectionCombobox: typeof import(
+			"./src/components/CollectionCombobox.vue",
+		)["default"]
+		DocLink: typeof import("./src/components/DocLink.vue")["default"]
+		FooterLinkDialog: typeof import(
+			"./src/components/footer/FooterLinkDialog.vue",
+		)["default"]
+		FooterPreview: typeof import(
+			"./src/components/footer/FooterPreview.vue",
+		)["default"]
+		FooterSettings: typeof import(
+			"./src/components/settings/FooterSettings.vue",
+		)["default"]
+		IntegrationCard: typeof import(
+			"./src/components/integrations/IntegrationCard.vue",
+		)["default"]
+		IntegrationDialog: typeof import(
+			"./src/components/integrations/IntegrationDialog.vue",
+		)["default"]
+		IntegrationList: typeof import(
+			"./src/components/integrations/IntegrationList.vue",
+		)["default"]
+		IntegrationLogo: typeof import(
+			"./src/components/integrations/IntegrationLogo.vue",
+		)["default"]
+		ListSkeleton: typeof import("./src/components/ListSkeleton.vue")["default"]
+		NavInspector: typeof import(
+			"./src/components/navigation/NavInspector.vue",
+		)["default"]
+		OptionRow: typeof import("./src/components/OptionRow.vue")["default"]
+		OrderStateBadge: typeof import(
+			"./src/components/OrderStateBadge.vue",
+		)["default"]
+		PaymentSettings: typeof import(
+			"./src/components/settings/PaymentSettings.vue",
+		)["default"]
+		ProfileSettings: typeof import(
+			"./src/components/settings/ProfileSettings.vue",
+		)["default"]
+		RouterLink: typeof import("vue-router")["RouterLink"]
+		RouterView: typeof import("vue-router")["RouterView"]
+		SettingsAttach: typeof import(
+			"./src/components/settings/SettingsAttach.vue",
+		)["default"]
+		SettingsField: typeof import(
+			"./src/components/settings/SettingsField.vue",
+		)["default"]
+		SettingsLinkField: typeof import(
+			"./src/components/settings/SettingsLinkField.vue",
+		)["default"]
+		ShippingSettings: typeof import(
+			"./src/components/settings/ShippingSettings.vue",
+		)["default"]
+		StoreSettings: typeof import(
+			"./src/components/settings/StoreSettings.vue",
+		)["default"]
+	}
 }

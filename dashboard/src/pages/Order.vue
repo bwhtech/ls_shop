@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import type { OrderDetail } from "@/types"
-import { orderStateTheme } from "@/utils/format"
 import {
-	Badge,
 	Breadcrumbs,
 	Button,
 	LoadingText,
@@ -81,11 +80,7 @@ function confirmFulfil() {
 			<div class="body-container pb-40 pt-5">
 				<div class="flex items-center gap-3">
 					<h1 class="text-md text-ink-gray-9">{{ order.data.name }}</h1>
-					<Badge
-						variant="subtle"
-						:theme="orderStateTheme(order.data.state)"
-						:label="order.data.state"
-					/>
+					<OrderStateBadge :state="order.data.state" />
 				</div>
 				<p class="mt-1 text-p-sm text-ink-gray-5">
 					Placed {{ order.data.placed_on }} · {{ order.data.payment_mode ?? "No payment mode" }}
