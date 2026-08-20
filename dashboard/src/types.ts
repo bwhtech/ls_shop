@@ -151,3 +151,51 @@ export type Overview = {
 	running_low: InventoryRow[]
 	needs_attention: BlockedOption[]
 }
+
+export type FooterLink = {
+	name: string
+	parent: string
+	link_label: string
+	link_url: string
+	link_order: number
+	enabled: number
+}
+
+export type FooterSection = {
+	name: string
+	title: string
+	section_order: number
+	enabled: number
+	links: FooterLink[]
+}
+
+export type FooterPage = {
+	name: string
+	route: string
+}
+
+export type FooterEditorData = {
+	columns: FooterSection[]
+	pages: FooterPage[]
+	modified: string
+}
+
+/**
+ * A row in the footer tree. Sections and links share one node type because frappe-ui's `Tree`
+ * renders one forest - `kind` is what the slots and the drop gate branch on.
+ */
+export type FooterNode = {
+	/** Prefixed so a section and a link can never collide on `nodeKey`. */
+	key: string
+	kind: "section" | "link"
+	/** Section name, or the child row name for a link. */
+	name: string
+	label: string
+	/** Owning section, empty for a section itself. */
+	section: string
+	url: string
+	enabled: number
+	children: FooterNode[]
+	/** Owned by frappe-ui's Tree, which reads and writes open state on the node itself. */
+	expanded?: boolean
+}

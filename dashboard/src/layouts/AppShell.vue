@@ -93,7 +93,10 @@ const sections = [
 	},
 	{
 		label: "Storefront",
-		items: [{ label: "Navigation", route: "Navigation", icon: "lucide-menu" }],
+		items: [
+			{ label: "Navigation", route: "Navigation", icon: "lucide-menu" },
+			{ label: "Footer", route: "Footer", icon: "lucide-panel-bottom" },
+		],
 	},
 ]
 </script>

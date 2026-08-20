@@ -39,6 +39,11 @@ const routes = [
 		name: "Navigation",
 		component: () => import("@/pages/Navigation.vue"),
 	},
+	{
+		path: "/storefront/footer",
+		name: "Footer",
+		component: () => import("@/pages/Footer.vue"),
+	},
 ]
 
 export default createRouter({
