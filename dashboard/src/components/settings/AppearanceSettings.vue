@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import {
+	type ColorScheme,
 	Select,
 	SettingsBody,
 	SettingsHeader,
 	SettingsRow,
-	useTheme,
+	useColorScheme,
 } from "frappe-ui"
 import { computed } from "vue"
 
-const { currentTheme, setTheme } = useTheme()
+const { colorScheme, setColorScheme } = useColorScheme()
 
 const themeOptions = [
 	{ label: "Light", value: "light" },
@@ -17,14 +18,14 @@ const themeOptions = [
 ]
 
 const selectedTheme = computed({
-	get: () => currentTheme.value,
-	set: (theme) => setTheme(theme),
+	get: () => colorScheme.value,
+	set: (theme: ColorScheme) => setColorScheme(theme),
 })
 </script>
 
 <template>
 	<SettingsHeader>
-		<h2 class="text-lg font-semibold text-ink-gray-8">Appearance</h2>
+		<h2 class="text-md font-semibold text-ink-gray-8">Appearance</h2>
 	</SettingsHeader>
 
 	<SettingsBody>

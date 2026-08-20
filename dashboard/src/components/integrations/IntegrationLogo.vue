@@ -12,5 +12,5 @@ const markup = computed(() => {
 </script>
 
 <template>
-	<div class="h-9 w-24 shrink-0 overflow-hidden rounded-md border border-outline-gray-2" v-html="markup" />
+	<div class="h-9 w-24 shrink-0 overflow-hidden rounded-5 border border-outline-gray-2" v-html="markup" />
 </template>

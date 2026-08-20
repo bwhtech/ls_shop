@@ -374,7 +374,7 @@ function linkActions(
 			>
 				<template #item="{ element: section, index: columnIndex }">
 					<div
-						class="flex w-72 shrink-0 flex-col rounded-lg border border-outline-gray-1 bg-surface-gray-1"
+						class="flex w-72 shrink-0 flex-col rounded-6 border border-outline-gray-1 bg-surface-gray-1"
 					>
 						<div class="flex items-center gap-2 px-2 py-2">
 							<Tooltip text="Drag to reorder columns">
@@ -437,7 +437,7 @@ function linkActions(
 							<template #item="{ element: link, index: linkIndex }">
 								<div
 									:data-name="link.name"
-									class="group flex cursor-grab items-start gap-2 rounded-md border border-outline-gray-1 bg-surface-base px-2 py-2 shadow-sm active:cursor-grabbing"
+									class="group flex cursor-grab items-start gap-2 rounded-5 border border-outline-gray-1 bg-surface-base px-2 py-2 shadow-sm active:cursor-grabbing"
 								>
 									<button
 										type="button"

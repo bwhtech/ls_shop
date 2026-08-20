@@ -3,106 +3,87 @@ import { openAddProduct } from "@/components/addProduct"
 import { showPalette, showShortcuts } from "@/components/commandPalette"
 import { openSettings } from "@/components/settings"
 import type { OrderRow, ProductRow } from "@/types"
-import { useEventListener } from "@vueuse/core"
+import {
+	KeyboardShortcut,
+	type KeyboardShortcutCombo,
+	KeyboardShortcutsDialog,
+	useCall,
+	useColorScheme,
+	useKeyboardShortcut,
+} from "frappe-ui"
 import {
 	CommandPalette,
+	CommandPaletteEmpty,
+	CommandPaletteGroup,
+	CommandPaletteInput,
 	CommandPaletteItem,
-	KeyboardShortcutsModal,
-	formatShortcutLabel,
-	useCall,
-	useShortcut,
-	useTheme,
-} from "frappe-ui"
-import { type Component, computed, h, markRaw, ref, watch } from "vue"
+	CommandPaletteList,
+	type CommandPaletteValue,
+} from "frappe-ui/experimental"
+import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 
 type PaletteItem = {
 	name: string
 	title: string
 	description?: string
-	icon: Component
+	shortcut?: KeyboardShortcutCombo
+	icon: string
 	action: () => void
 }
 
 const router = useRouter()
-const { setTheme, currentTheme } = useTheme()
+const { setColorScheme, toggleColorScheme } = useColorScheme()
 
 const searchQuery = ref("")
-
-// CommandPaletteItem renders `item.icon` through `<component :is>`, so a lucide class name has
-// to arrive wrapped in a component rather than as the bare string the rest of the app passes.
-function lucide(name: string): Component {
-	return () => h("span", { class: name, "aria-hidden": "true" })
-}
-
-const icons = {
-	home: lucide("lucide-house"),
-	orders: lucide("lucide-receipt"),
-	products: lucide("lucide-package"),
-	inventory: lucide("lucide-boxes"),
-	navigation: lucide("lucide-menu"),
-	footer: lucide("lucide-panel-bottom"),
-	profile: lucide("lucide-circle-user"),
-	appearance: lucide("lucide-palette"),
-	store: lucide("lucide-store"),
-	shipping: lucide("lucide-truck"),
-	payments: lucide("lucide-credit-card"),
-	advanced: lucide("lucide-settings-2"),
-	add: lucide("lucide-plus"),
-	storefront: lucide("lucide-external-link"),
-	light: lucide("lucide-sun"),
-	dark: lucide("lucide-moon"),
-	system: lucide("lucide-monitor"),
-	keyboard: lucide("lucide-keyboard"),
-}
 
 function go(route: string) {
 	router.push({ name: route })
 }
 
-// `description` renders on the right of a palette row, so the keyboard route to a destination is
-// learnt from the mouse route to it.
+// The shortcut chip rides on the row, so the keyboard route to a destination is learnt from
+// the mouse route to it.
 const destinations: PaletteItem[] = [
 	{
 		name: "home",
 		title: "Home",
-		description: formatShortcutLabel({ key: "h", ctrl: true, shift: true }),
-		icon: icons.home,
+		shortcut: "Mod+Shift+H",
+		icon: "lucide-house",
 		action: () => go("Home"),
 	},
 	{
 		name: "orders",
 		title: "Orders",
-		description: formatShortcutLabel({ key: "o", ctrl: true, shift: true }),
-		icon: icons.orders,
+		shortcut: "Mod+Shift+O",
+		icon: "lucide-receipt",
 		action: () => go("Orders"),
 	},
 	{
 		name: "products",
 		title: "Products",
-		description: formatShortcutLabel({ key: "p", ctrl: true, shift: true }),
-		icon: icons.products,
+		shortcut: "Mod+Shift+P",
+		icon: "lucide-package",
 		action: () => go("Products"),
 	},
 	{
 		name: "inventory",
 		title: "Inventory",
-		description: formatShortcutLabel({ key: "i", ctrl: true, shift: true }),
-		icon: icons.inventory,
+		shortcut: "Mod+Shift+I",
+		icon: "lucide-boxes",
 		action: () => go("Inventory"),
 	},
 	{
 		name: "navigation",
 		title: "Navigation",
-		description: formatShortcutLabel({ key: "m", ctrl: true, shift: true }),
-		icon: icons.navigation,
+		shortcut: "Mod+Shift+M",
+		icon: "lucide-menu",
 		action: () => go("Navigation"),
 	},
 	{
 		name: "footer",
 		title: "Footer",
-		description: formatShortcutLabel({ key: "f", ctrl: true, shift: true }),
-		icon: icons.footer,
+		shortcut: "Mod+Shift+F",
+		icon: "lucide-panel-bottom",
 		action: () => go("Footer"),
 	},
 ]
@@ -111,21 +92,21 @@ const actions: PaletteItem[] = [
 	{
 		name: "add-product",
 		title: "Add product",
-		description: formatShortcutLabel({ key: "a", ctrl: true, shift: true }),
-		icon: icons.add,
+		shortcut: "Mod+Shift+A",
+		icon: "lucide-plus",
 		action: openAddProduct,
 	},
 	{
 		name: "view-storefront",
 		title: "View storefront",
-		icon: icons.storefront,
+		icon: "lucide-external-link",
 		action: () => window.open("/", "_blank"),
 	},
 	{
 		name: "shortcuts",
 		title: "Keyboard shortcuts",
-		description: formatShortcutLabel({ key: "/", ctrl: true }),
-		icon: icons.keyboard,
+		shortcut: "Mod+Slash",
+		icon: "lucide-keyboard",
 		action: () => {
 			showShortcuts.value = true
 		},
@@ -138,65 +119,65 @@ const settingsTabs: PaletteItem[] = [
 	{
 		name: "settings-profile",
 		title: "Profile",
-		icon: icons.profile,
+		icon: "lucide-circle-user",
 		action: () => openSettings("profile"),
 	},
 	{
 		name: "settings-appearance",
 		title: "Appearance",
-		icon: icons.appearance,
+		icon: "lucide-palette",
 		action: () => openSettings("appearance"),
 	},
 	{
 		name: "settings-store",
 		title: "Store details",
-		icon: icons.store,
+		icon: "lucide-store",
 		action: () => openSettings("store"),
 	},
 	{
 		name: "settings-shipping",
 		title: "Shipping & returns",
-		icon: icons.shipping,
+		icon: "lucide-truck",
 		action: () => openSettings("shipping"),
 	},
 	{
 		name: "settings-payments",
 		title: "Payments",
-		icon: icons.payments,
+		icon: "lucide-credit-card",
 		action: () => openSettings("payments"),
 	},
 	{
 		name: "settings-footer",
 		title: "Footer & social",
-		icon: icons.footer,
+		icon: "lucide-panel-bottom",
 		action: () => openSettings("footer"),
 	},
 	{
 		name: "settings-advanced",
 		title: "Advanced",
-		icon: icons.advanced,
+		icon: "lucide-settings-2",
 		action: () => openSettings("advanced"),
 	},
 ]
 
-const themes: PaletteItem[] = [
+const colorSchemes: PaletteItem[] = [
 	{
 		name: "theme-light",
 		title: "Light mode",
-		icon: icons.light,
-		action: () => setTheme("light"),
+		icon: "lucide-sun",
+		action: () => setColorScheme("light"),
 	},
 	{
 		name: "theme-dark",
 		title: "Dark mode",
-		icon: icons.dark,
-		action: () => setTheme("dark"),
+		icon: "lucide-moon",
+		action: () => setColorScheme("dark"),
 	},
 	{
 		name: "theme-system",
 		title: "System theme",
-		icon: icons.system,
-		action: () => setTheme("system"),
+		icon: "lucide-monitor",
+		action: () => setColorScheme("system"),
 	},
 ]
 
@@ -212,8 +193,8 @@ const orderSearch = useCall<{ orders: OrderRow[] }>({
 	immediate: false,
 })
 
-// CommandPalette never filters - that is the caller's job - so the static entries are matched
-// here and the record lookups are debounced into the same list.
+// `filterable="false"`: the record rows are already what the server decided matches, so a
+// second client pass would drop them. The static entries are matched here instead.
 let searchTimer: ReturnType<typeof setTimeout>
 watch(searchQuery, (query) => {
 	clearTimeout(searchTimer)
@@ -221,15 +202,6 @@ watch(searchQuery, (query) => {
 	searchTimer = setTimeout(async () => {
 		await Promise.all([productSearch.submit(), orderSearch.submit()])
 	}, 250)
-})
-
-// ponytail: beta-37's CommandPalette puts `v-model` on headlessui's ComboboxInput, which only
-// emits `change` - so `update:searchQuery` never fires and the palette cannot report what was
-// typed. Reading the native input event is the bridge; delete it once the upstream emit lands.
-useEventListener(document, "input", (event: Event) => {
-	const target = event.target as HTMLElement | null
-	if (!showPalette.value || target?.getAttribute("role") !== "combobox") return
-	searchQuery.value = (target as HTMLInputElement).value
 })
 
 function matches(items: PaletteItem[]) {
@@ -244,7 +216,7 @@ const productMatches = computed<PaletteItem[]>(() =>
 				name: `product-${product.name}`,
 				title: product.title,
 				description: product.collection,
-				icon: icons.products,
+				icon: "lucide-package",
 				action: () =>
 					router.push({ name: "Product", params: { name: product.name } }),
 			}))
@@ -257,7 +229,7 @@ const orderMatches = computed<PaletteItem[]>(() =>
 				name: `order-${order.name}`,
 				title: order.name,
 				description: order.customer,
-				icon: icons.orders,
+				icon: "lucide-receipt",
 				action: () =>
 					router.push({ name: "Order", params: { name: order.name } }),
 			}))
@@ -269,33 +241,33 @@ const groups = computed(() =>
 		{ title: "Go to", items: matches(destinations) },
 		{ title: "Actions", items: matches(actions) },
 		{ title: "Settings", items: matches(settingsTabs) },
-		{ title: "Theme", items: matches(themes) },
+		{ title: "Theme", items: matches(colorSchemes) },
 		{ title: "Products", items: productMatches.value },
 		{ title: "Orders", items: orderMatches.value },
-	]
-		.filter((group) => group.items.length)
-		.map((group) => ({ ...group, component: markRaw(CommandPaletteItem) })),
+	].filter((group) => group.items.length),
 )
 
-function run(item: PaletteItem) {
+function runCommand(command: CommandPaletteValue) {
+	const item = command as PaletteItem
 	item.action()
 }
 
-// One registry: every shortcut declares its own description and group, which is what the
-// shortcuts modal lists - so the help stays in step with the bindings by construction.
-useShortcut([
+// One registry: every shortcut declares its own description and group, which is what
+// KeyboardShortcutsDialog lists - so the help stays in step with the bindings by construction.
+useKeyboardShortcut([
 	{
-		key: "k",
-		ctrl: true,
+		combo: "Mod+K",
 		description: "Open command palette",
 		group: "General",
+		// The palette answers from a focused field too, or it dies the moment any page's search
+		// box has focus.
+		allowInInput: true,
 		handler: () => {
 			showPalette.value = true
 		},
 	},
 	{
-		key: "/",
-		ctrl: true,
+		combo: "Mod+Slash",
 		description: "Show keyboard shortcuts",
 		group: "General",
 		// The palette and the settings dialog are both `[role=dialog]`, and help should still
@@ -306,72 +278,55 @@ useShortcut([
 		},
 	},
 	{
-		key: ",",
-		ctrl: true,
+		combo: "Mod+Comma",
 		description: "Open settings",
 		group: "General",
 		handler: () => openSettings(),
 	},
 	{
-		key: "l",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+L",
 		description: "Toggle light / dark theme",
 		group: "General",
-		handler: () => setTheme(currentTheme.value === "dark" ? "light" : "dark"),
+		handler: () => toggleColorScheme(),
 	},
 	{
-		key: "h",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+H",
 		description: "Go to Home",
 		group: "Navigation",
 		handler: () => go("Home"),
 	},
 	{
-		key: "o",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+O",
 		description: "Go to Orders",
 		group: "Navigation",
 		handler: () => go("Orders"),
 	},
 	{
-		key: "p",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+P",
 		description: "Go to Products",
 		group: "Navigation",
 		handler: () => go("Products"),
 	},
 	{
-		key: "i",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+I",
 		description: "Go to Inventory",
 		group: "Navigation",
 		handler: () => go("Inventory"),
 	},
 	{
-		key: "m",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+M",
 		description: "Go to Navigation",
 		group: "Navigation",
 		handler: () => go("Navigation"),
 	},
 	{
-		key: "f",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+F",
 		description: "Go to Footer",
 		group: "Navigation",
 		handler: () => go("Footer"),
 	},
 	{
-		key: "a",
-		ctrl: true,
-		shift: true,
+		combo: "Mod+Shift+A",
 		description: "Add product",
 		group: "Catalog",
 		handler: () => openAddProduct(),
@@ -381,10 +336,44 @@ useShortcut([
 
 <template>
 	<CommandPalette
-		v-model:show="showPalette"
-		v-model:search-query="searchQuery"
-		:groups="groups"
-		@select="run"
-	/>
-	<KeyboardShortcutsModal v-model:open="showShortcuts" />
+		v-model:open="showPalette"
+		v-model:query="searchQuery"
+		:filterable="false"
+		@select="runCommand"
+	>
+		<CommandPaletteInput placeholder="Search products, orders and commands" />
+
+		<CommandPaletteList>
+			<CommandPaletteGroup
+				v-for="group in groups"
+				:key="group.title"
+				:label="group.title"
+			>
+				<CommandPaletteItem
+					v-for="item in group.items"
+					:key="item.name"
+					:value="item"
+					:label="item.title"
+				>
+					<template #prefix>
+						<span
+							:class="[item.icon, 'mr-2 size-4 shrink-0 text-ink-gray-6']"
+							aria-hidden="true"
+						/>
+					</template>
+					{{ item.title }}
+					<template v-if="item.shortcut || item.description" #suffix>
+						<KeyboardShortcut v-if="item.shortcut" :combo="item.shortcut" />
+						<span v-else class="text-sm text-ink-gray-5">
+							{{ item.description }}
+						</span>
+					</template>
+				</CommandPaletteItem>
+			</CommandPaletteGroup>
+		</CommandPaletteList>
+
+		<CommandPaletteEmpty>No matches</CommandPaletteEmpty>
+	</CommandPalette>
+
+	<KeyboardShortcutsDialog v-model:open="showShortcuts" />
 </template>

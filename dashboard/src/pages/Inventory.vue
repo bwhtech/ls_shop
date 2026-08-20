@@ -7,12 +7,12 @@ import {
 	Breadcrumbs,
 	Button,
 	FormControl,
-	ListView,
 	TabButtons,
 	TextInput,
 	toast,
 	useCall,
 } from "frappe-ui"
+import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
 
 const search = ref("")

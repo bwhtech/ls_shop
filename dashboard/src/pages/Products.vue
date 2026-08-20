@@ -4,14 +4,8 @@ import ListSkeleton from "@/components/ListSkeleton.vue"
 import { showAddProduct } from "@/components/addProduct"
 import type { ProductRow } from "@/types"
 import { formatRowPrice, publishTheme } from "@/utils/format"
-import {
-	Badge,
-	Breadcrumbs,
-	Button,
-	FormControl,
-	ListView,
-	useCall,
-} from "frappe-ui"
+import { Badge, Breadcrumbs, Button, FormControl, useCall } from "frappe-ui"
+import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 
@@ -117,11 +111,11 @@ const listOptions = {
 						v-if="row.image"
 						:src="row.image"
 						alt=""
-						class="size-6 shrink-0 rounded object-cover"
+						class="size-6 shrink-0 rounded-4 object-cover"
 					/>
 					<div
 						v-else
-						class="grid size-6 shrink-0 place-items-center rounded bg-surface-gray-2 text-2xs text-ink-gray-4"
+						class="grid size-6 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-2xs text-ink-gray-4"
 					>
 						{{ row.title.slice(0, 1) }}
 					</div>

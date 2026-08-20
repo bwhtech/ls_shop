@@ -65,7 +65,7 @@ const source = computed(
 		<div v-if="!collapsed" class="px-3 pb-3 sm:px-5">
 			<div
 				ref="stage"
-				class="h-64 overflow-hidden rounded border border-outline-gray-2 bg-surface-base"
+				class="h-64 overflow-hidden rounded-4 border border-outline-gray-2 bg-surface-base"
 			>
 				<iframe
 					:key="language"

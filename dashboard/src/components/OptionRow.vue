@@ -127,11 +127,11 @@ function confirmRemoveImage(fileUrl: string) {
 					v-if="variant.images.length"
 					:src="variant.images[0]"
 					alt=""
-					class="size-9 shrink-0 rounded object-cover"
+					class="size-9 shrink-0 rounded-4 object-cover"
 				/>
 				<div
 					v-else
-					class="grid size-9 shrink-0 place-items-center rounded bg-surface-gray-2 text-xs text-ink-gray-4"
+					class="grid size-9 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-xs text-ink-gray-4"
 				>
 					{{ variant.option.slice(0, 1) }}
 				</div>
@@ -167,7 +167,7 @@ function confirmRemoveImage(fileUrl: string) {
 						<img
 							:src="image"
 							alt=""
-							class="size-20 rounded border border-outline-gray-1 object-cover"
+							class="size-20 rounded-4 border border-outline-gray-1 object-cover"
 						/>
 						<Button
 							class="absolute -right-1.5 -top-1.5 hidden rounded-full group-hover:inline-flex"
@@ -193,7 +193,7 @@ function confirmRemoveImage(fileUrl: string) {
 						<template #default="{ openFileSelector, uploading, progress }">
 							<button
 								type="button"
-								class="grid size-20 place-items-center rounded border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
+								class="grid size-20 place-items-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
 								@click="openFileSelector"
 							>
 								<span v-if="uploading" class="text-xs">{{ progress }}%</span>

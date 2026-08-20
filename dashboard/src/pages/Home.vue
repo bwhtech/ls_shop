@@ -62,11 +62,11 @@ function formatStat(stat: Overview["stats"][number]) {
 					<div
 						v-for="stat in stats"
 						:key="stat.key"
-						class="rounded-lg border border-outline-gray-1 bg-surface-base p-4"
+						class="rounded-6 border border-outline-gray-1 bg-surface-base p-4"
 					>
 						<div class="text-xs text-ink-gray-5">{{ stat.label }}</div>
 						<div
-							class="mt-1 truncate text-2xl font-semibold"
+							class="mt-1 truncate text-xl font-semibold"
 							:class="stat.value < 0 ? 'text-ink-red-5' : 'text-ink-gray-9'"
 						>
 							{{ formatStat(stat) }}
@@ -137,7 +137,7 @@ function formatStat(stat: Overview["stats"][number]) {
 				<div class="grid gap-3 sm:grid-cols-2">
 					<!-- Running low -->
 					<section
-						class="space-y-2 rounded-lg border border-outline-gray-1 bg-surface-base p-4"
+						class="space-y-2 rounded-6 border border-outline-gray-1 bg-surface-base p-4"
 					>
 						<div class="flex h-7 items-center justify-between">
 							<h3 class="text-sm font-semibold text-ink-gray-8">Running low</h3>
@@ -176,7 +176,7 @@ function formatStat(stat: Overview["stats"][number]) {
 
 					<!-- Needs attention -->
 					<section
-						class="space-y-2 rounded-lg border border-outline-gray-1 bg-surface-base p-4"
+						class="space-y-2 rounded-6 border border-outline-gray-1 bg-surface-base p-4"
 					>
 						<div class="flex h-7 items-center justify-between">
 							<h3 class="text-sm font-semibold text-ink-gray-8">

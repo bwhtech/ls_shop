@@ -80,7 +80,7 @@ function confirmFulfil() {
 		<div v-else-if="order.data" class="min-h-0 flex-1 overflow-y-auto">
 			<div class="body-container pb-40 pt-5">
 				<div class="flex items-center gap-3">
-					<h1 class="text-lg text-ink-gray-9">{{ order.data.name }}</h1>
+					<h1 class="text-md text-ink-gray-9">{{ order.data.name }}</h1>
 					<Badge
 						variant="subtle"
 						:theme="orderStateTheme(order.data.state)"
@@ -118,11 +118,11 @@ function confirmFulfil() {
 											v-if="item.image"
 											:src="item.image"
 											alt=""
-											class="size-8 shrink-0 rounded object-cover"
+											class="size-8 shrink-0 rounded-4 object-cover"
 										/>
 										<div
 											v-else
-											class="grid size-8 shrink-0 place-items-center rounded bg-surface-gray-2 text-xs text-ink-gray-4"
+											class="grid size-8 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-xs text-ink-gray-4"
 										>
 											{{ item.title.slice(0, 1) }}
 										</div>

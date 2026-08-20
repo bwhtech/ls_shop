@@ -34,7 +34,7 @@ export default defineConfig({
 	optimizeDeps: {
 		// frappe-ui and frappe-ui/editor pre-bundle separately and each inlines its own
 		// ProseMirror copy, which breaks the editor. Keep frappe-ui out of pre-bundling.
-		exclude: ["frappe-ui"],
+		exclude: ["frappe-ui", "frappe-ui/experimental"],
 		// frappe-ui ships a nested CJS feather-icons; pre-bundle it so its default export
 		// gets CJS->ESM interop, otherwise FeatherIcon fails and the app never mounts.
 		// frappe-ui is excluded above, so its nested CJS deps never get interop'd. Pre-bundle

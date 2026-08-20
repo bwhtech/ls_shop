@@ -86,7 +86,7 @@ async function saveActive(payload: {
 	<div>
 		<div v-if="list.loading && !integrations.length" class="space-y-4 py-4">
 			<div v-for="row in 3" :key="row" class="flex items-center gap-4">
-				<Skeleton class="h-9 w-24 rounded-md" />
+				<Skeleton class="h-9 w-24 rounded-5" />
 				<div class="flex-1 space-y-2">
 					<Skeleton class="h-3.5 w-32" />
 					<Skeleton class="h-3 w-64" />

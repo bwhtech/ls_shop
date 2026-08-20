@@ -2,14 +2,8 @@
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import type { OrderRow } from "@/types"
 import { orderStateTheme } from "@/utils/format"
-import {
-	Badge,
-	Breadcrumbs,
-	FormControl,
-	ListView,
-	TabButtons,
-	useCall,
-} from "frappe-ui"
+import { Badge, Breadcrumbs, FormControl, TabButtons, useCall } from "frappe-ui"
+import { ListView } from "frappe-ui/experimental"
 import { computed, ref, watch } from "vue"
 
 const search = ref("")

@@ -61,7 +61,7 @@ function saveName() {
 
 <template>
 	<SettingsHeader>
-		<h2 class="text-lg font-semibold text-ink-gray-8">Profile</h2>
+		<h2 class="text-md font-semibold text-ink-gray-8">Profile</h2>
 	</SettingsHeader>
 
 	<SettingsBody>

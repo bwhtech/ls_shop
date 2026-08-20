@@ -30,7 +30,7 @@ function fileName(url: string) {
 			<img
 				:src="props.modelValue"
 				alt=""
-				class="size-9 rounded border border-outline-gray-1 bg-surface-gray-1 object-contain"
+				class="size-9 rounded-4 border border-outline-gray-1 bg-surface-gray-1 object-contain"
 			/>
 		</a>
 		<a

@@ -9,8 +9,8 @@ import {
 	Switch,
 	toast,
 } from "frappe-ui"
-import { Link } from "frappe-ui/frappe"
 import { computed, reactive, ref, watch } from "vue"
+import DocLink from "../DocLink.vue"
 import { normalizeValue } from "../settings/useSettingsForm"
 import type {
 	Integration,
@@ -132,7 +132,7 @@ async function copyWebhookUrl() {
 				<p class="text-p-base text-ink-gray-6">{{ props.integration.blurb }}</p>
 
 				<div
-					class="flex items-center justify-between gap-4 rounded border border-outline-gray-2 px-3 py-2.5"
+					class="flex items-center justify-between gap-4 rounded-4 border border-outline-gray-2 px-3 py-2.5"
 				>
 					<div class="min-w-0">
 						<div class="text-base text-ink-gray-8">Enable this integration</div>
@@ -192,7 +192,7 @@ async function copyWebhookUrl() {
 							:required="field.required"
 							:description="plainText(field.description)"
 						/>
-						<Link
+						<DocLink
 							v-else-if="field.fieldtype === 'Link'"
 							v-model="values[field.fieldname] as string"
 							:doctype="field.options ?? ''"
@@ -214,7 +214,7 @@ async function copyWebhookUrl() {
 				<div v-if="props.integration.webhook_url" class="space-y-1.5">
 					<div class="text-base text-ink-gray-7">Webhook URL</div>
 					<div
-						class="flex items-center gap-2 rounded border border-outline-gray-2 bg-surface-gray-1 py-1.5 pl-3 pr-1.5"
+						class="flex items-center gap-2 rounded-4 border border-outline-gray-2 bg-surface-gray-1 py-1.5 pl-3 pr-1.5"
 					>
 						<span class="min-w-0 flex-1 truncate text-p-sm text-ink-gray-7">
 							{{ props.integration.webhook_url }}

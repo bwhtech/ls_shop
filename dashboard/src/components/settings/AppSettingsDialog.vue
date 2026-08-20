@@ -77,7 +77,7 @@ const tabGroups = [
 </script>
 
 <template>
-	<SettingsDialog v-model="showSettings" v-model:tab="activeSettingsTab" size="4xl">
+	<SettingsDialog v-model:open="showSettings" v-model:tab="activeSettingsTab" size="4xl">
 		<SettingsSidebar>
 			<SettingsNavGroup v-for="group in tabGroups" :key="group.label" :label="group.label">
 				<SettingsNavItem v-for="tab in group.tabs" :key="tab.slug" :value="tab.slug">

@@ -5,6 +5,7 @@ import { openSettings } from "@/components/settings"
 import AppSettingsDialog from "@/components/settings/AppSettingsDialog.vue"
 import {
 	Button,
+	type ColorScheme,
 	DesktopShell,
 	KeyboardShortcut,
 	ScrollArea,
@@ -13,7 +14,7 @@ import {
 	SidebarItem,
 	SidebarLabel,
 	useCall,
-	useTheme,
+	useColorScheme,
 } from "frappe-ui"
 import { computed, h } from "vue"
 
@@ -23,11 +24,11 @@ const store = useCall<Record<string, string>>({
 
 const storeName = computed(() => store.data?.store_name || "Your store")
 
-const { currentTheme, setTheme } = useTheme()
+const { colorScheme, setColorScheme } = useColorScheme()
 
 /** A tick against whichever theme is active, the way Gameplan marks the current choice. */
-function themeCheckmark(theme: string) {
-	if (currentTheme.value !== theme) return null
+function themeCheckmark(theme: ColorScheme) {
+	if (colorScheme.value !== theme) return null
 	return h("span", { class: "lucide-check size-4 text-ink-gray-6" })
 }
 
@@ -47,19 +48,19 @@ const menuItems = computed(() => [
 				label: "Light Mode",
 				icon: "lucide-sun",
 				slots: { suffix: () => themeCheckmark("light") },
-				onClick: () => setTheme("light"),
+				onClick: () => setColorScheme("light"),
 			},
 			{
 				label: "Dark Mode",
 				icon: "lucide-moon",
 				slots: { suffix: () => themeCheckmark("dark") },
-				onClick: () => setTheme("dark"),
+				onClick: () => setColorScheme("dark"),
 			},
 			{
 				label: "System Default",
 				icon: "lucide-monitor",
 				slots: { suffix: () => themeCheckmark("system") },
-				onClick: () => setTheme("system"),
+				onClick: () => setColorScheme("system"),
 			},
 		],
 	},

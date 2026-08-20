@@ -192,11 +192,11 @@ function saveDetails() {
 						v-if="heroImage"
 						:src="heroImage"
 						alt=""
-						class="size-12 shrink-0 rounded-lg object-cover"
+						class="size-12 shrink-0 rounded-6 object-cover"
 					/>
 					<div
 						v-else
-						class="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-gray-2 text-ink-gray-4"
+						class="grid size-12 shrink-0 place-items-center rounded-6 bg-surface-gray-2 text-ink-gray-4"
 					>
 						{{ details.title.slice(0, 1) }}
 					</div>
