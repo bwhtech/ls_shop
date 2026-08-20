@@ -85,14 +85,18 @@ const menuItems = computed(() => [
 	},
 ])
 
+// Grouped by the job the owner came to do, not by which doctype backs the page. A section
+// without a label renders as pinned top-level items, the way CRM and Gameplan pin their
+// everyday destinations above the first group header.
 const sections = [
 	{
-		label: "Overview",
-		items: [{ label: "Home", route: "Home", icon: "lucide-house" }],
-	},
-	{
-		label: "Sales",
-		items: [{ label: "Orders", route: "Orders", icon: "lucide-receipt" }],
+		label: "",
+		items: [
+			{ label: "Home", route: "Home", icon: "lucide-house" },
+			{ label: "Orders", route: "Orders", icon: "lucide-receipt" },
+			// Analytics joins this daily run once /store/analytics ships:
+			// { label: "Analytics", route: "Analytics", icon: "lucide-chart-line" },
+		],
 	},
 	{
 		label: "Catalog",
@@ -125,8 +129,12 @@ const sections = [
 				/>
 
 				<ScrollArea class="min-h-0 flex-1" viewport-class="px-2 pb-6">
-					<div v-for="section in sections" :key="section.label" class="mb-3">
-						<SidebarLabel>{{ section.label }}</SidebarLabel>
+					<div
+						v-for="section in sections"
+						:key="section.items[0].route"
+						class="mb-3"
+					>
+						<SidebarLabel v-if="section.label">{{ section.label }}</SidebarLabel>
 						<nav class="mt-0.5 space-y-0.5">
 							<SidebarItem
 								v-for="item in section.items"
