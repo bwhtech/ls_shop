@@ -5,7 +5,8 @@ import re
 
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Count, Sum
+from frappe.query_builder import Case
+from frappe.query_builder.functions import Count, Max, Sum
 from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate, strip_html
 
 from ls_shop.api.admin.catalog import get_unpublishable_options
@@ -49,6 +50,18 @@ SHIPMENT_STAGES = {
 	"Lost": "shipped",
 }
 
+# The rungs where the order no longer waits on the owner: the parcel has moved, arrived, come back,
+# or the order is gone. An order on one of these has no business in the "To fulfil" worklist, whatever
+# ERPNext's own status still says. `shipped` sits here deliberately - the owner shipped it, so the
+# only party still to act is the carrier.
+SETTLED_STAGES = frozenset({"cancelled", "returned", "delivered", "shipped"})
+
+# The carrier statuses that put an order on a settled rung. Derived from the ladder's own map rather
+# than listed again, so the worklist can never drift from the badge it has to agree with.
+SETTLED_SHIPMENT_STATUSES = tuple(
+	status for status, stage in SHIPMENT_STAGES.items() if stage in SETTLED_STAGES
+)
+
 # How many rows each Home panel shows before it sends the owner to the full screen.
 OVERVIEW_PANEL_LENGTH = 5
 OVERVIEW_WINDOW_DAYS = 30
@@ -65,15 +78,16 @@ def get_orders(
 	"""
 	frappe.has_permission("Sales Order", ptype="read", throw=True)
 
-	filters = {"docstatus": ["<", 2]}
 	if status == "open":
-		filters["status"] = ["in", OPEN_STATUSES]
+		filters = get_open_order_filters()
 	elif status == "fulfilled":
-		filters["status"] = "Completed"
+		filters = [["docstatus", "<", 2], ["status", "=", "Completed"]]
 	elif status == "cancelled":
-		filters = {"docstatus": 2}
+		filters = [["docstatus", "=", 2]]
+	else:
+		filters = [["docstatus", "<", 2]]
 	if search:
-		filters["name"] = ["like", f"%{search}%"]
+		filters.append(["name", "like", f"%{search}%"])
 
 	total = frappe.db.count("Sales Order", filters)
 	orders = frappe.get_all(
@@ -125,6 +139,76 @@ def get_orders(
 		],
 		"total": total,
 	}
+
+
+def get_open_order_filters() -> list:
+	"""What "To fulfil" means, in one place: the tab, the Home figure and the fulfil button all read
+	it, so none of them can contradict the badge.
+
+	An order is waiting on the owner when it is confirmed, still open in ERPNext's own status, and
+	has not reached a settled rung of the ladder. The two exclusions are subqueries rather than lists
+	of names, because the stage is derived in Python only after the page is fetched: filtering the
+	derived list would silently corrupt both the page size and the total, and a name list would grow
+	with every order the store has ever shipped.
+	"""
+	filters = [
+		["docstatus", "=", 1],
+		["status", "in", OPEN_STATUSES],
+		["name", "not in", get_returned_orders()],
+	]
+	from ls_shop.api.shipping import is_connector_installed
+
+	if is_connector_installed():
+		filters.append(["name", "not in", get_shipped_orders()])
+	return filters
+
+
+def get_returned_orders():
+	"""The orders a submitted return has reversed - `pick_stage`'s `has_return` rung, as a subquery.
+
+	A return resets per_delivered, which is why these orders drift back into an open ERPNext status
+	wearing a Returned badge.
+	"""
+	delivery_note = frappe.qb.DocType("Delivery Note")
+	delivery_note_item = frappe.qb.DocType("Delivery Note Item")
+	return (
+		frappe.qb.from_(delivery_note_item)
+		.join(delivery_note)
+		.on(delivery_note_item.parent == delivery_note.name)
+		.select(delivery_note_item.against_sales_order)
+		.where(delivery_note.docstatus == 1)
+		.where(delivery_note.is_return == 1)
+		# A NULL anywhere in a NOT IN subquery makes the whole predicate NULL, which would drop
+		# every order from the worklist; delivery note lines raised outside an order have none.
+		.where(delivery_note_item.against_sales_order.notnull())
+		.where(delivery_note_item.against_sales_order != "")
+	)
+
+
+def get_shipped_orders():
+	"""The orders whose parcel has physically moved, as a subquery.
+
+	Only the latest shipment counts, exactly as `read_shipment_stages` reads it: an order rebooked
+	after a failed pickup carries a stale older request that must not settle it. Comparing the newest
+	moved request against the newest request of any kind picks that out in a single grouped pass, and
+	without a correlated subquery, so MariaDB and Postgres both plan it the same way.
+	"""
+	shipping_request = frappe.qb.DocType("Shipping Request")
+	newest_moved = Max(
+		Case()
+		.when(shipping_request.status.isin(SETTLED_SHIPMENT_STATUSES), shipping_request.creation)
+		.else_(None)
+	)
+	return (
+		frappe.qb.from_(shipping_request)
+		.select(shipping_request.ref_docname)
+		.where(shipping_request.ref_doctype == "Sales Order")
+		.where(shipping_request.docstatus < 2)
+		.where(shipping_request.ref_docname.notnull())
+		.where(shipping_request.ref_docname != "")
+		.groupby(shipping_request.ref_docname)
+		.having(newest_moved == Max(shipping_request.creation))
+	)
 
 
 def get_address_lines(address_display):
@@ -305,6 +389,7 @@ def get_order(sales_order: str):
 			sizes_by_item_code.setdefault(cstr(row.item_code), row.size)
 
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
+	state = describe_state(order, lifecycle)
 
 	return {
 		"name": order.name,
@@ -313,13 +398,13 @@ def get_order(sales_order: str):
 		"phone": order.contact_phone,
 		"placed_on": order.transaction_date,
 		"status": order.status,
-		"state": describe_state(order, lifecycle),
+		"state": state,
 		"currency": order.currency,
 		"total": flt(order.total),
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"shipping_address": get_address_lines(order.address_display),
-		"can_fulfil": cint(order.docstatus) == 1 and flt(order.per_delivered) < 100,
+		"can_fulfil": can_fulfil_order(order, state),
 		"items": [
 			{
 				"item_code": row.item_code,
@@ -335,6 +420,17 @@ def get_order(sales_order: str):
 		],
 		"deliveries": lifecycle.get("delivery_notes") or [],
 	}
+
+
+def can_fulfil_order(order, state) -> bool:
+	"""Whether there is anything left for the owner to ship.
+
+	per_delivered alone is not the answer: a return resets it, so a returned order used to offer a
+	solid "Fulfil order" button. The ladder already knows the order is done with the owner.
+	"""
+	return (
+		cint(order.docstatus) == 1 and flt(order.per_delivered) < 100 and state["key"] not in SETTLED_STAGES
+	)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -360,6 +456,13 @@ def fulfil_order(sales_order: str):
 		frappe.throw(_("Only a confirmed order can be fulfilled."))
 	if flt(order.per_delivered) >= 100:
 		frappe.throw(_("This order has already been fulfilled."))
+
+	# The button is hidden for a settled order, but a screen left open on a stale list can still
+	# reach here, so the rule is enforced where it is decided rather than only where it is drawn.
+	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
+	state = describe_state(order, lifecycle)
+	if state["key"] in SETTLED_STAGES:
+		frappe.throw(_("This order is already {0} and needs nothing shipped.").format(state["label"]))
 
 	delivery_note = make_delivery_note(sales_order)
 	delivery_note.insert()
@@ -388,10 +491,13 @@ def get_overview(order_status: str | None = None):
 	current_window = read_sales_window(window_start, today)
 	previous_window = read_sales_window(previous_start, previous_end)
 
-	to_fulfil = frappe.db.count("Sales Order", {"docstatus": 1, "status": ["in", OPEN_STATUSES]})
+	# The same filters the Orders screen's "To fulfil" tab runs, so the figure and the list the owner
+	# lands on after clicking it can never disagree.
+	open_order_filters = get_open_order_filters()
+	to_fulfil = frappe.db.count("Sales Order", open_order_filters)
 	oldest_open = frappe.db.get_value(
 		"Sales Order",
-		{"docstatus": 1, "status": ["in", OPEN_STATUSES]},
+		open_order_filters,
 		"transaction_date",
 		order_by="transaction_date asc",
 	)
