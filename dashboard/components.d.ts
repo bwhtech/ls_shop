@@ -12,8 +12,11 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
+    AppearanceSettings: typeof import('./src/components/settings/AppearanceSettings.vue')['default']
+    AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
   }
 }
