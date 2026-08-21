@@ -327,7 +327,10 @@ def format_theme_css():
 
 def get_currency_symbol():
 	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
-	if currency == "SAR" or frappe.conf.developer_mode:
+	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font. The check
+	# used to fall through on developer_mode as well, which stamped the riyal on every price a
+	# non-SAR dev site rendered.
+	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
 	return frappe.get_cached_value("Currency", currency, "symbol")
 
