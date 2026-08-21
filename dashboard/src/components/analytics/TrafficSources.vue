@@ -17,6 +17,7 @@ const { rangeParams, rangeCaption } = useAnalyticsRange()
 
 const columns: AnalyticsTableColumn[] = [
 	{ key: "source", label: "Source" },
+	{ key: "campaign", label: "Campaign" },
 	{ key: "sessions", label: "Sessions", numeric: true },
 	{ key: "orders", label: "Orders", numeric: true },
 	{ key: "revenue", label: "Revenue", numeric: true },
@@ -31,11 +32,12 @@ const trafficSources = useCall<TrafficSourceRow[]>({
 
 onAnalyticsRefresh(() => trafficSources.reload())
 
-// source and medium are one group server-side, so they are one identity here too.
+// source, medium and campaign are one group server-side, so they are one identity here too.
 const rows = computed(() =>
 	(trafficSources.data ?? []).map((row) => ({
 		...row,
 		group: row.medium ? `${row.source} / ${row.medium}` : row.source,
+		key: `${row.source} / ${row.medium} / ${row.campaign}`,
 	})),
 )
 </script>
@@ -49,8 +51,12 @@ const rows = computed(() =>
 		:empty="!rows.length"
 		empty-message="No traffic was attributed in this period."
 	>
-		<AnalyticsTable :columns="columns" :rows="rows" row-key="group">
+		<AnalyticsTable :columns="columns" :rows="rows" row-key="key">
 			<template #source="{ row }">{{ row.group }}</template>
+			<template #campaign="{ row }">
+				<span v-if="row.campaign" class="text-ink-gray-8">{{ row.campaign }}</span>
+				<span v-else class="text-ink-gray-4">&mdash;</span>
+			</template>
 			<template #sessions="{ row }">
 				{{ formatCount(Number(row.sessions)) }}
 			</template>

@@ -28,7 +28,9 @@ FUNNEL_STAGES = (
 	("purchased", "Purchased", "purchase"),
 )
 ABANDONED_CARTS_LIMIT = 20
-TRAFFIC_SOURCES_LIMIT = 30
+# source x medium x campaign multiplies the distinct groups, so the cap is wider than the
+# source x medium one was, while still bounding a guest-controlled grouping
+TRAFFIC_SOURCES_LIMIT = 50
 # engagement sorts by conversion rate, so rank a wider by-views pool first, then slice
 ENGAGEMENT_CANDIDATE_LIMIT = 100
 ITEM_SOURCES_LIMIT = 10
@@ -377,18 +379,22 @@ def get_traffic_sources(from_date: str, to_date: str):
 	analytics_event = frappe.qb.DocType("Storefront Analytics Event")
 	source = Coalesce(NullIf(analytics_event.utm_source, ""), "Direct")
 	medium = Coalesce(analytics_event.utm_medium, "")
+	# direct and organic traffic legitimately has no campaign, so it stays empty rather than
+	# being labelled with a placeholder the shop owner would read as a real campaign
+	campaign = Coalesce(analytics_event.utm_campaign, "")
 	sessions = distinct_sessions(analytics_event)
 	rows = (
 		frappe.qb.from_(analytics_event)
 		.select(
 			source,
 			medium,
+			campaign,
 			sessions,
 			distinct_purchase_sessions(analytics_event),
 			Sum(Case().when(analytics_event.event == "purchase", analytics_event.value)),
 		)
 		.where(in_window(analytics_event.creation, start, end))
-		.groupby(source, medium)
+		.groupby(source, medium, campaign)
 		.orderby(sessions, order=Order.desc)
 		# guests control utm_* values, so distinct groups are unbounded without a cap
 		.limit(TRAFFIC_SOURCES_LIMIT)
@@ -398,10 +404,11 @@ def get_traffic_sources(from_date: str, to_date: str):
 		{
 			"source": row[0],
 			"medium": row[1] or "",
-			"sessions": cint(row[2]),
-			"orders": cint(row[3]),
-			"revenue": flt(row[4]),
-			"conversion_rate": get_rate(cint(row[3]), cint(row[2])),
+			"campaign": row[2] or "",
+			"sessions": cint(row[3]),
+			"orders": cint(row[4]),
+			"revenue": flt(row[5]),
+			"conversion_rate": get_rate(cint(row[4]), cint(row[3])),
 		}
 		for row in rows
 	]

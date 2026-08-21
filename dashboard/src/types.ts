@@ -257,6 +257,8 @@ export type ProductEngagementRow = {
 export type TrafficSourceRow = {
 	source: string
 	medium: string
+	/** Empty for direct and organic traffic, which legitimately runs no campaign. */
+	campaign: string
 	sessions: number
 	orders: number
 	revenue: number

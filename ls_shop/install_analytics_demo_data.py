@@ -118,7 +118,7 @@ CHANNELS = (
 		"key": "newsletter",
 		"utm_source": "newsletter",
 		"utm_medium": "email",
-		"utm_campaign": "mid-season-sale",
+		"utm_campaign": "end-of-season-sale",
 		"referrer": None,
 		"base_share": 0.03,
 		"campaign": None,
@@ -130,13 +130,13 @@ CHANNELS = (
 		"landing": (("/en/products", 0.70), ("product", 0.30)),
 	},
 	{
-		"key": "whatsapp",
+		"key": "whatsapp-diwali",
 		"utm_source": "whatsapp",
 		"utm_medium": "social",
-		"utm_campaign": "raksha-bandhan",
+		"utm_campaign": "diwali",
 		"referrer": "https://wa.me/",
 		"base_share": 0.0,
-		"campaign": "raksha-bandhan",
+		"campaign": "diwali",
 		"devices": (("Mobile", 0.92), ("Tablet", 0.05), ("Desktop", 0.03)),
 		"hours": EVENING_HOURS,
 		"weekend_lift": 1.25,
@@ -145,28 +145,45 @@ CHANNELS = (
 		"landing": (("/en/products", 0.62), ("product", 0.38)),
 	},
 	{
-		"key": "instagram",
+		"key": "instagram-diwali",
 		"utm_source": "instagram",
 		"utm_medium": "social",
-		"utm_campaign": "monsoon-edit",
+		"utm_campaign": "diwali",
 		"referrer": "https://l.instagram.com/",
 		"base_share": 0.0,
-		"campaign": "monsoon-edit",
+		"campaign": "diwali",
+		"devices": (("Mobile", 0.90), ("Tablet", 0.06), ("Desktop", 0.04)),
+		"hours": EVENING_HOURS,
+		"weekend_lift": 1.3,
+		"intent": 1.2,
+		"collection": "gifting",
+		"landing": (("product", 0.66), ("/en/products", 0.34)),
+	},
+	{
+		# the same channel running a second campaign is what proves the traffic-source table
+		# separates campaigns instead of collapsing to one row per channel
+		"key": "instagram-holi",
+		"utm_source": "instagram",
+		"utm_medium": "social",
+		"utm_campaign": "holi",
+		"referrer": "https://l.instagram.com/",
+		"base_share": 0.0,
+		"campaign": "holi",
 		"devices": (("Mobile", 0.90), ("Tablet", 0.06), ("Desktop", 0.04)),
 		"hours": EVENING_HOURS,
 		"weekend_lift": 1.3,
 		"intent": 1.05,
 		"collection": "edit",
-		"landing": (("product", 0.66), ("/en/products", 0.34)),
+		"landing": (("product", 0.60), ("/en/products", 0.40)),
 	},
 	{
-		"key": "facebook",
+		"key": "facebook-diwali",
 		"utm_source": "facebook",
 		"utm_medium": "paid",
-		"utm_campaign": "independence-day-sale",
+		"utm_campaign": "diwali",
 		"referrer": "https://l.facebook.com/",
 		"base_share": 0.0,
-		"campaign": "independence-day-sale",
+		"campaign": "diwali",
 		"devices": (("Mobile", 0.78), ("Desktop", 0.15), ("Tablet", 0.07)),
 		"hours": EVENING_HOURS,
 		"weekend_lift": 1.15,
@@ -212,16 +229,15 @@ CLEARED_ATTRIBUTION = {
 
 
 def get_campaign_windows(start_date, end_date):
-	"""Festival campaigns anchored inside the seeded window.
+	"""Festival campaigns clustered into contiguous bursts inside the seeded window.
 
-	Diwali and Holi both fall outside a late-June-to-late-August window, so the festivals that do
-	land in it are used instead, keeping the same channel pairing against a real calendar. Offsets
-	are relative to the window so the shape survives being seeded on a different date.
+	These are demo dates, not a calendar: the real Diwali (November) and Holi (March) fall outside
+	a rolling ~60-day window, so each burst is anchored by an offset from the window instead, which
+	also keeps the shape intact when the seeder is re-run on a different date.
 	"""
 	return {
-		"raksha-bandhan": (add_days(end_date, -11), end_date),
-		"independence-day-sale": (add_days(end_date, -13), add_days(end_date, -4)),
-		"monsoon-edit": (add_days(start_date, 13), add_days(start_date, 33)),
+		"holi": (add_days(end_date, -30), add_days(end_date, -20)),
+		"diwali": (add_days(end_date, -16), end_date),
 	}
 
 

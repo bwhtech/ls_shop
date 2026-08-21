@@ -10,6 +10,7 @@ from frappe.utils import add_days, now_datetime
 
 from ls_shop.analytics import events
 from ls_shop.api.analytics import capture
+from ls_shop.api.analytics_dashboard import get_traffic_sources
 from ls_shop.lifestyle_shop_ecommerce.doctype.storefront_analytics_event.storefront_analytics_event import (
 	StorefrontAnalyticsEvent,
 )
@@ -280,3 +281,78 @@ class TestClearOldLogs(IntegrationTestCase):
 
 		StorefrontAnalyticsEvent.clear_old_logs(days=30)
 		self.assertFalse(frappe.db.exists("Storefront Analytics Event", event))
+
+
+class TestGetTrafficSources(IntegrationTestCase):
+	"""A window far outside the demo seeder's ~60 days keeps this test's rows the only ones in it."""
+
+	WINDOW_FROM = "2024-01-10"
+	WINDOW_TO = "2024-01-12"
+
+	def setUp(self):
+		self.event_names = []
+
+	def tearDown(self):
+		# get_traffic_sources aggregates every row in the window, so one test's rows would land in
+		# the next test's totals if they outlived it
+		frappe.db.delete("Storefront Analytics Event", {"name": ("in", self.event_names)})
+
+	def make_session(self, session_id, source, medium, campaign, revenue=0):
+		events_in_session = [("page_view", 0)] + ([("purchase", revenue)] if revenue else [])
+		for event, value in events_in_session:
+			row = frappe.get_doc(
+				{
+					"doctype": "Storefront Analytics Event",
+					"event": event,
+					"session_id": session_id,
+					"utm_source": source,
+					"utm_medium": medium,
+					"utm_campaign": campaign,
+					"value": value,
+				}
+			).insert(ignore_permissions=True)
+			self.event_names.append(row.name)
+			frappe.db.set_value(
+				"Storefront Analytics Event",
+				row.name,
+				"creation",
+				f"{self.WINDOW_FROM} 10:00:00",
+				update_modified=False,
+			)
+
+	def get_rows(self):
+		return {
+			(row["source"], row["medium"], row["campaign"]): row
+			for row in get_traffic_sources(self.WINDOW_FROM, self.WINDOW_TO)
+		}
+
+	def test_two_campaigns_on_one_channel_stay_separate_rows(self):
+		self.make_session("test-diwali-1", "instagram", "social", "diwali", revenue=1000)
+		self.make_session("test-diwali-2", "instagram", "social", "diwali")
+		self.make_session("test-holi-1", "instagram", "social", "holi", revenue=250)
+
+		rows = self.get_rows()
+
+		self.assertEqual(rows[("instagram", "social", "diwali")]["sessions"], 2)
+		self.assertEqual(rows[("instagram", "social", "diwali")]["revenue"], 1000)
+		self.assertEqual(rows[("instagram", "social", "holi")]["sessions"], 1)
+		self.assertEqual(rows[("instagram", "social", "holi")]["revenue"], 250)
+
+	def test_campaignless_traffic_reports_an_empty_campaign(self):
+		self.make_session("test-direct-1", None, None, None)
+		self.make_session("test-organic-1", "google", "organic", None)
+
+		rows = self.get_rows()
+
+		self.assertEqual(rows[("Direct", "", "")]["sessions"], 1)
+		self.assertEqual(rows[("google", "organic", "")]["sessions"], 1)
+
+	def test_campaign_revenue_sums_to_the_channel_total(self):
+		self.make_session("test-diwali-1", "instagram", "social", "diwali", revenue=1000)
+		self.make_session("test-holi-1", "instagram", "social", "holi", revenue=250)
+
+		instagram_revenue = sum(
+			row["revenue"] for key, row in self.get_rows().items() if key[0] == "instagram"
+		)
+
+		self.assertEqual(instagram_revenue, 1250)
