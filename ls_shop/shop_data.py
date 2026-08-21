@@ -12,6 +12,7 @@ that replaces `layout.html` can still reach it.
 
 import frappe
 
+from ls_shop.branding import get_brand_assets
 from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
 
 
@@ -154,7 +155,7 @@ def get_header_data():
 	return frappe._dict(
 		settings=settings,
 		store_name=settings.store_name or "Lifestyle",
-		brand_logo=settings.brand_logo or "/assets/ls_shop/icons/lifestyle.svg",
+		brand_logo=get_brand_assets().logo,
 		navigation_menu=menu,
 		navigation_categories=build_legacy_navigation(menu),
 		featured_brands=get_featured_brands(menu),

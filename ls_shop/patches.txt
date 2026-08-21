@@ -11,3 +11,4 @@ ls_shop.patches.rebuild_ecommerce_category_tree
 ls_shop.patches.drop_item_group_nav_fields
 ls_shop.patches.seed_shop_theme_routes
 ls_shop.patches.allow_guest_on_order_confirmation
+ls_shop.patches.sync_brand_assets_to_website_settings
