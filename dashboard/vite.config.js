@@ -14,7 +14,7 @@ export default defineConfig({
 				// footer_editor_preview is a Frappe-rendered www page the footer editor loads in an
 				// iframe. Anything not matched here falls through to vite's SPA fallback, so leaving it
 				// out makes the preview pane render the dashboard inside itself instead of the storefront.
-				source: "^/(app|login|api|assets|files|private|footer_editor_preview)(/|\\?|$)",
+				source: "^/(app|login|api|assets|files|private|footer_editor_preview|navbar_editor_preview)(/|\\?|$)",
 			},
 			jinjaBootData: true,
 			lucideIcons: true,

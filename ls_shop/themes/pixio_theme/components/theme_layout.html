@@ -43,7 +43,9 @@
 {# .page-wraper opens in chrome_top and closes here: it has to wrap header, main and footer,
    and <main> is emitted by the base between the two blocks. #}
 {% block chrome_bottom %}
-    {% include "components/includes/site_footer.html" %}
+    {# Its own block for the same reason site_header has one: the navigation editor previews the
+       header with the footer blanked, and .page-wraper still has to close here. #}
+    {% block site_footer %}{% include "components/includes/site_footer.html" %}{% endblock %}
 </div>
 {% endblock %}
 

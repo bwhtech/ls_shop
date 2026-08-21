@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import FooterLinkDialog from "@/components/footer/FooterLinkDialog.vue"
-import FooterPreview from "@/components/footer/FooterPreview.vue"
 import { useFooter } from "@/composables/useFooter"
 import type { FooterLink, FooterSection } from "@/types"
 import { useStorage } from "@vueuse/core"
@@ -491,7 +491,13 @@ function linkActions(
 			</Draggable>
 		</ScrollArea>
 
-		<FooterPreview v-model:collapsed="previewCollapsed" :token="previewToken" />
+		<ChromePreview
+			v-model:collapsed="previewCollapsed"
+			:token="previewToken"
+			path="/footer_editor_preview"
+			title="Footer preview"
+			selector="footer"
+		/>
 
 		<FooterLinkDialog
 			v-model:open="linkDialogOpen"

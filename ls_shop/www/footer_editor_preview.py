@@ -10,34 +10,14 @@ import frappe
 from frappe.utils import cstr, escape_html, validate_url
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import SAFE_URL_SCHEMES
-from ls_shop.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
-from ls_shop.shop_themes.render import render_themed_template
-from ls_shop.shop_themes.theme_resolver import find_theme_file
-
-# The preview renders through the active theme's own layout, most specific first, rather than
-# rendering the footer partial on a hand-built page. A theme declares its stylesheets inside the
-# layout's `head` block - Pixio links six of them - so any head assembled here is a second copy that
-# drifts the moment a theme adds a file. Extending the layout also inherits its `body_class`, its
-# `dir`, and format_theme_css(), which is what makes the preview match the storefront.
-PREVIEW_LAYOUTS = ("components/theme_layout.html", "components/base.html")
-BASE_FOOTER = "templates/includes/footer.html"
-
-# Everything that is not the footer. Blanked rather than left to render, because the preview is a
-# footer preview - and because seo/analytics blocks would emit tracking from inside an editor pane.
-# Blanking chrome_top instead would unbalance the layout: Pixio opens .page-wraper there and closes
-# it in chrome_bottom alongside the footer, so the footer would render outside the wrapper every rule
-# in the theme scopes under. The header lives in its own block in both themes - `header` in the
-# default theme's base, `site_header` in Pixio's layout - so those come out and the wrapper stays.
-BLANKED_BLOCKS = (
-	"seo",
-	"json_ld",
-	"analytics_head",
-	"analytics_events",
-	"header",
-	"site_header",
-	"body",
-	"uncontained_body",
+from ls_shop.shop_themes.chrome_preview import (
+	COMMON_BLANKED_BLOCKS,
+	HEADER_BLOCKS,
+	get_preview_context,
+	render_chrome_preview,
 )
+
+BASE_FOOTER = "templates/includes/footer.html"
 
 no_cache = True
 
@@ -109,36 +89,13 @@ def get_context(context):
 	if lang not in PREVIEW_LANGUAGES:
 		lang = frappe.local.lang or "en"
 
-	footer_context = frappe._dict(
-		preview_settings=settings,
-		lang=lang,
-		is_rtl=lang == "ar",
-		# The layout emits format_theme_css(), which reads the SAVED doc - it cannot see the colour
-		# the owner is dragging right now. This is the same CSS generated off the previewed doc, and
-		# it is appended after the layout's own so it wins.
-		preview_theme_css=settings.generate_theme_css(),
-		# The default theme's base renders a breadcrumb outside any block, guarded only by this.
-		show_breadcrumb=False,
-	)
+	footer_context = get_preview_context(settings, lang)
 
-	# base.html reads the page language off frappe.lang, so the ?lang switch has to move it here
-	# rather than only reaching the footer partial through the context.
-	frappe.local.lang = lang
-
-	theme_name = resolve_active_theme()
-	theme_context = get_theme_context(theme_name)
-	layout = next(
-		(
-			candidate
-			for candidate in PREVIEW_LAYOUTS
-			if theme_context["dirs"] and find_theme_file(theme_context["dirs"], candidate)
-		),
-		None,
-	)
-	if layout:
-		context.rendered_html = render_themed_template(
-			get_preview_template(layout), footer_context, theme_name=theme_name
-		)
+	# The footer preview is the page with its header taken out, not the footer partial on a page of
+	# its own - see chrome_preview for why that distinction matters.
+	rendered = render_chrome_preview(footer_context, COMMON_BLANKED_BLOCKS + HEADER_BLOCKS)
+	if rendered:
+		context.rendered_html = rendered
 		return
 
 	context.rendered_html = f"""<!DOCTYPE html>
@@ -152,10 +109,3 @@ def get_context(context):
 {frappe.render_template(BASE_FOOTER, footer_context)}
 </body>
 </html>"""
-
-
-def get_preview_template(layout):
-	blanks = "".join(f"{{% block {name} %}}{{% endblock %}}" for name in BLANKED_BLOCKS)
-	# super() keeps the theme's own head - its stylesheets - and appends the previewed colours.
-	head = "{% block head %}{{ super() }}{{ preview_theme_css }}{% endblock %}"
-	return f'{{% extends "{layout}" %}}{blanks}{head}'

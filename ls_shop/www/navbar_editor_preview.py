@@ -1,0 +1,57 @@
+# Copyright (c) 2026, company@bwhstudios.com and contributors
+# For license information, please see license.txt
+
+"""Renders the storefront header so the navigation editor can show the menu it is editing.
+
+The mirror of footer_editor_preview: same machinery from shop_themes.chrome_preview, pointed at the
+other end of the page. The menu itself is read live rather than passed in - unlike the footer's
+copy fields, a menu is edited through its own endpoints and is already saved by the time the pane
+reloads, so there is nothing unsaved to carry.
+"""
+
+import frappe
+from frappe.utils import escape_html
+
+from ls_shop.shop_data import get_header_data
+from ls_shop.shop_themes.chrome_preview import (
+	COMMON_BLANKED_BLOCKS,
+	FOOTER_BLOCKS,
+	get_preview_context,
+	render_chrome_preview,
+)
+
+BASE_HEADER = "templates/includes/header.html"
+
+no_cache = True
+
+PREVIEW_LANGUAGES = ("en", "ar")
+
+
+def get_context(context):
+	frappe.has_permission("Lifestyle Settings", "write", throw=True)
+
+	lang = frappe.form_dict.get("lang")
+	if lang not in PREVIEW_LANGUAGES:
+		lang = frappe.local.lang or "en"
+
+	settings = frappe.get_cached_doc("Lifestyle Settings")
+	header_context = get_preview_context(settings, lang)
+
+	rendered = render_chrome_preview(header_context, COMMON_BLANKED_BLOCKS + FOOTER_BLOCKS)
+	if rendered:
+		context.rendered_html = rendered
+		return
+
+	# No theme active: the base header expects the same header_data the storefront builds for it.
+	header_context.header_data = get_header_data()
+	context.rendered_html = f"""<!DOCTYPE html>
+<html lang="{escape_html(lang)}" dir="{"rtl" if header_context.is_rtl else "ltr"}">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="/assets/ls_shop/css/tailwind.css">
+{settings.generate_theme_css()}
+</head>
+<body>
+{frappe.render_template(BASE_HEADER, header_context)}
+</body>
+</html>"""

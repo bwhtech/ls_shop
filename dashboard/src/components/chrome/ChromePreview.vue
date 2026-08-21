@@ -4,8 +4,14 @@ import { Button, TabButtons } from "frappe-ui"
 import { computed, ref } from "vue"
 
 const props = defineProps<{
-	/** Bumped by the page after every save, to pull the rendered footer again. */
+	/** Bumped by the page after every save, to pull the rendered chrome again. */
 	token: number
+	/** The www page rendering this piece of chrome, e.g. `/footer_editor_preview`. */
+	path: string
+	/** Shown on the toggle, e.g. "Footer preview". */
+	title: string
+	/** The chrome being previewed, e.g. `footer`. The pane is sized to it. */
+	selector: string
 }>()
 
 const collapsed = defineModel<boolean>("collapsed", { required: true })
@@ -48,13 +54,18 @@ const stageHeight = computed(() =>
 
 function measureFrame(event: Event) {
 	const frame = event.target as HTMLIFrameElement
-	contentHeight.value =
-		frame.contentDocument?.documentElement?.scrollHeight ?? 0
+	const previewDocument = frame.contentDocument
+	// Measured off the chrome itself, not the document: a header sits at the top of a full-height
+	// themed page, so sizing to scrollHeight would hang an empty storefront under the navbar.
+	const chrome = previewDocument?.querySelector(props.selector)
+	contentHeight.value = chrome
+		? Math.ceil(chrome.getBoundingClientRect().bottom)
+		: (previewDocument?.documentElement?.scrollHeight ?? 0)
 }
 
 const source = computed(
 	() =>
-		`/footer_editor_preview?lang=${language.value}&t=${props.token}-${reloadToken.value}`,
+		`${props.path}?lang=${language.value}&t=${props.token}-${reloadToken.value}`,
 )
 </script>
 
@@ -65,7 +76,7 @@ const source = computed(
 				<Button
 					variant="ghost"
 					:icon-left="collapsed ? 'lucide-chevron-up' : 'lucide-chevron-down'"
-					:label="collapsed ? 'Show footer preview' : 'Footer preview'"
+					:label="collapsed ? `Show ${title.toLowerCase()}` : title"
 					@click="collapsed = !collapsed"
 				/>
 				<TabButtons v-if="!collapsed" v-model="language" :buttons="LANGUAGES" />
@@ -88,7 +99,7 @@ const source = computed(
 				<iframe
 					:key="language"
 					:src="source"
-					title="Footer preview"
+					:title="title"
 					class="origin-top-left border-0"
 					:style="{
 						width: `${FRAME_WIDTH}px`,

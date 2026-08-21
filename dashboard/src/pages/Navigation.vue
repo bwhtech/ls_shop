@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import NavInspector from "@/components/navigation/NavInspector.vue"
 import { useNavMenu } from "@/composables/useNavMenu"
 import type { MenuNode } from "@/types"
+import { useStorage } from "@vueuse/core"
 import {
 	Badge,
 	Breadcrumbs,
@@ -26,7 +28,10 @@ const {
 	mutate,
 	depthOf,
 	canNest,
+	revision,
 } = useNavMenu()
+
+const previewCollapsed = useStorage("ls-shop-navbar-preview-collapsed", false)
 
 const itemGroups = useCall<{ name: string }[]>({
 	url: "/api/v2/document/Item Group",
@@ -310,5 +315,13 @@ const menuActions = computed(() => [
 				<NavInspector @remove="removeEntry" />
 			</div>
 		</div>
+
+		<ChromePreview
+			v-model:collapsed="previewCollapsed"
+			:token="revision"
+			path="/navbar_editor_preview"
+			title="Navigation preview"
+			selector="header"
+		/>
 	</div>
 </template>
