@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
+import OrderProgress from "@/components/orders/OrderProgress.vue"
+import type { OrderProgressStep } from "@/components/orders/types"
 import type { OrderDetail } from "@/types"
 import {
 	Breadcrumbs,
@@ -23,7 +25,9 @@ import { useRoute } from "vue-router"
 const route = useRoute()
 const orderName = computed(() => String(route.params.name))
 
-const order = useCall<OrderDetail>({
+// The stepper's own shape lives with the component that draws it, so the shared OrderDetail type
+// stays as it is and this screen still gets a checked `progress`.
+const order = useCall<OrderDetail & { progress: OrderProgressStep[] }>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.get_order",
 	params: () => ({ sales_order: orderName.value }),
 	refetch: true,
@@ -85,6 +89,11 @@ function confirmFulfil() {
 				<p class="mt-1 text-p-sm text-ink-gray-5">
 					Placed {{ order.data.placed_on }} · {{ order.data.payment_mode ?? "No payment mode" }}
 				</p>
+
+				<OrderProgress
+					:steps="order.data.progress"
+					class="mt-5 rounded-6 border border-outline-gray-1 px-4 py-3.5"
+				/>
 
 				<section class="mt-6">
 					<h2 class="text-md text-ink-gray-9">Items</h2>

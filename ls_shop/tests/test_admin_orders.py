@@ -12,7 +12,9 @@ from ls_shop.api.admin.orders import (
 	OPEN_STATUSES,
 	SETTLED_STAGES,
 	STAGE_LABELS,
+	STEP_SEQUENCE,
 	can_fulfil_order,
+	describe_progress,
 	describe_state,
 	fulfil_order,
 	get_address_lines,
@@ -159,6 +161,107 @@ class TestFulfilmentLadder(UnitTestCase):
 		self.assertEqual(state, {"key": "On Hold", "label": "On Hold"})
 
 
+class TestFulfilmentSteps(UnitTestCase):
+	"""The stepper draws a *sequence*, which the ladder is not - it is a priority ordering. These pin
+	the translation between the two, and above all that a path which ended reads as ended."""
+
+	def keys(self, order, lifecycle=None):
+		return [step["key"] for step in describe_progress(order, lifecycle)]
+
+	def states(self, order, lifecycle=None):
+		return {step["key"]: step["state"] for step in describe_progress(order, lifecycle)}
+
+	def test_a_new_order_stands_on_the_first_node_with_the_rest_ahead_of_it(self):
+		steps = describe_progress(make_order())
+		self.assertEqual([step["key"] for step in steps], list(STEP_SEQUENCE))
+		self.assertEqual(steps[0]["state"], "current")
+		self.assertTrue(all(step["state"] == "upcoming" for step in steps[1:]))
+
+	def test_the_node_the_owner_is_on_is_the_ladder_s_own_answer(self):
+		lifecycle = frappe._dict(has_draft_delivery_note=True, has_packing_slip=True)
+		order = make_order()
+		self.assertEqual(self.states(order, lifecycle)["packed"], "current")
+		self.assertEqual(describe_state(order, lifecycle)["key"], "packed")
+
+	def test_everything_before_the_current_node_reads_as_done(self):
+		lifecycle = frappe._dict(stage_from_shipment="shipped")
+		states = self.states(make_order(), lifecycle)
+		self.assertEqual(states["to_fulfil"], "done")
+		self.assertEqual(states["delivery_note_drafted"], "done")
+		self.assertEqual(states["packed"], "done")
+		self.assertEqual(states["shipped"], "current")
+		self.assertEqual(states["delivered"], "upcoming")
+
+	def test_a_quantity_rung_annotates_the_dispatch_node_rather_than_adding_one(self):
+		""" "Partly fulfilled" says how much went out, not where the order is, so it must not become
+		a circle of its own - it would be a step no order ever has to pass through."""
+		steps = describe_progress(make_order(per_delivered=40))
+		self.assertEqual([step["key"] for step in steps], list(STEP_SEQUENCE))
+		shipped = next(step for step in steps if step["key"] == "shipped")
+		self.assertEqual(shipped["state"], "current")
+		self.assertEqual(shipped["note"], STAGE_LABELS["partly_fulfilled"])
+
+	def test_a_fully_fulfilled_order_has_not_yet_been_delivered(self):
+		order = make_order(status="Completed", per_delivered=100)
+		states = self.states(order)
+		self.assertEqual(states["shipped"], "current")
+		self.assertEqual(states["delivered"], "upcoming")
+
+	def test_a_cancelled_order_ends_the_path_instead_of_leaving_it_half_walked(self):
+		steps = describe_progress(make_order(docstatus=2))
+		self.assertEqual([step["key"] for step in steps], ["to_fulfil", "cancelled"])
+		self.assertEqual(steps[-1]["state"], "current")
+		self.assertNotIn("upcoming", [step["state"] for step in steps])
+
+	def test_a_cancelled_order_keeps_the_nodes_it_did_reach(self):
+		lifecycle = frappe._dict(has_packing_slip=True, has_draft_delivery_note=True)
+		self.assertEqual(
+			self.keys(make_order(docstatus=2), lifecycle),
+			["to_fulfil", "delivery_note_drafted", "packed", "cancelled"],
+		)
+
+	def test_a_returned_order_walked_as_far_as_dispatch_and_stops_there(self):
+		"""A return is what reset per_delivered, so the goods provably went out - but a parcel that
+		came back was never delivered, and the path must not offer Delivered as still to come."""
+		lifecycle = frappe._dict(has_return=True, delivery_notes=["MAT-DN-0001"])
+		steps = describe_progress(make_order(), lifecycle)
+		self.assertEqual(
+			[step["key"] for step in steps],
+			["to_fulfil", "delivery_note_drafted", "packed", "shipped", "returned"],
+		)
+		self.assertEqual(steps[-1]["state"], "current")
+		self.assertNotIn("delivered", [step["key"] for step in steps])
+
+	def test_a_delivered_parcel_that_came_back_keeps_its_delivery(self):
+		lifecycle = frappe._dict(has_return=True, stage_from_shipment="delivered")
+		# The carrier delivered it, so `pick_stage` reads delivered and the path has not ended.
+		self.assertEqual(self.keys(make_order(), lifecycle)[-1], "delivered")
+
+	def test_an_rto_parcel_never_arrived(self):
+		lifecycle = frappe._dict(stage_from_shipment="returned")
+		self.assertEqual(self.keys(make_order(), lifecycle)[-1], "returned")
+
+	def test_a_status_the_sequence_has_no_node_for_still_gets_said(self):
+		"""On Hold and Closed are not rungs, so they have no circle to stand on. The order stands on
+		what the paperwork proves instead, and ERPNext's own word rides along as the caption."""
+		steps = describe_progress(make_order(status="On Hold"))
+		current = next(step for step in steps if step["state"] == "current")
+		self.assertEqual(current["key"], "to_fulfil")
+		self.assertEqual(current["note"], "On Hold")
+
+	def test_an_off_ladder_order_stands_as_far_along_as_its_documents_reach(self):
+		lifecycle = frappe._dict(delivery_notes=["MAT-DN-0001"])
+		states = self.states(make_order(status="On Hold"), lifecycle)
+		self.assertEqual(states["delivery_note_drafted"], "current")
+		self.assertEqual(states["to_fulfil"], "done")
+
+	def test_every_node_is_named_for_a_person_not_by_its_key(self):
+		for step in describe_progress(make_order(docstatus=2)):
+			with self.subTest(step=step["key"]):
+				self.assertNotEqual(step["label"], step["key"])
+				self.assertTrue(step["label"])
+
+
 class TestAddressLines(UnitTestCase):
 	"""ERPNext hands over address_display as HTML; the dashboard renders text, so the <br> tags
 	used to appear literally on the order screen."""
@@ -296,6 +399,27 @@ class TestToFulfilAgreement(IntegrationTestCase):
 
 		to_fulfil = next(stat for stat in get_overview()["stats"] if stat["key"] == "to_fulfil")
 		self.assertEqual(to_fulfil["value"], get_orders(status="open")["total"])
+
+	def test_the_stepper_dates_the_nodes_it_can_and_leaves_the_rest_blank(self):
+		"""Timestamps ride along on reads the lifecycle already does, so they have to survive the
+		trip: the order date and the dispatch date come from real documents here."""
+		fulfil_order(self.sales_order.name)
+
+		steps = {step["key"]: step for step in get_order(self.sales_order.name)["progress"]}
+		self.assertEqual(steps["to_fulfil"]["at"], self.sales_order.transaction_date)
+		self.assertTrue(steps["delivery_note_drafted"]["at"])
+		self.assertTrue(steps["shipped"]["at"])
+		# Nothing was packed and no carrier moved it, so those nodes have no document to date them.
+		self.assertIsNone(steps["packed"]["at"])
+
+	def test_a_returned_order_reads_the_same_on_the_stepper_as_on_its_badge(self):
+		return_against_order(self.sales_order)
+
+		detail = get_order(self.sales_order.name)
+		self.assertEqual(detail["state"]["key"], "returned")
+		self.assertEqual(detail["progress"][-1]["key"], "returned")
+		self.assertEqual(detail["progress"][-1]["state"], "current")
+		self.assertTrue(detail["progress"][-1]["at"])
 
 	def test_the_tab_never_shows_an_order_wearing_a_settled_badge(self):
 		"""The bug in one line: every row of the worklist has to be an order the owner can still act on."""

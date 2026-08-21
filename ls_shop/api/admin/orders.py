@@ -37,6 +37,36 @@ STAGE_LABELS = {
 	"to_fulfil": "To fulfil",
 }
 
+# The stepper's spine: the path an order actually walks, in the order it walks it. STAGE_LABELS above
+# is a *priority* ordering - read top-down to answer "where is this order now" - which is not a
+# timeline. These five rungs are the ones that are genuinely sequential, and they are the only nodes
+# the stepper ever draws on the happy path.
+STEP_SEQUENCE = ("to_fulfil", "delivery_note_drafted", "packed", "shipped", "delivered")
+STEP_POSITIONS = {key: index for index, key in enumerate(STEP_SEQUENCE)}
+
+# Milestone wording, not badge wording. A stepper node names something that happened ("Order
+# placed"); the badge answers what the order still needs ("To fulfil"). Same keys, so the two can
+# only ever describe the same rung.
+STEP_LABELS = {
+	"to_fulfil": "Order placed",
+	"delivery_note_drafted": "Delivery note",
+	"packed": "Packed",
+	"shipped": "Shipped",
+	"delivered": "Delivered",
+	"cancelled": "Cancelled",
+	"returned": "Returned",
+}
+
+# Two rungs describe how *much* of the dispatch has happened rather than a step of its own, so they
+# annotate the dispatch node instead of adding a node the order never has to pass through. Nothing
+# in the ladder changes: they still decide the badge, they just do not earn a circle.
+QUANTITY_STAGES = {"partly_fulfilled": "shipped", "fulfilled": "shipped"}
+
+# Cancelled and returned END the path rather than sitting on it. An order on one of them is drawn as
+# the steps it really reached, then the terminal node - never with the rest of the happy path
+# trailing off as "upcoming", which it is now never going to walk.
+TERMINAL_STAGES = ("cancelled", "returned")
+
 # bwh_shipping tracks a parcel in the carrier's vocabulary; the dashboard only cares which rung of
 # the ladder that vocabulary lands on. Anything unlisted (Draft, Ready To Ship, Cancelled) is a
 # shipment that has not physically moved, so it leaves the stage to the documents underneath it.
@@ -263,6 +293,116 @@ def pick_stage(order, lifecycle) -> str:
 	return cstr(order.status)
 
 
+def describe_progress(order, lifecycle=None) -> list:
+	"""The order's walk along the fulfilment path, as the nodes a stepper draws.
+
+	One opinion about where an order is, not two: the current node is `pick_stage`'s own answer,
+	placed on the sequence rather than re-derived from the paperwork, so the stepper and the badge on
+	the same screen can never disagree.
+	"""
+	lifecycle = lifecycle or frappe._dict()
+	stage = pick_stage(order, lifecycle)
+	timestamps = read_step_timestamps(order, lifecycle)
+	reached = furthest_step_reached(order, lifecycle)
+
+	if stage in TERMINAL_STAGES:
+		steps = [build_step(key, "done", timestamps) for key in STEP_SEQUENCE[: reached + 1]]
+		steps.append(build_step(stage, "current", timestamps))
+		return steps
+
+	# A stage the sequence has no node for - a quantity rung, or ERPNext's own On Hold, Closed or
+	# Draft - has no position of its own. The quantity rungs borrow the dispatch node; anything else
+	# falls back to what the paperwork proves, because a truthful node with an odd caption beats a
+	# confidently wrong position. Either way the stage still gets said, as the node's note.
+	current = STEP_POSITIONS.get(QUANTITY_STAGES.get(stage, stage), reached)
+	note = None if stage in STEP_POSITIONS else STAGE_LABELS.get(stage) or cstr(order.status)
+
+	return [
+		build_step(
+			key,
+			"done" if index < current else "current" if index == current else "upcoming",
+			timestamps,
+			note=note if index == current else None,
+		)
+		for index, key in enumerate(STEP_SEQUENCE)
+	]
+
+
+def build_step(key: str, state: str, timestamps: dict, note: str | None = None) -> dict:
+	"""One node. `at` is only ever a date a document actually carries, never an inferred one."""
+	return {
+		"key": key,
+		"label": _(STEP_LABELS[key]),
+		"state": state,
+		"at": timestamps.get(key),
+		"note": _(note) if note else None,
+	}
+
+
+def furthest_step_reached(order, lifecycle) -> int:
+	"""How far along the sequence the paperwork proves this order got.
+
+	Only used where the stage cannot say it itself - a terminal order, which stopped somewhere the
+	stage no longer records, and an off-ladder status. A stepper marks everything before the furthest
+	node as done, so each rung only needs the evidence that it was passed, not that it was performed.
+	"""
+	reached = 0
+	if lifecycle.get("has_draft_delivery_note") or lifecycle.get("delivery_notes"):
+		reached = STEP_POSITIONS["delivery_note_drafted"]
+	if lifecycle.get("has_packing_slip"):
+		reached = max(reached, STEP_POSITIONS["packed"])
+	# A return proves the goods went out before they came back, and it is what reset per_delivered.
+	if flt(order.per_delivered) > 0 or lifecycle.get("has_return") or lifecycle.get("dispatched_on"):
+		reached = max(reached, STEP_POSITIONS["shipped"])
+	if lifecycle.get("stage_from_shipment") in ("shipped", "delivered", "returned"):
+		reached = max(reached, STEP_POSITIONS["shipped"])
+	# RTO is a parcel that came back without ever arriving, so only an actual delivery scan counts.
+	if lifecycle.get("stage_from_shipment") == "delivered":
+		reached = max(reached, STEP_POSITIONS["delivered"])
+	return reached
+
+
+def read_step_timestamps(order, lifecycle) -> dict:
+	"""When each node happened, taken from the documents the lifecycle reader already fetched.
+
+	Every one of these rides along on a query that was being run anyway, so timestamps cost the list
+	screen nothing; a node with no document behind it simply has no date.
+	"""
+	return {
+		"to_fulfil": order.transaction_date,
+		"delivery_note_drafted": lifecycle.get("drafted_on"),
+		"packed": lifecycle.get("packed_on"),
+		"shipped": lifecycle.get("shipped_on") or lifecycle.get("dispatched_on"),
+		"delivered": lifecycle.get("delivered_on"),
+		# The return document dates the goods actually coming back; an RTO has no such document, so
+		# the carrier's own word is the fallback rather than the first choice.
+		"returned": lifecycle.get("returned_on") or lifecycle.get("carrier_returned_on"),
+		# Cancelling is the last thing that can be done to a Sales Order, so its last write is when
+		# it was cancelled.
+		# ponytail: modified stands in for a cancellation timestamp, revisit if a version log is read here
+		"cancelled": order.get("modified") if cint(order.docstatus) == 2 else None,
+	}
+
+
+def keep_earliest(lifecycle, field: str, value) -> None:
+	"""First of its kind wins: an order split across two delivery notes was drafted when the first
+	one was, not when the last one was."""
+	if not value:
+		return
+	current = lifecycle.get(field)
+	if current is None or value < current:
+		lifecycle[field] = value
+
+
+def keep_latest(lifecycle, field: str, value) -> None:
+	"""Last of its kind wins: an order returned in two parts came back when the last part did."""
+	if not value:
+		return
+	current = lifecycle.get(field)
+	if current is None or value > current:
+		lifecycle[field] = value
+
+
 def read_order_lifecycles(order_names: list) -> dict:
 	"""The fulfilment paperwork behind a page of orders, in a fixed number of queries.
 
@@ -286,10 +426,12 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 	delivery_note_names = list(orders_by_delivery_note)
 	if delivery_note_names:
+		# creation and posting_date ride along on reads that were happening anyway, which is what
+		# lets the stepper date every node without costing the list screen a single extra query.
 		for note in frappe.get_all(
 			"Delivery Note",
 			filters={"name": ["in", delivery_note_names]},
-			fields=["name", "docstatus", "is_return"],
+			fields=["name", "docstatus", "is_return", "creation", "posting_date"],
 		):
 			for order_name in orders_by_delivery_note.get(cstr(note.name), ()):
 				lifecycle = lifecycles.setdefault(order_name, frappe._dict(delivery_notes=[]))
@@ -297,16 +439,23 @@ def read_order_lifecycles(order_names: list) -> dict:
 					lifecycle.delivery_notes.append(cstr(note.name))
 					if cint(note.is_return):
 						lifecycle.has_return = True
+						keep_latest(lifecycle, "returned_on", note.posting_date)
+						continue
+					keep_earliest(lifecycle, "dispatched_on", note.posting_date)
 				else:
 					lifecycle.has_draft_delivery_note = True
+				# A return note is paperwork about the way back, so it never dates the drafting of
+				# the outbound one.
+				keep_earliest(lifecycle, "drafted_on", note.creation)
 
 		for slip in frappe.get_all(
 			"Packing Slip",
 			filters={"delivery_note": ["in", delivery_note_names], "docstatus": ["<", 2]},
-			fields=["delivery_note"],
+			fields=["delivery_note", "creation"],
 		):
 			for order_name in orders_by_delivery_note.get(cstr(slip.delivery_note), ()):
 				lifecycles[order_name].has_packing_slip = True
+				keep_earliest(lifecycles[order_name], "packed_on", slip.creation)
 
 	read_shipment_stages(order_names, lifecycles)
 
@@ -331,13 +480,28 @@ def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 	for request in frappe.get_all(
 		"Shipping Request",
 		filters={"ref_doctype": "Sales Order", "ref_docname": ["in", order_names], "docstatus": ["<", 2]},
-		fields=["ref_docname", "status", "awb"],
+		fields=["ref_docname", "status", "awb", "creation", "modified", "pickup_date"],
 		order_by="creation desc",
 	):
 		lifecycle = lifecycles.get(cstr(request.ref_docname))
 		if lifecycle is None or "stage_from_shipment" in lifecycle:
 			continue
-		lifecycle.stage_from_shipment = SHIPMENT_STAGES.get(cstr(request.status))
+		stage = SHIPMENT_STAGES.get(cstr(request.status))
+		lifecycle.stage_from_shipment = stage
+		if stage in ("shipped", "delivered", "returned"):
+			# The booking is what put the parcel in the carrier's hands; the pickup date is the
+			# carrier's own word for that day, so it wins where the provider gave one.
+			keep_earliest(lifecycle, "shipped_on", request.pickup_date or request.creation)
+		if stage in ("delivered", "returned"):
+			# The request is written when a carrier scan is applied to it, so its last write is when
+			# it landed on the status it now holds. The scans themselves live in a child table that
+			# would cost a query per screen to read.
+			# ponytail: the request's last write stands in for the delivery scan, revisit by reading
+			# the Shipping Tracking Event row once the connector records them on this site
+			# Kept apart from the return note's own posting date rather than folded into it: one is a
+			# date and the other a datetime, and the two must never be compared against each other.
+			field = "delivered_on" if stage == "delivered" else "carrier_returned_on"
+			keep_latest(lifecycle, field, request.modified)
 
 
 @frappe.whitelist()
@@ -363,6 +527,7 @@ def get_order(sales_order: str):
 			"custom_ecommerce_payment_mode",
 			"shipping_address",
 			"address_display",
+			"modified",
 		],
 		as_dict=True,
 	)
@@ -399,6 +564,7 @@ def get_order(sales_order: str):
 		"placed_on": order.transaction_date,
 		"status": order.status,
 		"state": state,
+		"progress": describe_progress(order, lifecycle),
 		"currency": order.currency,
 		"total": flt(order.total),
 		"grand_total": flt(order.grand_total),
