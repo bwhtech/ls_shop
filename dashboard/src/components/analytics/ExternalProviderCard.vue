@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openSettings } from "@/components/settings"
 import type { ProviderReadback } from "@/types"
 import { formatCount } from "@/utils/format"
 import { Button } from "frappe-ui"
@@ -33,7 +34,7 @@ function readableMetric(key: string) {
 }
 
 function openAnalyticsSettings() {
-	window.open("/app/analytics-settings", "_blank")
+	openSettings("analytics")
 }
 </script>
 
@@ -51,7 +52,7 @@ function openAnalyticsSettings() {
 			<Button
 				variant="subtle"
 				icon-left="lucide-plug"
-				label="Set up in Analytics Settings"
+				label="Set up tracking"
 				@click="openAnalyticsSettings"
 			/>
 		</div>

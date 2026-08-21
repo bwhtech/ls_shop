@@ -9,6 +9,7 @@ import {
 } from "frappe-ui"
 import { markRaw } from "vue"
 import AdvancedSettings from "./AdvancedSettings.vue"
+import AnalyticsSettings from "./AnalyticsSettings.vue"
 import AppearanceSettings from "./AppearanceSettings.vue"
 import FooterSettings from "./FooterSettings.vue"
 import PaymentSettings from "./PaymentSettings.vue"
@@ -51,6 +52,13 @@ const tabs = [
 		slug: "payments",
 		icon: "lucide-credit-card",
 		component: markRaw(PaymentSettings),
+		group: "Store",
+	},
+	{
+		label: "Analytics & tracking",
+		slug: "analytics",
+		icon: "lucide-chart-line",
+		component: markRaw(AnalyticsSettings),
 		group: "Store",
 	},
 	{

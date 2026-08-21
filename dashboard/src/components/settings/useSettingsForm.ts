@@ -1,7 +1,7 @@
 import { toast, useCall } from "frappe-ui"
 import { computed, reactive, toRaw, watch } from "vue"
 
-const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin.settings."
+const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin."
 
 export type SettingsValue = string | number | boolean | null
 
@@ -14,16 +14,20 @@ export function normalizeValue(value: unknown): string {
 }
 
 /**
- * One load/edit/save cycle for a slice of Lifestyle Settings, shared by every settings tab
- * so each tab is only its field list and its markup.
+ * One load/edit/save cycle for a slice of settings, shared by every settings tab so each tab
+ * is only its field list and its markup.
+ *
+ * `apiModule` names the file under ls_shop/api/admin/ that owns the pair of endpoints - most
+ * tabs read Lifestyle Settings out of settings.py, but a tab backed by its own doctype does not.
  */
 export function useSettingsForm(
 	resource: string,
 	fieldnames: readonly string[],
 	savedMessage: string,
+	apiModule = "settings",
 ) {
 	const settings = useCall<Record<string, SettingsValue>>({
-		url: `${METHOD_PREFIX}get_${resource}`,
+		url: `${METHOD_PREFIX}${apiModule}.get_${resource}`,
 	})
 
 	const form = reactive<Record<string, SettingsValue>>(
@@ -50,7 +54,7 @@ export function useSettingsForm(
 	})
 
 	const save = useCall<Record<string, SettingsValue>>({
-		url: `${METHOD_PREFIX}save_${resource}`,
+		url: `${METHOD_PREFIX}${apiModule}.save_${resource}`,
 		method: "POST",
 		immediate: false,
 		onSuccess: () => {

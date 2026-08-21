@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { openSettings } from "@/components/settings"
 import { onAnalyticsRefresh } from "@/composables/useAnalyticsRange"
 import type { BadgeTheme, ProviderHealth, TrackingHealth } from "@/types"
 import { formatCount } from "@/utils/format"
-import { Badge, useCall } from "frappe-ui"
+import { Badge, Button, useCall } from "frappe-ui"
 import { computed } from "vue"
 import AnalyticsPanel from "./AnalyticsPanel.vue"
 import AnalyticsTable from "./AnalyticsTable.vue"
@@ -61,6 +62,15 @@ const rows = computed(() => {
 	]
 })
 
+// Off and Error both end at the same place - the credentials screen.
+const needsAttention = computed(() => {
+	const data = health.data
+	if (!data) return false
+	return [data.ga4, data.meta].some(
+		(provider) => !provider?.configured || !provider.ok,
+	)
+})
+
 const warnings = computed(() =>
 	[health.data?.ga4?.error, health.data?.meta?.error].filter(
 		(error): error is string => Boolean(error),
@@ -103,6 +113,14 @@ const warnings = computed(() =>
 			>
 				{{ warning }}
 			</p>
+
+			<Button
+				v-if="needsAttention"
+				variant="subtle"
+				icon-left="lucide-plug"
+				label="Manage tracking settings"
+				@click="openSettings('analytics')"
+			/>
 		</div>
 	</AnalyticsPanel>
 </template>
