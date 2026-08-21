@@ -15,6 +15,7 @@ from frappe.utils.data import (
 )
 
 from ls_shop.analytics import facebook, ga4
+from ls_shop.api.admin.orders import get_reporting_currency
 
 KNOWN_PROVIDER_ERRORS = {
 	"meta": "Meta denied pixel stats — the token needs ads_read AND the pixel's connected ad account assigned to the system user",
@@ -174,7 +175,10 @@ def get_overview(from_date: str, to_date: str):
 	previous_from, previous_to = get_previous_window(from_date, to_date)
 	previous = get_period_kpis(previous_from, previous_to)
 	return {
-		"currency": frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency"),
+		# Every figure on this screen is a base_grand_total sum, which is denominated in the
+		# company's currency - Global Defaults is a different setting and disagreed with it, so the
+		# tiles were labelling company-currency money with the global symbol.
+		"currency": get_reporting_currency(),
 		"kpis": {key: {"value": current[key], "previous": previous[key]} for key in current},
 	}
 
