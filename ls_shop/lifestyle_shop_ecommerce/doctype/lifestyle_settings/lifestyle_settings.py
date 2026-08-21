@@ -226,11 +226,16 @@ class LifestyleSettings(Document):
 
 	@frappe.whitelist()
 	def install_demo_data(self):
-		"""Install demo data for testing LS Shop"""
-		from ls_shop.install_demo_data import install_demo_data
+		"""Seed the Pixio demo storefront.
+
+		Points at install_pixio_demo, not the older install_demo_data: that one seeds a car-parts
+		catalogue and creates its price lists in USD, which mismatches any non-USD company and blocks
+		every Sales Invoice the demo goes on to raise.
+		"""
+		from ls_shop.install_pixio_demo import install_pixio_demo
 
 		frappe.enqueue(
-			install_demo_data,
+			install_pixio_demo,
 			queue="long",
 			timeout=3000,
 		)

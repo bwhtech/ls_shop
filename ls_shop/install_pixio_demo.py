@@ -28,7 +28,7 @@ from ls_shop.install_fashion_demo_data import (
 	IMAGE_ROOT,
 	install_fashion_demo_data,
 )
-from ls_shop.install_pixio_theme_data import install_pixio_theme_data
+from ls_shop.install_pixio_theme_data import PRODUCTS_URL, install_pixio_theme_data
 
 THEME = "Pixio Theme"
 DEMO_SIZES = DEFAULT_SIZES
@@ -46,6 +46,15 @@ COD_CHARGE_APPLICABLE_BELOW = 999
 # pricing on an India demo. Rates are recomputed from FASHION_PRODUCTS rather than scaled off
 # whatever is in the table, so a second run lands on the same number instead of compounding.
 RUPEE_MULTIPLIER = 50
+
+# Banners for the ORIGINAL (un-themed / Shop Default Theme) homepage, which reads Landing Page
+# Settings rather than Pixio Theme Settings. Seeding both means flipping Shop Theme Settings
+# .active_theme swaps the whole storefront look with the same catalogue underneath - which is the
+# point of having them side by side in a demo.
+DEFAULT_HOMEPAGE_IMAGES = "/assets/ls_shop/images/homepage/demo"
+DEFAULT_HERO_BANNERS = ("hero-1.webp", "hero-2.webp", "hero-3.webp", "hero-4.webp")
+DEFAULT_PROMO_TILES = ("tile-1.webp", "tile-2.webp", "tile-3.webp", "tile-4.webp")
+DEFAULT_WIDE_BANNER = "wide-1.webp"
 
 STORE_COPY = {
 	"store_name": "Pixio",
@@ -116,6 +125,7 @@ def install_pixio_demo():
 	install_pixio_theme_data()
 	apply_rupee_hero_prices()
 
+	save_default_homepage()
 	save_footer_sections()
 	save_mode_of_payment_accounts()
 
@@ -272,6 +282,41 @@ def apply_rupee_hero_prices():
 		if not amount:
 			continue
 		slide.subheading = f"₹{to_rupees(float(amount)):,}"
+
+	settings.save(ignore_permissions=True)
+
+
+def save_default_homepage():
+	"""Fill Landing Page Settings so the un-themed storefront is a real page, not an empty one.
+
+	The picks deliberately reuse whatever the catalogue already published rather than seeding a
+	second product set: the two themes are meant to differ in look, not in what is for sale.
+	"""
+	settings = frappe.get_doc("Landing Page Settings")
+
+	settings.hero_banner = []
+	for banner in DEFAULT_HERO_BANNERS:
+		settings.append(
+			"hero_banner",
+			{"banner_image": f"{DEFAULT_HOMEPAGE_IMAGES}/{banner}", "url": PRODUCTS_URL},
+		)
+
+	for index, tile in enumerate(DEFAULT_PROMO_TILES, start=1):
+		settings.set(f"gif_{index}", f"{DEFAULT_HOMEPAGE_IMAGES}/{tile}")
+		settings.set(f"gif_url_{index}", PRODUCTS_URL)
+
+	settings.banner_1 = f"{DEFAULT_HOMEPAGE_IMAGES}/{DEFAULT_WIDE_BANNER}"
+	settings.banner_url_1 = PRODUCTS_URL
+
+	published = frappe.get_all(
+		"Style Attribute Variant", filters={"is_published": 1}, pluck="name", order_by="creation"
+	)
+	settings.new_arrivals = []
+	settings.best_picks = []
+	for name in published[:6]:
+		settings.append("new_arrivals", {"item_variant": name})
+	for name in published[6:12]:
+		settings.append("best_picks", {"item_variant": name})
 
 	settings.save(ignore_permissions=True)
 
