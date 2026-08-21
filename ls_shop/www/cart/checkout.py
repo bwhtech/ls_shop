@@ -21,7 +21,10 @@ no_cache = True
 def get_context(context):
 	current_user = frappe.session.user
 	if current_user == "Guest":
-		raise frappe.PermissionError
+		# A guest deep-linking to checkout used to get Frappe's bare 403. The cart is where both
+		# themes offer the sign-in dialog, and it is the step this shopper has to come back through
+		# anyway, so send them there rather than to an error page.
+		frappe.redirect(f"/{frappe.local.lang}/cart")
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
 		frappe.redirect(f"/{frappe.local.lang}/cart")

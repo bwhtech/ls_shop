@@ -149,9 +149,13 @@
 							</tbody>
 						</table>
 						{% if frappe.session.user == "Guest" %}
-							<a href="/login?redirect-to=/{{ language }}/cart/checkout" class="btn btn-secondary w-100">
-								{{ _("Login to Checkout") }}
-							</a>
+							{# The dialog lives in site_header.html and reloads the page once the OTP lands,
+							   which re-renders this block as the Place Order button - so signing in never
+							   leaves the cart, and never hands the shopper Frappe's own login page. #}
+							<button type="button" class="btn btn-secondary w-100"
+								@click="$dispatch('open-auth')">
+								{{ _("Sign In to Checkout") }}
+							</button>
 						{% else %}
 							<button type="button" class="btn btn-secondary w-100" :disabled="checkout_loading"
 								@click="save_quotation_for_checkout()">

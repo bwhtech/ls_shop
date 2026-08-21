@@ -143,6 +143,9 @@
 
 	{% include "components/overlays/search_canvas.html" %}
 	{% include "components/overlays/cart_drawer.html" %}
+	{% if frappe.session.user == "Guest" %}
+		{% include "components/overlays/auth_dialog.html" %}
+	{% endif %}
 
 	{# Bootstrap writes this element from the JS this theme does not load, so the header emits it
 	   itself; style.css already carries .offcanvas-backdrop. The mobile drawer is deliberately

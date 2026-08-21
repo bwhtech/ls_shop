@@ -24,10 +24,13 @@ DEFAULT_ROUTES = [
 		"requires_auth": 0,
 	},
 	{"url_pattern": rf"^{LANG}/cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
+	# Gated by www.cart.checkout.get_context, not here. The resolver's own gate raises before any
+	# controller runs, so a guest deep-linking to checkout got a bare 403 with no way back; the
+	# controller sends them to the cart instead, where both themes offer the sign-in dialog.
 	{
 		"url_pattern": rf"^{LANG}/cart/checkout$",
 		"template_path": "pages/cart/checkout.html",
-		"requires_auth": 1,
+		"requires_auth": 0,
 	},
 	{
 		"url_pattern": rf"^{LANG}/account/dashboard$",
