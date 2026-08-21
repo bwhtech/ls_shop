@@ -5,6 +5,17 @@ import frappe
 from frappe.utils.data import cint, cstr, flt
 
 SETTINGS_DOCTYPE = "Lifestyle Settings"
+BRANDING_DOCTYPE = "Website Settings"
+
+# The Store tab spans two doctypes: the three brand assets moved to Website Settings, which is where
+# Frappe already keeps them and where ls_shop.branding reads them from; everything else on the tab
+# stays on Lifestyle Settings. The payload keys below are the pre-move ones on purpose - the Vue tab
+# and the sidebar bind to them - so this map is the only place the two names meet.
+BRANDING_FIELDS = {
+	"brand_logo": "banner_image",
+	"footer_logo": "footer_logo",
+	"favicon": "favicon",
+}
 
 STORE_DETAIL_FIELDS = (
 	"store_name",
@@ -15,6 +26,10 @@ STORE_DETAIL_FIELDS = (
 	"contact_phone",
 	"working_hours",
 	"company",
+)
+
+STORE_DETAIL_SETTINGS_FIELDS = tuple(
+	fieldname for fieldname in STORE_DETAIL_FIELDS if fieldname not in BRANDING_FIELDS
 )
 
 SHIPPING_FIELDS = ("shipping_rule", "return_period")
@@ -93,15 +108,42 @@ def write_settings_fields(allowed_fieldnames, values):
 	return {fieldname: settings.get(fieldname) for fieldname in allowed_fieldnames}
 
 
+def read_branding_fields():
+	"""The three brand assets, off Website Settings, under the payload's own key names."""
+	frappe.has_permission(BRANDING_DOCTYPE, ptype="read", throw=True)
+
+	website_settings = frappe.get_cached_doc(BRANDING_DOCTYPE)
+	return {key: website_settings.get(fieldname) for key, fieldname in BRANDING_FIELDS.items()}
+
+
+def write_branding_fields(values):
+	"""Write whichever brand assets the payload carries. Website Settings gets its own permission
+	check - a role that may edit Lifestyle Settings is not thereby allowed to edit the website."""
+	if not any(key in values for key in BRANDING_FIELDS):
+		return read_branding_fields()
+
+	frappe.has_permission(BRANDING_DOCTYPE, ptype="write", throw=True)
+
+	meta = frappe.get_meta(BRANDING_DOCTYPE)
+	website_settings = frappe.get_doc(BRANDING_DOCTYPE)
+	for key, fieldname in BRANDING_FIELDS.items():
+		if key in values:
+			fieldtype = meta.get_field(fieldname).fieldtype
+			website_settings.set(fieldname, coerce_field_value(fieldtype, values[key]))
+
+	website_settings.save()
+	return {key: website_settings.get(fieldname) for key, fieldname in BRANDING_FIELDS.items()}
+
+
 @frappe.whitelist()
 def get_store_settings():
 	"""Branding and contact details - the fields a store owner touches most."""
-	return read_settings_fields(STORE_DETAIL_FIELDS)
+	return read_settings_fields(STORE_DETAIL_SETTINGS_FIELDS) | read_branding_fields()
 
 
 @frappe.whitelist(methods=["POST"])
 def save_store_settings(**kwargs):
-	return write_settings_fields(STORE_DETAIL_FIELDS, kwargs)
+	return write_settings_fields(STORE_DETAIL_SETTINGS_FIELDS, kwargs) | write_branding_fields(kwargs)
 
 
 @frappe.whitelist()

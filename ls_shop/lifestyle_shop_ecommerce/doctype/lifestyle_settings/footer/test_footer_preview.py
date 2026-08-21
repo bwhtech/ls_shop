@@ -17,6 +17,7 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.footer.footer_p
 	reorder_footer_sections,
 	update_footer_link,
 )
+from ls_shop.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from ls_shop.www.footer_editor_preview import COLOR_PATTERN, get_context
 
 
@@ -248,6 +249,42 @@ class TestFooterEditor(IntegrationTestCase):
 		self.assertNotIn("expression(1)", html)
 		self.assertNotIn("<script>alert(2)", html)
 		self.assertIn("&lt;script&gt;alert(2)", html)
+
+	def render_preview(self, **overrides):
+		original_form_dict = frappe.local.form_dict
+		frappe.local.form_dict = frappe._dict(lang="en", **overrides)
+		try:
+			context = frappe._dict()
+			get_context(context)
+			return context.rendered_html
+		finally:
+			frappe.local.form_dict = original_form_dict
+
+	def test_preview_renders_the_active_theme_not_the_base_footer(self):
+		"""The base template hardcodes columns the editor's board does not manage, so falling back
+		to it makes the preview disagree with the board about what exists and in what order."""
+		html = self.render_preview()
+
+		theme_name = resolve_active_theme()
+		if not get_theme_context(theme_name)["dirs"]:
+			self.skipTest("no theme active on this site")
+
+		self.assertIn("page-wraper" if theme_name == "Pixio Theme" else "theme-shop-default", html)
+
+	def test_preview_hides_every_chrome_but_the_footer(self):
+		html = self.render_preview()
+
+		self.assertIn("<footer", html)
+		self.assertNotIn("<header", html)
+		self.assertNotIn("<nav", html)
+		self.assertNotIn("breadcrumb", html)
+
+	def test_preview_markup_is_balanced(self):
+		"""The layout opens its page wrapper in one block and closes it in another, so blanking the
+		wrong one leaves the footer outside the element every theme rule is scoped under."""
+		html = self.render_preview()
+
+		self.assertEqual(html.count("<div"), html.count("</div>"))
 
 	def test_get_context_applies_accepted_overrides(self):
 		original_form_dict = frappe.local.form_dict

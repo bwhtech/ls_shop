@@ -11,7 +11,10 @@ export default defineConfig({
 				// whatever webserver_port common_site_config says (8000 here) and routes by
 				// the request's Host, so browse the app at <site>:8080 to hit the right site.
 				port: 8080,
-				source: "^/(app|login|api|assets|files|private)",
+				// footer_editor_preview is a Frappe-rendered www page the footer editor loads in an
+				// iframe. Anything not matched here falls through to vite's SPA fallback, so leaving it
+				// out makes the preview pane render the dashboard inside itself instead of the storefront.
+				source: "^/(app|login|api|assets|files|private|footer_editor_preview|navbar_editor_preview)(/|\\?|$)",
 			},
 			jinjaBootData: true,
 			lucideIcons: true,

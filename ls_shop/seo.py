@@ -3,6 +3,8 @@ from urllib.parse import quote, urlsplit, urlunsplit
 import frappe
 from frappe.utils import cstr, flt, get_url, strip_html_tags
 
+from ls_shop.branding import get_configured_brand_assets
+
 META_DESCRIPTION_MAX_LENGTH = 160
 
 DEFAULT_OG_IMAGE = "/assets/ls_shop/images/1.jpg"
@@ -257,7 +259,7 @@ def build_page_seo(source, display_name=None, page_type="website"):
 	image = (
 		source.get("og_image")
 		or settings.get("default_share_image")
-		or settings.get("favicon")
+		or get_configured_brand_assets()["favicon"]
 		or DEFAULT_OG_IMAGE
 	)
 
@@ -354,7 +356,9 @@ def build_collection_json_ld(category, breadcrumbs, total_count=0):
 def default_seo():
 	settings = get_seo_settings()
 
-	image = settings.get("default_share_image") or settings.get("favicon") or DEFAULT_OG_IMAGE
+	image = (
+		settings.get("default_share_image") or get_configured_brand_assets()["favicon"] or DEFAULT_OG_IMAGE
+	)
 
 	return {
 		"title": apply_title_template(),
@@ -372,7 +376,7 @@ def default_seo():
 def org_website_json_ld():
 	settings = get_seo_settings()
 	store_name = get_store_name()
-	favicon = settings.get("favicon")
+	favicon = get_configured_brand_assets()["favicon"]
 	site_url = get_url()
 
 	organization = {

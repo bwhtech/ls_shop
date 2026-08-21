@@ -158,7 +158,7 @@ function saveDetails() {
 					theme="yellow"
 					:dismissible="false"
 					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
-					:description="`${blockedOptions.join(', ')} still needs a photo before it can go live.`"
+					:description="`${blockedOptions.join(', ')} still ${blockedOptions.length > 1 ? 'need' : 'needs'} a photo before ${blockedOptions.length > 1 ? 'they' : 'it'} can go live.`"
 				/>
 
 				<div class="flex items-baseline justify-between">

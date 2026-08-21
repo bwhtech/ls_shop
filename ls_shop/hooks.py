@@ -162,6 +162,7 @@ doc_events = {
 jinja = {
 	"filters": ["ls_shop.utils.can_return"],
 	"methods": [
+		"ls_shop.branding.get_brand_assets",
 		"ls_shop.utils.format_theme_css",
 		"ls_shop.utils.get_currency_symbol",
 		"ls_shop.search.result_card.get_search_result_fields",

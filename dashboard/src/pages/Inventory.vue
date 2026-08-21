@@ -89,7 +89,11 @@ const columns = [
 			<span class="ml-auto text-sm text-ink-gray-5">{{ inventory.data?.total ?? 0 }} sizes</span>
 		</div>
 
-		<ListSkeleton v-if="inventory.loading && !rows.length" class="px-3 sm:px-5" />
+		<ListSkeleton
+			v-if="inventory.loading && !inventory.data"
+			class="px-3 sm:px-5"
+			:columns="columns"
+		/>
 
 		<ListView
 			v-else

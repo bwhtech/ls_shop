@@ -9,9 +9,12 @@
    The reference footer carries no social row, so the header's `.dz-social-icon` block is not
    repeated here and nothing was extracted into a shared macro. #}
 
-{% set settings = frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings") %}
+{# preview_settings carries the footer editor's unsaved values, so binding straight to the saved
+   doc would make the preview ignore whatever the shop owner is currently typing. Same idiom as
+   templates/includes/footer.html. #}
+{% set settings = preview_settings if preview_settings is defined and preview_settings else frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings") %}
 {% set store_name = settings.store_name or "Lifestyle" %}
-{% set footer_logo = settings.footer_logo or settings.brand_logo or "/assets/ls_shop/images/lifestyle.png" %}
+{% set footer_logo = preview_settings.footer_logo if preview_settings is defined and preview_settings and preview_settings.footer_logo else get_brand_assets().footer_logo %}
 {% set contact_email = settings.contact_email or "Contact@lifestyle.sa" %}
 {% set contact_phone = settings.contact_phone or "920000576" %}
 {% set working_hours = settings.working_hours or "Sun - Thu / 10.00 AM - 6.00 PM" %}

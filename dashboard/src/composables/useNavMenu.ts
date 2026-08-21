@@ -127,8 +127,13 @@ async function call<T = EditorData>(
 async function mutate(name: string, params: Record<string, unknown> = {}) {
 	const data = await call(name, params)
 	apply(data as EditorData)
+	// Every menu change funnels through here, so this is the one place the storefront preview has
+	// to be told the menu it rendered is now stale.
+	revision.value += 1
 	return data
 }
+
+const revision = ref(0)
 
 async function load() {
 	apply(await call("get_editor_data"))
@@ -138,6 +143,7 @@ export function useNavMenu() {
 	return {
 		menu,
 		maxDepth,
+		revision,
 		selectedName,
 		selected,
 		loading: computed(() => request.loading),
