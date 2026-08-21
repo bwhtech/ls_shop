@@ -346,12 +346,12 @@
 			},
 			{ fieldtype: 'Section Break' },
 			{
-				fieldname: 'item_groups',
-				fieldtype: 'MultiSelectPills',
-				label: __('Item Groups'),
+				fieldname: 'item_group',
+				fieldtype: 'Link',
+				label: __('Item Group'),
+				options: 'Item Group',
 				depends_on: 'eval:doc.link_type == "Item Group"',
-				default: node.item_groups,
-				get_data: (txt) => frappe.db.get_link_options('Item Group', txt),
+				default: node.item_group,
 			},
 			{
 				fieldname: 'brand',
@@ -491,7 +491,7 @@
 	}
 
 	function get_link_target(link_type, values) {
-		if (link_type === 'Item Group') return values.item_groups || [];
+		if (link_type === 'Item Group') return values.item_group || '';
 		if (link_type === 'Brand') return values.brand || '';
 		if (link_type === 'URL') return values.url || '';
 		return '';

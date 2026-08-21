@@ -68,7 +68,6 @@ class TestNavbarFlow(IntegrationTestCase):
 		self.brand = frappe.get_doc({"doctype": "Brand", "brand": f"{PREFIX} Brand {self.tag}"}).insert().name
 
 	def tearDown(self):
-		frappe.db.delete("Ecommerce Category Item Group", {"parent": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Brand", {"name": ["like", f"{PREFIX}%"]})
@@ -172,14 +171,14 @@ class TestNavbarFlow(IntegrationTestCase):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
 		accessories = self.add_node(men, f"{PREFIX} Accessories")
-		bags = self.add_node(accessories, f"{PREFIX} Bags", "Item Group", [self.bags])
+		bags = self.add_node(accessories, f"{PREFIX} Bags", "Item Group", self.bags)
 		brand_tab = self.add_node(women, f"{PREFIX} Brand Tab", "Brand", self.brand)
 
 		before = self.master_data_snapshot()
 		shape_before = labels_in_order(navbar_manager.get_menu_editor_data()["menu"])
 
 		navbar_manager.update_node(bags, display_name=f"{PREFIX} Handbags")
-		navbar_manager.update_node(brand_tab, link_type="Item Group", link_target=[self.bags, self.shirts])
+		navbar_manager.update_node(brand_tab, link_type="Item Group", link_target=self.shirts)
 		navbar_manager.reorder_nodes("", [women, men])
 		navbar_manager.move_node(accessories, women, 0)
 		navbar_manager.set_visibility(brand_tab, 0)
@@ -205,7 +204,7 @@ class TestNavbarFlow(IntegrationTestCase):
 
 		self.assert_master_data_untouched(before)
 		roots = navbar_manager.get_menu_editor_data()["menu"]
-		linked_at_root = {group for root in roots for group in root["item_groups"]}
+		linked_at_root = {root["item_group"] for root in roots if root["item_group"]}
 		top_level = set(
 			frappe.get_all(
 				"Item Group", filters={"parent_item_group": get_root_of("Item Group")}, pluck="name"
@@ -234,7 +233,7 @@ class TestNavbarFlow(IntegrationTestCase):
 		)
 		# The fourth catalog level is skipped rather than thrown, and never reaches the menu.
 		self.assertFalse(frappe.db.exists("Ecommerce Category", {"display_name": self.too_deep}))
-		self.assertFalse(frappe.db.exists("Ecommerce Category Item Group", {"item_group": self.too_deep}))
+		self.assertFalse(frappe.db.exists("Ecommerce Category", {"item_group": self.too_deep}))
 		self.assert_nested_set_valid("after a repeated import")
 
 	def test_import_leaves_bounds_a_rebuild_would_not_change(self):
@@ -382,38 +381,28 @@ class TestNavbarFlow(IntegrationTestCase):
 		self.assertEqual((before.lft, before.rgt), (after.lft, after.rgt))
 		self.assert_nested_set_valid("after renaming an imported node")
 
-	def test_delete_node_removes_the_row_and_its_item_group_links(self):
+	def test_delete_node_removes_the_row_and_its_item_group_link(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
-		bags = self.add_node(men, f"{PREFIX} Bags", "Item Group", [self.bags, self.shirts])
-		self.assertEqual(
-			frappe.get_all(
-				"Ecommerce Category Item Group",
-				filters={"parent": bags},
-				order_by="idx asc",
-				pluck="item_group",
-			),
-			[self.bags, self.shirts],
-		)
+		bags = self.add_node(men, f"{PREFIX} Bags", "Item Group", self.bags)
+		self.assertEqual(frappe.db.get_value("Ecommerce Category", bags, "item_group"), self.bags)
 
 		navbar_manager.delete_node(bags)
 
 		self.assertFalse(frappe.db.exists("Ecommerce Category", bags))
-		self.assertFalse(frappe.db.exists("Ecommerce Category Item Group", {"parent": bags}))
 		self.assertTrue(frappe.db.exists("Ecommerce Category", men), "the parent must survive")
 		self.assert_nested_set_valid("after deleting a linked node")
 
 	def test_delete_node_cascades_through_the_subtree_and_keeps_the_nested_set_valid(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		column = self.add_node(men, f"{PREFIX} Accessories")
-		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", [self.bags])
+		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", self.bags)
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
-		kept_leaf = self.add_node(women, f"{PREFIX} Shirts", "Item Group", [self.shirts])
+		kept_leaf = self.add_node(women, f"{PREFIX} Shirts", "Item Group", self.shirts)
 
 		navbar_manager.delete_node(men)
 
 		for name in (men, column, leaf):
 			self.assertFalse(frappe.db.exists("Ecommerce Category", name))
-		self.assertFalse(frappe.db.exists("Ecommerce Category Item Group", {"parent": leaf}))
 		self.assertTrue(frappe.db.exists("Ecommerce Category", kept_leaf), "an unrelated branch was cut")
 		self.assert_nested_set_valid("after deleting a branch with grandchildren")
 
@@ -421,9 +410,9 @@ class TestNavbarFlow(IntegrationTestCase):
 		"""A hidden entry must take its children and grandchildren with it, not promote them."""
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		hidden_column = self.add_node(men, f"{PREFIX} Hidden Column")
-		buried_leaf = self.add_node(hidden_column, f"{PREFIX} Buried Leaf", "Item Group", [self.bags])
+		buried_leaf = self.add_node(hidden_column, f"{PREFIX} Buried Leaf", "Item Group", self.bags)
 		kept_column = self.add_node(men, f"{PREFIX} Kept Column")
-		kept_leaf = self.add_node(kept_column, f"{PREFIX} Kept Leaf", "Item Group", [self.shirts])
+		kept_leaf = self.add_node(kept_column, f"{PREFIX} Kept Leaf", "Item Group", self.shirts)
 
 		navbar_manager.set_visibility(hidden_column, 0)
 
@@ -450,7 +439,7 @@ class TestNavbarFlow(IntegrationTestCase):
 	def test_hiding_a_root_tab_takes_the_whole_tab_with_it(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		column = self.add_node(men, f"{PREFIX} Accessories")
-		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", [self.bags])
+		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", self.bags)
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
 
 		navbar_manager.set_visibility(men, 0)

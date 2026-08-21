@@ -4,6 +4,9 @@ import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
 
 from ls_shop.api.payments import COD_PAYMENT_MODE
+from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar.navbar_manager import (
+	seed_menu_when_empty,
+)
 from ls_shop.search.build import ensure_index_built
 from ls_shop.search.record_builder import DEFAULT_CONTENT_FIELDS
 from ls_shop.search.result_card import DEFAULT_RESULT_FIELDS, RESULT_CARD_CATALOG
@@ -33,6 +36,7 @@ def after_install():
 	setup_robots_txt()
 	seed_llms_txt()
 	seed_default_routes()
+	seed_menu_when_empty()
 
 
 def after_migrate():

@@ -43,7 +43,6 @@ class TestStorefrontNav(IntegrationTestCase):
 		frappe.local.ls_shop_storefront_menu = None
 
 	def tearDown(self):
-		frappe.db.delete("Ecommerce Category Item Group", {"parent": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 		frappe.local.ls_shop_storefront_menu = None
@@ -129,27 +128,27 @@ class TestStorefrontNav(IntegrationTestCase):
 			[f"{PREFIX} B2 {self.tag}", f"{PREFIX} B1 {self.tag}"],
 		)
 
-	def test_category_facets_key_every_tab_and_carry_the_item_group_csv(self):
+	def test_category_facets_key_every_tab_and_carry_the_item_group(self):
 		shirts = self.make_item_group(f"{PREFIX} Shirts {self.tag}")
 		belts = self.make_item_group(f"{PREFIX} Belts {self.tag}")
 		tab = navbar_manager.create_node("", f"{PREFIX} Men {self.tag}").name
-		navbar_manager.create_node(tab, f"{PREFIX} Tops", "Item Group", [shirts, belts])
+		navbar_manager.create_node(tab, f"{PREFIX} Tops", "Item Group", shirts)
+		navbar_manager.create_node(tab, f"{PREFIX} Belts Tab", "Item Group", belts)
 		frappe.local.ls_shop_storefront_menu = None
 
 		all_tabs = get_category_facets("")
 		self.assertIn(f"{PREFIX} Men {self.tag}", all_tabs)
-		facet = all_tabs[f"{PREFIX} Men {self.tag}"][0]
-		self.assertEqual(facet["item_groups"], [shirts, belts])
-		self.assertEqual(facet["name"], f"{shirts},{belts}")
-		self.assertEqual(facet["is_leaf"], 1)
+		facets = all_tabs[f"{PREFIX} Men {self.tag}"]
+		self.assertEqual({facet["name"] for facet in facets}, {shirts, belts})
+		self.assertTrue(all(facet["is_leaf"] for facet in facets))
 
 		# Selecting the tab narrows to that tab only, keyed by whatever ?category= carried.
 		one_tab = get_category_facets(tab)
 		self.assertEqual(list(one_tab), [tab])
 		self.assertEqual(one_tab[tab], all_tabs[f"{PREFIX} Men {self.tag}"])
 
-	def test_a_heading_with_no_item_groups_never_becomes_a_facet(self):
-		"""A Brand or URL entry links no item groups, so a facet for it would filter on the empty
+	def test_a_heading_with_no_item_group_never_becomes_a_facet(self):
+		"""A Brand or URL entry links no item group, so a facet for it would filter on the empty
 		string — a checkbox that can be ticked and matches nothing."""
 		tab = navbar_manager.create_node("", f"{PREFIX} Mixed {self.tag}").name
 		navbar_manager.create_node(tab, f"{PREFIX} Just A Heading")
