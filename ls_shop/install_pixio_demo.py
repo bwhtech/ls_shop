@@ -16,6 +16,7 @@ Usage:
 
 import frappe
 
+from ls_shop.install_analytics_demo_data import install_analytics_demo_data
 from ls_shop.install_demo_data import (
 	configure_lifestyle_settings,
 	create_item_attributes,
@@ -118,10 +119,23 @@ def install_pixio_demo():
 	save_footer_sections()
 	save_mode_of_payment_accounts()
 
+	seed_storefront_analytics()
+
 	# nosemgrep: manual commit required, this runs outside a request
 	frappe.db.commit()
 	frappe.clear_cache()
 	print("✅ Pixio demo seeded")
+
+
+def seed_storefront_analytics():
+	"""Give the analytics screen a store worth looking at.
+
+	Runs last on purpose: the events reference real item codes and the orders it writes are what the
+	KPI tiles count, so seeding before the catalogue exists would attribute traffic to items that are
+	not there yet. Idempotent like the rest of this file - a re-run replaces its own rows rather than
+	doubling them - and reversible via remove_analytics_demo_data.
+	"""
+	install_analytics_demo_data()
 
 
 def configure_site_defaults():
