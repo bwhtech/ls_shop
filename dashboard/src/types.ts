@@ -191,3 +191,160 @@ export type FooterEditorData = {
 	pages: FooterPage[]
 	modified: string
 }
+
+// ── Storefront analytics ────────────────────────────────────────────────────
+// One type per `ls_shop.api.analytics_dashboard` endpoint, named after it.
+
+/** Every KPI tile carries the same figure for the equal-length window before it. */
+export type AnalyticsKpi = {
+	value: number
+	previous: number
+}
+
+export type AnalyticsKpiKey =
+	| "total_sales"
+	| "orders"
+	| "sessions"
+	| "conversion_rate"
+	| "aov"
+	| "returning_customer_rate"
+
+export type AnalyticsOverview = {
+	currency: string
+	kpis: Record<AnalyticsKpiKey, AnalyticsKpi>
+}
+
+export type SalesTimeseries = {
+	labels: string[]
+	sales: number[]
+	orders: number[]
+}
+
+export type FunnelStageRow = {
+	key: string
+	label: string
+	count: number
+}
+
+export type FunnelReport = {
+	stages: FunnelStageRow[]
+}
+
+export type LiveView = {
+	visitors_now: number
+	today: { sessions: number; orders: number; sales: number }
+	active_carts: number
+	checking_out: number
+}
+
+export type TopProduct = {
+	item_code: string
+	item_name: string
+	units: number
+	revenue: number
+}
+
+export type ProductEngagementRow = {
+	item_code: string
+	item_name: string
+	views: number
+	adds: number
+	purchases: number
+	cart_to_view_rate: number
+	purchase_to_view_rate: number
+}
+
+export type TrafficSourceRow = {
+	source: string
+	medium: string
+	sessions: number
+	orders: number
+	revenue: number
+	conversion_rate: number
+}
+
+export type DeviceSplitRow = {
+	device: string
+	sessions: number
+	conversion_rate: number
+}
+
+export type LandingPageRow = {
+	path: string
+	sessions: number
+	conversion_rate: number
+}
+
+export type AbandonedCartStatus = "Abandoned" | "Recoverable" | "Recovered"
+
+export type AbandonedCartRow = {
+	session_id: string
+	customer: string | null
+	email: string | null
+	items_count: number
+	value: number
+	last_activity: string
+	status: AbandonedCartStatus
+	quotation: string | null
+}
+
+export type AbandonedCarts = {
+	stats: { count: number; value: number; rate: number }
+	carts: AbandonedCartRow[]
+}
+
+/** `matrix[weekday][hour]`, weekday 0 = Monday. */
+export type SalesHeatmap = {
+	matrix: number[][]
+	max: number
+}
+
+export type ProviderHealth = {
+	configured: boolean
+	ok: boolean
+	purchases_30d: number | null
+	error: string | null
+}
+
+export type TrackingHealth = {
+	first_party: { events_24h: number; purchases_30d: number }
+	ga4: ProviderHealth
+	meta: ProviderHealth
+}
+
+/** GA4 keys its daily series `daily_sessions`, Meta keys its own `daily_pageviews`. */
+export type ProviderSummary = {
+	totals: Record<string, number>
+	daily_sessions?: Record<string, number>
+	daily_pageviews?: Record<string, number>
+}
+
+export type ProviderReadback = {
+	configured: boolean
+	summary: ProviderSummary | null
+	error: string | null
+}
+
+export type ExternalSummaries = {
+	ga4: ProviderReadback
+	meta: ProviderReadback
+}
+
+export type ItemAnalytics = {
+	item_code: string
+	item_name: string
+	totals: {
+		views: number
+		adds: number
+		checkouts: number
+		units_sold: number
+		revenue: number
+		cart_to_view_rate: number
+		purchase_to_view_rate: number
+		store_avg_purchase_to_view_rate: number
+	}
+	daily: { labels: string[]; views: number[]; adds: number[]; units: number[] }
+	devices: { device: string; views: number }[]
+	sources: { source: string; medium: string; views: number; adds: number }[]
+	recent_orders: { order: string; date: string; qty: number; amount: number }[]
+}

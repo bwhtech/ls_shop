@@ -78,18 +78,51 @@ export function availabilityTheme(availability: string) {
 	)
 }
 
-/** Money is rendered in the store's own currency, which only the API knows. */
-export function formatMoney(amount: number, currency: string) {
+/**
+ * Money is rendered in the store's own currency, which only the API knows.
+ *
+ * `compact` shortens the figure for a KPI tile or an axis tick, where the full
+ * grouping would not fit - it is the same function so no call site is tempted to
+ * assemble a price out of a code and a number.
+ */
+export function formatMoney(amount: number, currency: string, compact = false) {
 	try {
 		return new Intl.NumberFormat(undefined, {
 			style: "currency",
 			currency,
 			currencyDisplay: "narrowSymbol",
+			notation: compact ? "compact" : "standard",
+			maximumFractionDigits: compact ? 1 : undefined,
 		}).format(amount)
 	} catch {
 		// An unset or unrecognised currency code makes Intl throw; the figure still has to render.
 		return `${currency} ${amount.toFixed(2)}`
 	}
+}
+
+/** Counts read as plain numbers until they get long enough to need shortening. */
+export function formatCount(value: number) {
+	return new Intl.NumberFormat(undefined, {
+		notation: Math.abs(value) >= 10000 ? "compact" : "standard",
+		maximumFractionDigits: 1,
+	}).format(value)
+}
+
+/** Every rate the analytics API returns is already a percentage, to one decimal. */
+export function formatPercent(value: number) {
+	return `${value.toFixed(1)}%`
+}
+
+/** A timestamp that has to carry the time of day, e.g. when a cart was last touched. */
+export function formatDateTime(value: string) {
+	const parsed = new Date(value)
+	if (Number.isNaN(parsed.getTime())) return value
+	return new Intl.DateTimeFormat(undefined, {
+		day: "numeric",
+		month: "short",
+		hour: "numeric",
+		minute: "2-digit",
+	}).format(parsed)
 }
 
 /** Short, readable dates for the overview's compact rows - the full date is on the detail screen. */

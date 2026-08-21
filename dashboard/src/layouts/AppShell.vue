@@ -95,13 +95,17 @@ type SidebarSection = {
 // Grouped by the job the owner came to do, not by which doctype backs the page. A section
 // without a label renders as pinned top-level items, the way CRM and Gameplan pin their
 // everyday destinations above the first group header.
-// ponytail: the daily run has no Analytics row, add it here once /store/analytics ships
 const sections: SidebarSection[] = [
 	{
 		id: "daily",
 		items: [
 			{ label: "Home", route: "Home", icon: "lucide-house" },
 			{ label: "Orders", route: "Orders", icon: "lucide-receipt" },
+			{
+				label: "Analytics",
+				route: "Analytics",
+				icon: "lucide-chart-no-axes-column",
+			},
 		],
 	},
 	{
