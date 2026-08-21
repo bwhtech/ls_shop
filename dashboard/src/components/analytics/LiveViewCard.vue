@@ -51,15 +51,6 @@ const chips = computed(() => {
 		empty-message="Nothing has happened on the store yet."
 		:skeleton-rows="2"
 	>
-		<template #actions>
-			<span
-				class="flex items-center gap-1.5 rounded-full bg-surface-red-2 px-2 py-0.5 text-p-xs font-medium text-ink-red-7"
-			>
-				<span class="size-1.5 rounded-full bg-surface-red-7" aria-hidden="true" />
-				LIVE
-			</span>
-		</template>
-
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
 			<StatChip
 				v-for="chip in chips"
