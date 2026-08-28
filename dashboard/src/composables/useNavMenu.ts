@@ -107,11 +107,32 @@ function apply(data: EditorData | null) {
 		selectedName.value = null
 }
 
-/** Run a mutation and adopt the tree it returns. */
-async function mutate(name: string, params: Record<string, unknown> = {}) {
-	const data = await call<EditorData>(name, params)
+/** The nodes from the top level down to `name`, or none when it is not in the tree. */
+function pathTo(name: string, nodes: MenuNode[] = menu.value): MenuNode[] {
+	for (const node of nodes) {
+		if (node.name === name) return [node]
+		const below = pathTo(name, node.children)
+		if (below.length) return [node, ...below]
+	}
+	return []
+}
+
+/**
+ * Run a mutation and adopt the tree it returns.
+ *
+ * `revealUnder` opens the branch a row was added to or moved into. The refresh otherwise restores
+ * that branch's remembered collapsed state, so the change lands on the server yet looks like
+ * nothing happened until the page is re-entered.
+ */
+async function mutate(
+	method: string,
+	params: Record<string, unknown> = {},
+	revealUnder = "",
+) {
+	const data = await call<EditorData>(method, params)
 	if (!data) return null
 	apply(data)
+	for (const node of pathTo(revealUnder)) node.expanded = true
 	// Every menu change funnels through here, so this is the one place the storefront preview has
 	// to be told the menu it rendered is now stale.
 	revision.value += 1

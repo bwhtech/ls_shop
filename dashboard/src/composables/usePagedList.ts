@@ -1,3 +1,4 @@
+import type { ListEmptyState } from "@/types"
 import { refDebounced } from "@vueuse/core"
 import { useCall } from "frappe-ui"
 import { computed, ref, shallowRef, watch } from "vue"
@@ -56,6 +57,32 @@ export function usePagedList<TResponse extends { total: number }, TRow>(
 		start.value += pageLength
 	}
 
+	function clearSearch() {
+		search.value = ""
+	}
+
+	/**
+	 * The empty state a list draws, which a running search takes over.
+	 *
+	 * A search that matched nothing is not an empty store, and the screen's own "nothing here yet"
+	 * copy - "add your first product" - answers a question the owner did not ask and hides the one
+	 * thing they need, which is the way back to the full list. Keyed off the debounced term, so it
+	 * names the search the visible rows actually came from.
+	 */
+	function getEmptyState(whenListIsEmpty: ListEmptyState): ListEmptyState {
+		if (!searchText.value) return whenListIsEmpty
+		return {
+			title: "No matches",
+			description: `Nothing here matches “${searchText.value}”.`,
+			button: {
+				label: "Clear search",
+				variant: "subtle",
+				theme: "gray",
+				onClick: clearSearch,
+			},
+		}
+	}
+
 	/**
 	 * Read the list again from the first page. Re-running a grown window as it stands would append
 	 * the same page a second time, so a reload always goes back to the start.
@@ -68,5 +95,14 @@ export function usePagedList<TResponse extends { total: number }, TRow>(
 		start.value = 0
 	}
 
-	return { search, request, rows, total, hasMore, loadMore, reload }
+	return {
+		search,
+		request,
+		rows,
+		total,
+		hasMore,
+		loadMore,
+		reload,
+		getEmptyState,
+	}
 }

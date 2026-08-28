@@ -4,6 +4,7 @@ import ListPager from "@/components/ListPager.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import { usePagedList } from "@/composables/usePagedList"
 import type { InventoryRow } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import { availabilityTheme, cellAlignClass } from "@/utils/format"
 import {
 	Badge,
@@ -38,6 +39,7 @@ const {
 	hasMore,
 	loadMore,
 	reload,
+	getEmptyState,
 } = usePagedList<
 	{ rows: InventoryRow[]; total: number; low_stock_threshold: number },
 	InventoryRow
@@ -60,7 +62,7 @@ const receiveStock = useCall<
 		receiveQuantities.value = {}
 		reload()
 	},
-	onError: (error: Error) => toast.error(error.message),
+	onError: (error: Error) => toast.error(errorMessage(error)),
 })
 
 // Only the sizes the owner actually typed a quantity into: the map keeps a key for every field
@@ -73,6 +75,16 @@ const pendingReceipt = computed(() =>
 	),
 )
 const pendingCount = computed(() => Object.keys(pendingReceipt.value).length)
+
+const listOptions = computed(() => ({
+	selectable: false,
+	showTooltip: false,
+	resizeColumn: true,
+	emptyState: getEmptyState({
+		title: "Nothing running low",
+		description: "Every size has healthy stock.",
+	}),
+}))
 
 const columns = [
 	{ label: "Product", key: "product", width: 2.2 },
@@ -112,7 +124,7 @@ const columns = [
 			v-else-if="inventory.error"
 			class="min-h-0 flex-1"
 			title="Could not load your stock"
-			:message="inventory.error.message"
+			:message="errorMessage(inventory.error)"
 			@retry="reload"
 		/>
 
@@ -122,15 +134,7 @@ const columns = [
 			row-key="item_code"
 			:columns="columns"
 			:rows="rows"
-			:options="{
-				selectable: false,
-				showTooltip: false,
-				resizeColumn: true,
-				emptyState: {
-					title: 'Nothing running low',
-					description: 'Every size has healthy stock.',
-				},
-			}"
+			:options="listOptions"
 		>
 			<template #cell="{ item, row, column }">
 				<Badge

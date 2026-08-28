@@ -5,7 +5,8 @@ import ListSkeleton from "@/components/ListSkeleton.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import { usePagedList } from "@/composables/usePagedList"
 import type { OrderRow } from "@/types"
-import { cellAlignClass } from "@/utils/format"
+import { errorMessage } from "@/utils/errors"
+import { cellAlignClass, formatMoney } from "@/utils/format"
 import { Breadcrumbs, FormControl, TabButtons } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref } from "vue"
@@ -30,6 +31,7 @@ const {
 	hasMore,
 	loadMore,
 	reload,
+	getEmptyState,
 } = usePagedList<{ orders: OrderRow[]; total: number }, OrderRow>(
 	"/api/v2/method/ls_shop.api.admin.orders.get_orders",
 	PAGE_LENGTH,
@@ -41,7 +43,7 @@ const rows = computed(() =>
 	loadedOrders.value.map((order) => ({
 		...order,
 		items: `${order.item_count}`,
-		amount: `${order.currency} ${order.total}`,
+		amount: formatMoney(order.total, order.currency),
 	})),
 )
 
@@ -54,7 +56,7 @@ const columns = [
 	{ label: "Status", key: "state", width: 1.8 },
 ]
 
-const listOptions = {
+const listOptions = computed(() => ({
 	getRowRoute: (row: OrderRow) => ({
 		name: "Order",
 		params: { name: row.name },
@@ -63,11 +65,11 @@ const listOptions = {
 	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,
-	emptyState: {
+	emptyState: getEmptyState({
 		title: "No orders here",
 		description: "Orders placed in your store will show up here.",
-	},
-}
+	}),
+}))
 </script>
 
 <template>
@@ -98,7 +100,7 @@ const listOptions = {
 			v-else-if="orders.error"
 			class="min-h-0 flex-1"
 			title="Could not load your orders"
-			:message="orders.error.message"
+			:message="errorMessage(orders.error)"
 			@retry="reload"
 		/>
 

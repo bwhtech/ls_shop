@@ -4,6 +4,8 @@ import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import OrderProgress from "@/components/orders/OrderProgress.vue"
 import type { OrderProgressStep } from "@/components/orders/types"
 import type { OrderDetail } from "@/types"
+import { errorMessage } from "@/utils/errors"
+import { formatMoney } from "@/utils/format"
 import {
 	Breadcrumbs,
 	Button,
@@ -45,7 +47,29 @@ const fulfil = useCall<{ delivery_note: string }, { sales_order: string }>({
 		toast.success(`Fulfilled — delivery note ${result.delivery_note}`)
 		order.reload()
 	},
-	onError: (error: Error) => toast.error(error.message),
+	onError: (error: Error) => toast.error(errorMessage(error)),
+})
+
+/**
+ * The lines under the items, so the total is arrived at rather than announced.
+ *
+ * A charge of zero is not something the owner needs told - a prepaid order printing "Cash on
+ * delivery -" invites the question of what it is - so only a charge that was actually made gets a
+ * line. What is left always reconciles: the API hands back the unrecognised remainder of the
+ * charges table as `tax`, so subtotal plus these lines is the grand total.
+ */
+const totalsBreakdown = computed(() => {
+	const data = order.data
+	if (!data) return []
+	const charges = [
+		{ label: "Shipping", amount: data.shipping },
+		{ label: "Cash on delivery", amount: data.cod_charge },
+		{ label: "Tax", amount: data.tax },
+	]
+	return [
+		{ label: "Subtotal", amount: data.net_total },
+		...charges.filter((charge) => charge.amount),
+	]
 })
 
 // Fulfilling submits a stock movement that cannot be undone from here, so it asks first.
@@ -89,7 +113,7 @@ function confirmFulfil() {
 		<ErrorState
 			v-else-if="order.error"
 			title="Could not load this order"
-			:message="order.error.message"
+			:message="errorMessage(order.error)"
 			@retry="order.reload()"
 		/>
 
@@ -165,20 +189,40 @@ function confirmFulfil() {
 									</span>
 								</ListCell>
 								<ListCell class="justify-end">
-									<span class="text-base text-ink-gray-7">{{ item.rate }}</span>
+									<span class="text-base text-ink-gray-7">
+										{{ formatMoney(item.rate, order.data.currency) }}
+									</span>
 								</ListCell>
 								<ListCell class="justify-end">
-									<span class="text-base text-ink-gray-9">{{ item.amount }}</span>
+									<span class="text-base text-ink-gray-9">
+										{{ formatMoney(item.amount, order.data.currency) }}
+									</span>
 								</ListCell>
 							</ListRow>
 						</ListRows>
 					</List>
 
-					<div class="mt-3 flex justify-end gap-8 text-base">
-						<span class="text-ink-gray-5">Total</span>
-						<span class="text-ink-gray-9">
-							{{ order.data.currency }} {{ order.data.grand_total }}
-						</span>
+					<div class="mt-3 flex justify-end">
+						<dl class="w-64 space-y-1.5 text-base">
+							<div
+								v-for="row in totalsBreakdown"
+								:key="row.label"
+								class="flex justify-between gap-8"
+							>
+								<dt class="text-ink-gray-5">{{ row.label }}</dt>
+								<dd class="text-ink-gray-7">
+									{{ formatMoney(row.amount, order.data.currency) }}
+								</dd>
+							</div>
+							<div
+								class="flex justify-between gap-8 border-t border-outline-gray-1 pt-1.5"
+							>
+								<dt class="text-ink-gray-5">Total</dt>
+								<dd class="text-ink-gray-9">
+									{{ formatMoney(order.data.grand_total, order.data.currency) }}
+								</dd>
+							</div>
+						</dl>
 					</div>
 				</section>
 

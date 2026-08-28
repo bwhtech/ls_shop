@@ -1,5 +1,6 @@
 import { toast, useCall } from "frappe-ui"
 import { computed, effectScope, ref } from "vue"
+import { errorMessage } from "../utils/errors"
 
 /**
  * A `call(method, params)` over one module of whitelisted methods.
@@ -46,7 +47,7 @@ export function createMethodCaller(methodPrefix: string) {
 			// read off the call rather than caught.
 			const data = await request.submit(params)
 			if (request.error) {
-				toast.error(request.error.message)
+				toast.error(errorMessage(request.error))
 				return null
 			}
 			return data as TResponse

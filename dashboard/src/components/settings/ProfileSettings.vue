@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { UploadedFile } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import {
 	Avatar,
 	Button,
@@ -48,7 +49,7 @@ function saveProfileCall<TParams extends Record<string, unknown>>(
 			profile.reload()
 			onSuccess?.()
 		},
-		onError: (error: Error) => toast.error(error.message),
+		onError: (error: Error) => toast.error(errorMessage(error)),
 	})
 }
 

@@ -2,6 +2,7 @@ import type { AnalyticsRangeParams } from "@/types"
 import { formatShortDate } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { computed, ref, watch } from "vue"
+import { errorMessage } from "../utils/errors"
 
 export const METHOD_PREFIX = "/api/v2/method/ls_shop.api.analytics_dashboard."
 
@@ -104,7 +105,7 @@ export function useAnalyticsReport<TData>(
 		data: computed(() => report.data),
 		// A reload keeps the previous reading on screen rather than flashing the skeleton again.
 		loading: computed(() => report.loading && !report.data),
-		error: computed(() => report.error?.message ?? null),
+		error: computed(() => (report.error ? errorMessage(report.error) : null)),
 		reload,
 	}
 }

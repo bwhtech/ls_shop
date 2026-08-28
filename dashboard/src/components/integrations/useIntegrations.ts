@@ -1,3 +1,4 @@
+import { errorMessage } from "@/utils/errors"
 import { toast, useCall } from "frappe-ui"
 import { computed } from "vue"
 
@@ -46,8 +47,7 @@ export type SaveIntegrationParams = {
 
 /** Frappe's v2 API prefixes the exception class onto its message; the shop owner only needs the sentence. */
 export function integrationErrorMessage(error: Error | null | undefined) {
-	if (!error?.message) return "Could not save this integration"
-	return error.message.replace(/^\s*[A-Za-z]*Error:\s*/, "")
+	return errorMessage(error, "Could not save this integration")
 }
 
 /**

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductSize, ProductVariant, UploadedFile } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import { formatPriceRange, sumStock } from "@/utils/format"
 import {
 	Button,
@@ -29,7 +30,7 @@ const rates = ref<Record<string, string>>({})
 const receiveQuantities = ref<Record<string, string>>({})
 
 function reportError(error: Error) {
-	toast.error(error.message)
+	toast.error(errorMessage(error))
 }
 
 function call<TParams extends Record<string, unknown>>(

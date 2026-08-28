@@ -1,3 +1,4 @@
+import { errorMessage } from "@/utils/errors"
 import { toast, useCall } from "frappe-ui"
 import type { WritableComputedRef } from "vue"
 import { computed, reactive, toRaw, watch } from "vue"
@@ -108,7 +109,7 @@ export function useSettingsForm<
 			toast.success(savedMessage)
 			settings.reload()
 		},
-		onError: (error: Error) => toast.error(error.message),
+		onError: (error: Error) => toast.error(errorMessage(error)),
 	})
 
 	function submit(overrides: Record<string, SettingsValue> = {}) {

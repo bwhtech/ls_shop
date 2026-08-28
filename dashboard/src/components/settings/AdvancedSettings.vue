@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "@/utils/errors"
 import {
 	Alert,
 	SettingsBody,
@@ -63,7 +64,7 @@ const save = useCall<unknown, Record<string, SettingsValue>>({
 		toast.success("Advanced settings saved")
 		advanced.reload()
 	},
-	onError: (error: Error) => toast.error(error.message),
+	onError: (error: Error) => toast.error(errorMessage(error)),
 })
 </script>
 

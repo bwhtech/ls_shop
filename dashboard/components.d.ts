@@ -40,6 +40,7 @@ declare module 'vue' {
     ListPager: typeof import('./src/components/ListPager.vue')['default']
     ListSkeleton: typeof import('./src/components/ListSkeleton.vue')['default']
     LiveViewCard: typeof import('./src/components/analytics/LiveViewCard.vue')['default']
+    NameDialog: typeof import('./src/components/NameDialog.vue')['default']
     NavInspector: typeof import('./src/components/navigation/NavInspector.vue')['default']
     OptionRow: typeof import('./src/components/OptionRow.vue')['default']
     OrderProgress: typeof import('./src/components/orders/OrderProgress.vue')['default']

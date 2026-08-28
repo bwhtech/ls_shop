@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CollectionCombobox from "@/components/CollectionCombobox.vue"
+import { errorMessage } from "@/utils/errors"
 import {
 	Button,
 	Dialog,
@@ -42,7 +43,7 @@ const createProduct = useCall<
 		emit("created", product.name)
 	},
 	onError: (error: { message?: string }) =>
-		toast.error(error?.message ?? "Could not create product"),
+		toast.error(errorMessage(error, "Could not create product")),
 })
 
 function splitValues(value: string) {

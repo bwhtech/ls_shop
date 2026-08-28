@@ -24,6 +24,7 @@ import type {
 	AnalyticsRangeParams,
 	ExternalSummaries,
 } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import {
 	Button,
 	PageHeader,
@@ -91,7 +92,7 @@ function openProductDrilldown(itemCode: string) {
 					:overview="overview.data"
 					:currency="currency"
 					:loading="overview.loading && !overview.data"
-					:error="overview.error?.message ?? null"
+					:error="overview.error ? errorMessage(overview.error) : null"
 				/>
 
 				<SalesOverTime :currency="currency" />
@@ -124,7 +125,7 @@ function openProductDrilldown(itemCode: string) {
 						not-connected-message="GA4 is not connected."
 						:readback="externalSummaries.data?.ga4"
 						:loading="externalSummaries.loading && !externalSummaries.data"
-						:error="externalSummaries.error?.message ?? null"
+						:error="externalSummaries.error ? errorMessage(externalSummaries.error) : null"
 					/>
 					<ExternalProviderCard
 						title="Meta Pixel"
@@ -134,7 +135,7 @@ function openProductDrilldown(itemCode: string) {
 						not-connected-message="The Meta Pixel is not connected."
 						:readback="externalSummaries.data?.meta"
 						:loading="externalSummaries.loading && !externalSummaries.data"
-						:error="externalSummaries.error?.message ?? null"
+						:error="externalSummaries.error ? errorMessage(externalSummaries.error) : null"
 					/>
 					<TrackingHealthCard />
 				</div>

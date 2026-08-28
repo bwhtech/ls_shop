@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FooterLink, FooterPage, FooterSection } from "@/types"
-import { Combobox, Dialog, ErrorMessage, FormControl, toast } from "frappe-ui"
-import { computed, ref, watch } from "vue"
+import { Button, Combobox, Dialog, FormControl, toast } from "frappe-ui"
+import { computed, ref, useId, watch } from "vue"
 
 const props = defineProps<{
 	/** The column the link belongs to. */
@@ -15,6 +15,10 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { required: true })
 
+// The submit button sits in the dialog's own action row, outside the form. `form` is how HTML
+// associates the two, so the browser runs each field's `required` check on click.
+const formId = useId()
+
 const SOURCE_OPTIONS = [
 	{ label: "Custom URL", value: "url" },
 	{ label: "Existing page", value: "page" },
@@ -24,7 +28,7 @@ const source = ref("url")
 const page = ref("")
 const label = ref("")
 const url = ref("")
-const error = ref("")
+const saving = ref(false)
 
 const isEdit = computed(() => Boolean(props.link))
 
@@ -40,7 +44,6 @@ function pageUrl(route: string) {
 
 watch(open, (isOpen) => {
 	if (!isOpen) return
-	error.value = ""
 	// Editing starts on the URL field: the link already has one, and re-picking a page would
 	// overwrite a label the owner may have deliberately changed.
 	source.value = "url"
@@ -57,36 +60,28 @@ watch(page, (name) => {
 })
 
 async function save() {
-	error.value = ""
-	if (!label.value.trim() || !url.value.trim()) {
-		error.value = "A link needs both a label and a URL."
-		return
+	saving.value = true
+	try {
+		// A refused save resolves false rather than throwing, so closing the dialog waits on
+		// the answer - closing it regardless would throw away what the owner typed.
+		const saved = await props.submit({
+			label: label.value.trim(),
+			url: url.value.trim(),
+		})
+		if (!saved) return
+
+		open.value = false
+		toast.success(isEdit.value ? "Link saved" : "Link added")
+	} finally {
+		saving.value = false
 	}
-
-	// A refused save resolves false rather than throwing, so closing the dialog waits on the
-	// answer - closing it regardless would throw away what the owner typed.
-	if (!(await props.submit({ label: label.value, url: url.value }))) return
-
-	open.value = false
-	toast.success(isEdit.value ? "Link saved" : "Link added")
 }
 </script>
 
 <template>
-	<Dialog
-		v-model:open="open"
-		:title="isEdit ? 'Edit link' : 'Add a link'"
-		:actions="[
-			{
-				label: isEdit ? 'Save' : 'Add',
-				variant: 'solid',
-				theme: 'gray',
-				onClick: save,
-			},
-		]"
-	>
+	<Dialog v-model:open="open" :title="isEdit ? 'Edit link' : 'Add a link'">
 		<template #default>
-			<div class="space-y-4">
+			<form :id="formId" class="space-y-4" @submit.prevent="save">
 				<p v-if="section" class="text-p-base text-ink-gray-7">
 					In the {{ section.title }} column.
 				</p>
@@ -117,8 +112,19 @@ async function save() {
 					description="Where this link sends shoppers."
 				/>
 
-				<ErrorMessage v-if="error" :message="error" />
-			</div>
+			</form>
+		</template>
+
+		<template #actions>
+			<Button
+				class="w-full"
+				type="submit"
+				:form="formId"
+				variant="solid"
+				theme="gray"
+				:loading="saving"
+				:label="isEdit ? 'Save' : 'Add'"
+			/>
 		</template>
 	</Dialog>
 </template>

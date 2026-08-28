@@ -4,6 +4,7 @@ import {
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
 import type { AnalyticsRangeParams, ItemAnalytics } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import {
 	formatCount,
 	formatMoney,
@@ -137,7 +138,7 @@ const sourceRows = computed<SourceRow[]>(() =>
 						Could not load this product report
 					</p>
 					<p class="mt-1 text-p-sm text-ink-gray-5">
-						{{ itemAnalytics.error.message }}
+						{{ errorMessage(itemAnalytics.error) }}
 					</p>
 				</div>
 

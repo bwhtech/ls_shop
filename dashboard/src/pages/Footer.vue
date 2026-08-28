@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameDialog from "@/components/NameDialog.vue"
 import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import FooterLinkDialog from "@/components/footer/FooterLinkDialog.vue"
 import { useFooter } from "@/composables/useFooter"
@@ -25,6 +26,7 @@ const { sections, pages, previewToken, loading, load, mutate, reordered } =
 onMounted(load)
 
 const previewCollapsed = useStorage("ls-shop-footer-preview-collapsed", false)
+const sectionDialogOpen = ref(false)
 const linkDialogOpen = ref(false)
 const linkDialogSection = ref<FooterSection | null>(null)
 const linkDialogLink = ref<FooterLink | null>(null)
@@ -132,23 +134,11 @@ async function moveSection(columnIndex: number, offset: number) {
 	})
 }
 
-function addSection() {
-	dialog.prompt({
-		title: "Add a footer column",
-		fields: [
-			{
-				name: "title",
-				label: "Column title",
-				placeholder: "Help",
-				required: true,
-			},
-		],
-		confirmLabel: "Add",
-		onConfirm: async ({ values }) => {
-			if (await mutate("add_section", { title: values.title }))
-				toast.success("Column added")
-		},
-	})
+/** Resolves to whether the column landed, so the dialog knows whether it may close. */
+async function saveSection(title: string) {
+	const added = await mutate("add_section", { title })
+	if (added) toast.success("Column added")
+	return Boolean(added)
 }
 
 function renameSection(section: FooterSection) {
@@ -352,7 +342,7 @@ function linkActions(
 				theme="gray"
 				icon-left="lucide-plus"
 				label="Add column"
-				@click="addSection"
+				@click="sectionDialogOpen = true"
 			/>
 		</PageHeader>
 
@@ -369,7 +359,7 @@ function linkActions(
 					variant="subtle"
 					theme="gray"
 					label="Add column"
-					@click="addSection"
+					@click="sectionDialogOpen = true"
 				/>
 			</div>
 
@@ -506,6 +496,15 @@ function linkActions(
 			path="/footer_editor_preview"
 			title="Footer preview"
 			selector="footer"
+		/>
+
+		<NameDialog
+			v-model:open="sectionDialogOpen"
+			title="Add a footer column"
+			label="Column title"
+			placeholder="Help"
+			confirm-label="Add"
+			:submit="saveSection"
 		/>
 
 		<FooterLinkDialog

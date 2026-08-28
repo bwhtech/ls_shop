@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameDialog from "@/components/NameDialog.vue"
 import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import NavInspector from "@/components/navigation/NavInspector.vue"
 import { useNavMenu } from "@/composables/useNavMenu"
@@ -17,7 +18,7 @@ import {
 	useCall,
 } from "frappe-ui"
 import type { DropInfo, MoveContext, TreeNode } from "frappe-ui"
-import { computed, onMounted } from "vue"
+import { computed, onMounted, ref } from "vue"
 
 const {
 	menu,
@@ -77,33 +78,45 @@ async function onDragEnd(info: DropInfo | null) {
 	// Null means the drag was cancelled or never landed anywhere valid.
 	if (!info) return
 
+	const toParent = info.to === null ? "" : String(info.to)
 	// `move_node` reparents and positions in one call, so a reorder within one parent and a
 	// move across parents are the same request - `to` is simply unchanged in the first case.
-	const moved = await mutate("move_node", {
-		name: String(info.node.name),
-		to_parent: info.to === null ? "" : String(info.to),
-		target_index: info.newIndex,
-	})
+	const moved = await mutate(
+		"move_node",
+		{
+			name: String(info.node.name),
+			to_parent: toParent,
+			target_index: info.newIndex,
+		},
+		toParent,
+	)
 	// Tree has already drawn the drop, so a refusal is undone by reading the menu back.
 	if (!moved) await load()
 }
 
+const entryDialogOpen = ref(false)
+const entryDialogParent = ref("")
+
 function addEntry(parent = "") {
-	dialog.prompt({
-		title: parent ? "Add an entry inside" : "Add a menu section",
-		fields: [
-			{
-				name: "display_name",
-				label: "Menu label",
-				placeholder: "Shoes",
-				required: true,
-			},
-		],
-		confirmLabel: "Add",
-		onConfirm: async ({ values }) => {
-			await mutate("add_node", { parent, display_name: values.display_name })
-		},
-	})
+	entryDialogParent.value = parent
+	entryDialogOpen.value = true
+}
+
+/** Resolves to whether the entry landed, so the dialog knows whether it may close. */
+async function saveEntry(displayName: string) {
+	const parent = entryDialogParent.value
+	const added = await mutate(
+		"add_node",
+		{ parent, display_name: displayName },
+		parent,
+	)
+	return Boolean(added)
+}
+
+function groupCount(node: MenuNode) {
+	const total = node.item_groups.length
+	if (!total) return ""
+	return `${total} ${total === 1 ? "group" : "groups"}`
 }
 
 function countEntries(nodes: MenuNode[]): number {
@@ -302,7 +315,7 @@ const menuActions = computed(() => [
 						<div v-if="isMenuNode(node)" class="flex items-center gap-2">
 							<Badge v-if="!node.visible" variant="subtle" theme="amber" label="Hidden" />
 							<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
-								{{ node.item_groups.length ? `${node.item_groups.length} groups` : "" }}
+								{{ groupCount(node) }}
 							</span>
 							<span @click.stop>
 								<Dropdown :options="rowActions(node)">
@@ -329,6 +342,15 @@ const menuActions = computed(() => [
 				<NavInspector @remove="removeEntry" />
 			</div>
 		</div>
+
+		<NameDialog
+			v-model:open="entryDialogOpen"
+			:title="entryDialogParent ? 'Add an entry inside' : 'Add a menu section'"
+			label="Menu label"
+			placeholder="Shoes"
+			confirm-label="Add"
+			:submit="saveEntry"
+		/>
 
 		<ChromePreview
 			v-model:collapsed="previewCollapsed"

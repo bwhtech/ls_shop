@@ -1,4 +1,4 @@
-import type { BadgeProps } from "frappe-ui"
+import type { BadgeProps, ButtonProps } from "frappe-ui"
 
 /** The one field we read off frappe-ui's FileUploader success payload. */
 export type UploadedFile = {
@@ -53,6 +53,16 @@ export type AnalyticsRangeParams = {
 	to_date: string
 }
 
+/**
+ * What a list screen puts in place of its rows. ListView v-binds `button` straight onto a Button,
+ * so the click handler travels with the rest of the button's props.
+ */
+export type ListEmptyState = {
+	title: string
+	description: string
+	button?: ButtonProps & { onClick: () => void }
+}
+
 /** Taken from the Badge component itself, so our map cannot drift from what frappe-ui ships. */
 export type BadgeTheme = NonNullable<BadgeProps["theme"]>
 export type BadgeVariant = NonNullable<BadgeProps["variant"]>
@@ -96,6 +106,16 @@ export type OrderDetail = {
 	state: OrderState
 	currency: string
 	total: number
+	/**
+	 * The charges that make up the difference between `net_total` and `grand_total`. `tax` is the
+	 * remainder of the charges table rather than a tax figure in its own right, so the four always
+	 * sum to the total even when a charge row is of a kind neither side recognises.
+	 */
+	net_total: number
+	shipping: number
+	cod_charge: number
+	tax: number
+	total_taxes_and_charges: number
 	grand_total: number
 	payment_mode: string | null
 	shipping_address: string | null

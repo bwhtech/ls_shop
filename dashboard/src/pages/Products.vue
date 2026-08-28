@@ -6,6 +6,7 @@ import ListSkeleton from "@/components/ListSkeleton.vue"
 import { showAddProduct } from "@/components/addProduct"
 import { usePagedList } from "@/composables/usePagedList"
 import type { ProductRow } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import { cellAlignClass, formatRowPrice, publishTheme } from "@/utils/format"
 import { Badge, Breadcrumbs, Button, FormControl } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
@@ -25,6 +26,7 @@ const {
 	hasMore,
 	loadMore,
 	reload,
+	getEmptyState,
 } = usePagedList<{ products: ProductRow[]; total: number }, ProductRow>(
 	"/api/v2/method/ls_shop.api.admin.catalog.get_products",
 	PAGE_LENGTH,
@@ -50,7 +52,7 @@ const columns = [
 	{ label: "Status", key: "status", width: 1.3 },
 ]
 
-const listOptions = {
+const listOptions = computed(() => ({
 	getRowRoute: (row: ProductRow) => ({
 		name: "Product",
 		params: { name: row.name },
@@ -59,7 +61,7 @@ const listOptions = {
 	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,
-	emptyState: {
+	emptyState: getEmptyState({
 		title: "No products yet",
 		description: "Add your first product to start selling.",
 		button: {
@@ -72,8 +74,8 @@ const listOptions = {
 				showAddProduct.value = true
 			},
 		},
-	},
-}
+	}),
+}))
 </script>
 
 <template>
@@ -110,7 +112,7 @@ const listOptions = {
 			v-else-if="products.error"
 			class="min-h-0 flex-1"
 			title="Could not load your products"
-			:message="products.error.message"
+			:message="errorMessage(products.error)"
 			@retry="reload"
 		/>
 
