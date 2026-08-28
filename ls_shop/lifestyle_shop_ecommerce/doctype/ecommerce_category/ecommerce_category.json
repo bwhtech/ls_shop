@@ -16,7 +16,7 @@
 		"section_break_2",
 		"route_slug",
 		"link_type",
-		"item_groups",
+		"link_item_groups",
 		"link_brand",
 		"link_url",
 		"section_break_3",
@@ -102,11 +102,11 @@
 		},
 		{
 			"depends_on": "eval:doc.link_type == 'Item Group'",
-			"description": "Products in these groups are shown together. Sub-groups get their own menu entries.",
-			"fieldname": "item_groups",
-			"fieldtype": "Table MultiSelect",
+			"description": "Products from every listed group are shown together.",
+			"fieldname": "link_item_groups",
+			"fieldtype": "Table",
 			"label": "Item Groups",
-			"options": "Ecommerce Category Item Group Link"
+			"options": "Ecommerce Category Item Group"
 		},
 		{
 			"depends_on": "eval:doc.link_type == 'Brand'",

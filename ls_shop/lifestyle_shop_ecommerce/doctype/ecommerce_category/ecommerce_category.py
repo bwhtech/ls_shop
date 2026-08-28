@@ -11,7 +11,7 @@ from frappe.utils.nestedset import NestedSet, update_move_node
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import require_safe_url
 from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
-ITEM_GROUP_LINK_DOCTYPE = "Ecommerce Category Item Group Link"
+ITEM_GROUP_LINK_DOCTYPE = "Ecommerce Category Item Group"
 
 # root tab -> mega-menu column -> link. Deeper levels exist in no storefront theme.
 MAX_MENU_DEPTH = 3
@@ -36,8 +36,8 @@ class EcommerceCategory(NestedSet):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category_item_group_link.ecommerce_category_item_group_link import (
-			EcommerceCategoryItemGroupLink,
+		from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category_item_group.ecommerce_category_item_group import (
+			EcommerceCategoryItemGroup,
 		)
 
 		category_name: DF.Data
@@ -47,7 +47,7 @@ class EcommerceCategory(NestedSet):
 		icon: DF.Data | None
 		image: DF.AttachImage | None
 		is_group: DF.Check
-		item_groups: DF.TableMultiSelect[EcommerceCategoryItemGroupLink]
+		link_item_groups: DF.Table[EcommerceCategoryItemGroup]
 		lft: DF.Int
 		link_brand: DF.Link | None
 		link_type: DF.Literal["", "Item Group", "Brand", "URL"]
@@ -112,7 +112,7 @@ class EcommerceCategory(NestedSet):
 		endpoint — the model is the only place that covers every write path.
 		"""
 		if self.link_type != "Item Group":
-			self.set("item_groups", [])
+			self.link_item_groups = []
 		if self.link_type != "Brand":
 			self.link_brand = None
 		if self.link_type != "URL":
@@ -167,10 +167,9 @@ def build_listing_href(root_slug, item_groups, language):
 	"""Product listing URL for a menu entry's item groups, as the `?subcategory=` filter expects.
 
 	The filter reads the parameter as a comma-separated list and matches any of the groups, so an
-	entry linking several of them lands on one listing holding all their products. The comma itself
-	stays unencoded — it is the separator, not part of a group name.
+	entry linking several of them lands on one listing holding all their products.
 	"""
-	subcategory = ",".join(quote(item_group) for item_group in item_groups)
+	subcategory = quote(",".join(item_groups))
 	if root_slug:
 		return f"/{language}/products?category={root_slug}&subcategory={subcategory}"
 	return f"/{language}/products?subcategory={subcategory}"
@@ -241,7 +240,7 @@ def add_item_group_links(item_groups_by_entry):
 			link = frappe.new_doc(ITEM_GROUP_LINK_DOCTYPE)
 			link.parent = entry
 			link.parenttype = "Ecommerce Category"
-			link.parentfield = "item_groups"
+			link.parentfield = "link_item_groups"
 			link.idx = index
 			link.item_group = item_group
 			link.creation = timestamp

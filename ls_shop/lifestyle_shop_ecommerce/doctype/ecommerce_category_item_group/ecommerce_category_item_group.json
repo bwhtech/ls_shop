@@ -5,18 +5,16 @@
 	"doctype": "DocType",
 	"editable_grid": 1,
 	"engine": "InnoDB",
-	"field_order": [
-		"item_group"
-	],
+	"field_order": ["item_group"],
 	"fields": [
 		{
+			"columns": 1,
 			"fieldname": "item_group",
 			"fieldtype": "Link",
 			"in_list_view": 1,
 			"label": "Item Group",
 			"options": "Item Group",
-			"reqd": 1,
-			"search_index": 1
+			"reqd": 1
 		}
 	],
 	"index_web_pages_for_search": 1,
@@ -25,10 +23,10 @@
 	"modified": "2026-08-28 10:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Lifestyle Shop Ecommerce",
-	"name": "Ecommerce Category Item Group Link",
+	"name": "Ecommerce Category Item Group",
 	"owner": "Administrator",
 	"permissions": [],
-	"sort_field": "creation",
+	"sort_field": "modified",
 	"sort_order": "DESC",
 	"states": []
 }

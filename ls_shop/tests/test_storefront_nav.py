@@ -133,8 +133,8 @@ class TestStorefrontNav(IntegrationTestCase):
 		shirts = self.make_item_group(f"{PREFIX} Shirts {self.tag}")
 		belts = self.make_item_group(f"{PREFIX} Belts {self.tag}")
 		tab = navbar_manager.create_node("", f"{PREFIX} Men {self.tag}").name
-		navbar_manager.create_node(tab, f"{PREFIX} Tops", "Item Group", shirts)
-		navbar_manager.create_node(tab, f"{PREFIX} Belts Tab", "Item Group", belts)
+		navbar_manager.create_node(tab, f"{PREFIX} Tops", "Item Group", [shirts])
+		navbar_manager.create_node(tab, f"{PREFIX} Belts Tab", "Item Group", [belts])
 		frappe.local.ls_shop_storefront_menu = None
 
 		all_tabs = get_category_facets("")

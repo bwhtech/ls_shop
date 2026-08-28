@@ -174,14 +174,14 @@ class TestNavbarFlow(IntegrationTestCase):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
 		accessories = self.add_node(men, f"{PREFIX} Accessories")
-		bags = self.add_node(accessories, f"{PREFIX} Bags", "Item Group", self.bags)
+		bags = self.add_node(accessories, f"{PREFIX} Bags", "Item Group", [self.bags])
 		brand_tab = self.add_node(women, f"{PREFIX} Brand Tab", "Brand", self.brand)
 
 		before = self.master_data_snapshot()
 		shape_before = labels_in_order(navbar_manager.get_menu_editor_data()["menu"])
 
 		navbar_manager.update_node(bags, display_name=f"{PREFIX} Handbags")
-		navbar_manager.update_node(brand_tab, link_type="Item Group", link_target=self.shirts)
+		navbar_manager.update_node(brand_tab, link_type="Item Group", link_target=[self.shirts])
 		navbar_manager.reorder_nodes("", [women, men])
 		navbar_manager.move_node(accessories, women, 0)
 		navbar_manager.set_visibility(brand_tab, 0)
@@ -386,7 +386,7 @@ class TestNavbarFlow(IntegrationTestCase):
 
 	def test_delete_node_removes_the_row_and_its_item_group_link(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
-		bags = self.add_node(men, f"{PREFIX} Bags", "Item Group", self.bags)
+		bags = self.add_node(men, f"{PREFIX} Bags", "Item Group", [self.bags])
 		self.assertEqual(get_item_groups_by_entry([bags]), {bags: [self.bags]})
 
 		navbar_manager.delete_node(bags)
@@ -399,9 +399,9 @@ class TestNavbarFlow(IntegrationTestCase):
 	def test_delete_node_cascades_through_the_subtree_and_keeps_the_nested_set_valid(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		column = self.add_node(men, f"{PREFIX} Accessories")
-		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", self.bags)
+		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", [self.bags])
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
-		kept_leaf = self.add_node(women, f"{PREFIX} Shirts", "Item Group", self.shirts)
+		kept_leaf = self.add_node(women, f"{PREFIX} Shirts", "Item Group", [self.shirts])
 
 		navbar_manager.delete_node(men)
 
@@ -414,9 +414,9 @@ class TestNavbarFlow(IntegrationTestCase):
 		"""A hidden entry must take its children and grandchildren with it, not promote them."""
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		hidden_column = self.add_node(men, f"{PREFIX} Hidden Column")
-		buried_leaf = self.add_node(hidden_column, f"{PREFIX} Buried Leaf", "Item Group", self.bags)
+		buried_leaf = self.add_node(hidden_column, f"{PREFIX} Buried Leaf", "Item Group", [self.bags])
 		kept_column = self.add_node(men, f"{PREFIX} Kept Column")
-		kept_leaf = self.add_node(kept_column, f"{PREFIX} Kept Leaf", "Item Group", self.shirts)
+		kept_leaf = self.add_node(kept_column, f"{PREFIX} Kept Leaf", "Item Group", [self.shirts])
 
 		navbar_manager.set_visibility(hidden_column, 0)
 
@@ -443,7 +443,7 @@ class TestNavbarFlow(IntegrationTestCase):
 	def test_hiding_a_root_tab_takes_the_whole_tab_with_it(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		column = self.add_node(men, f"{PREFIX} Accessories")
-		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", self.bags)
+		leaf = self.add_node(column, f"{PREFIX} Bags", "Item Group", [self.bags])
 		women = self.add_node(None, f"{PREFIX} Women {self.tag}")
 
 		navbar_manager.set_visibility(men, 0)

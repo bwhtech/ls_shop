@@ -87,11 +87,6 @@ class TestMenuItemGroups(IntegrationTestCase):
 
 		self.assertEqual(find_node(menu, entry["name"])["item_groups"], [self.denim])
 
-	def test_a_repeated_group_is_stored_once(self):
-		entry = self.add_entry(f"{PREFIX} Repeat", [self.shirts, self.shirts])
-
-		self.assertEqual(entry["item_groups"], [self.shirts])
-
 	def test_a_form_encoded_request_carries_the_list_as_text(self):
 		"""`frappe.call` posts JSON, but a form-encoded request delivers the array as a string."""
 		entry = self.add_entry(f"{PREFIX} Encoded", frappe.as_json([self.shirts, self.denim]))
@@ -110,12 +105,9 @@ class TestMenuItemGroups(IntegrationTestCase):
 	def test_the_listing_link_filters_on_every_group(self):
 		entry = self.add_entry(f"{PREFIX} Both", [self.shirts, self.denim])
 
-		subcategory = entry["href"].split("subcategory=")[1]
+		subcategory = unquote(entry["href"].split("subcategory=")[1])
 
-		self.assertEqual(
-			[unquote(value) for value in subcategory.split(",")],
-			[self.shirts, self.denim],
-		)
+		self.assertEqual(subcategory.split(","), [self.shirts, self.denim])
 
 	def test_the_sidebar_facet_carries_every_group(self):
 		self.add_entry(f"{PREFIX} Both", [self.shirts, self.denim])

@@ -83,7 +83,7 @@ class TestNavbarManager(IntegrationTestCase):
 
 	def test_editing_the_menu_never_touches_item_group(self):
 		accessories = self.add_node(self.men, "Test MM Accessories")
-		bags = self.add_node(accessories["name"], "Test MM Bags", "Item Group", "Test MM Bags")
+		bags = self.add_node(accessories["name"], "Test MM Bags", "Item Group", ["Test MM Bags"])
 
 		before = self.item_group_snapshot()
 
@@ -96,7 +96,7 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(before, self.item_group_snapshot())
 
 	def test_deleting_a_node_never_touches_item_group(self):
-		shoes = self.add_node(self.men, "Test MM Shoes", "Item Group", "Test MM Shirts")
+		shoes = self.add_node(self.men, "Test MM Shoes", "Item Group", ["Test MM Shirts"])
 		before = self.item_group_snapshot()
 
 		navbar_manager.delete_node(shoes["name"])
@@ -124,7 +124,7 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(find_node(menu, women_bags["name"])["label"], "Test MM Bags")
 
 	def test_node_links_to_one_item_group(self):
-		bags = self.add_node(self.men, "Test MM Bags", "Item Group", "Test MM Bags")
+		bags = self.add_node(self.men, "Test MM Bags", "Item Group", ["Test MM Bags"])
 
 		self.assertEqual(bags["item_groups"], ["Test MM Bags"])
 		self.assertIn("subcategory=Test%20MM%20Bags", bags["href"])
@@ -186,7 +186,7 @@ class TestNavbarManager(IntegrationTestCase):
 
 	def test_delete_node_takes_its_whole_subtree(self):
 		column = self.add_node(self.men, "Test MM Accessories")["name"]
-		leaf = self.add_node(column, "Test MM Bags Tab", "Item Group", "Test MM Bags")["name"]
+		leaf = self.add_node(column, "Test MM Bags Tab", "Item Group", ["Test MM Bags"])["name"]
 
 		menu = navbar_manager.delete_node(self.men)["menu"]
 
@@ -392,7 +392,7 @@ class TestNavbarManager(IntegrationTestCase):
 		self.assertEqual(find_node(menu, self.men)["meta_title"], "Test MM Menswear")
 
 	def test_update_node_keeps_the_other_fields_when_only_seo_changes(self):
-		bags = self.add_node(None, "Test MM Bags", "Item Group", "Test MM Bags")
+		bags = self.add_node(None, "Test MM Bags", "Item Group", ["Test MM Bags"])
 
 		menu = navbar_manager.update_node(bags["name"], meta_title="Test MM Bags Page")["menu"]
 
@@ -533,11 +533,11 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 
 	@classmethod
 	def build_menu(cls):
-		cls.women = navbar_manager.create_node("", "ZZ Pub Women", "Item Group", "ZZ Pub Dresses").name
+		cls.women = navbar_manager.create_node("", "ZZ Pub Women", "Item Group", ["ZZ Pub Dresses"]).name
 		cls.footwear = navbar_manager.create_node(
-			cls.women, "ZZ Pub Footwear", "Item Group", "ZZ Pub Footwear"
+			cls.women, "ZZ Pub Footwear", "Item Group", ["ZZ Pub Footwear"]
 		).name
-		cls.men = navbar_manager.create_node("", "ZZ Pub Men", "Item Group", "ZZ Pub Luggage").name
+		cls.men = navbar_manager.create_node("", "ZZ Pub Men", "Item Group", ["ZZ Pub Luggage"]).name
 		cls.heading = navbar_manager.create_node("", "ZZ Pub Heading").name
 
 	@classmethod

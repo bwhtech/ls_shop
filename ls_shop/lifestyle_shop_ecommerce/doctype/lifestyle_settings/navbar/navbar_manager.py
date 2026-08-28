@@ -78,27 +78,15 @@ def get_unique_category_name(parent, display_name):
 	return candidate
 
 
-def get_link_item_groups(link_target):
-	"""The item group names on a menu entry, whatever shape the caller passed them in.
-
-	The dashboard's multi-select posts a JSON array, while the Desk link field and the item-group
-	import pass a single name; a form-encoded request delivers the array as text, which is the only
-	reason the string is inspected before it is parsed.
-	"""
-	if isinstance(link_target, str) and not link_target.strip().startswith("["):
-		link_target = [link_target]
-	names = (cstr(value).strip() for value in parse_list(link_target))
-	return list(dict.fromkeys(name for name in names if name))
-
-
 def set_link(doc, link_type, link_target):
 	doc.link_type = link_type or ""
-	doc.set("item_groups", [])
+	doc.link_item_groups = []
 	doc.link_brand = None
 	doc.link_url = None
 
 	if link_type == "Item Group":
-		doc.set("item_groups", [{"item_group": name} for name in get_link_item_groups(link_target)])
+		for item_group in parse_list(link_target):
+			doc.append("link_item_groups", {"item_group": item_group})
 	elif link_type == "Brand":
 		doc.link_brand = link_target
 	elif link_type == "URL":
@@ -366,7 +354,7 @@ def seed_categories_from_item_groups(item_group=None, parent=""):
 					menu_parent,
 					group.item_group_name or group.name,
 					"Item Group",
-					group.name,
+					[group.name],
 					display_order=next_display_order[menu_parent],
 				).name
 				next_display_order[menu_parent] += 1
