@@ -29,11 +29,16 @@ const linkDialogOpen = ref(false)
 const linkDialogSection = ref<FooterSection | null>(null)
 const linkDialogLink = ref<FooterLink | null>(null)
 
-/** A drag on the board is already applied to the local lists, so the server is told the result. */
+/**
+ * A drag on the board is already applied to the local lists, so the server is told the result -
+ * and a refusal has to be undone by reading the board back, or it keeps showing a move that never
+ * happened.
+ */
 async function onColumnDrop() {
-	await mutate("reorder_sections", {
+	const moved = await mutate("reorder_sections", {
 		ordered_names: sections.value.map((section) => section.name),
 	})
+	if (!moved) await load()
 }
 
 type DragEndEvent = {
@@ -56,12 +61,13 @@ async function onLinkDrop(event: DragEndEvent) {
 
 	// `move_link` unlinks and re-inserts in one call, so the two columns never disagree about
 	// which one owns the row mid-move.
-	await mutate("move_link", {
+	const moved = await mutate("move_link", {
 		from_section: fromSection,
 		to_section: toSection,
 		link_row_name: linkRowName,
 		target_index: event.newIndex,
 	})
+	if (!moved) await load()
 }
 
 function columnOf(name: string) {
@@ -71,10 +77,11 @@ function columnOf(name: string) {
 async function reorderLinks(sectionName: string) {
 	const column = columnOf(sectionName)
 	if (!column) return
-	await mutate("reorder_links", {
+	const moved = await mutate("reorder_links", {
 		section_name: sectionName,
 		ordered_row_names: column.links.map((link) => link.name),
 	})
+	if (!moved) await load()
 }
 
 /**
@@ -104,7 +111,7 @@ async function moveLinkToColumn(
 ) {
 	const target = sections.value[columnIndex + offset]
 	if (!target) return
-	await mutate("move_link", {
+	const moved = await mutate("move_link", {
 		from_section: section.name,
 		to_section: target.name,
 		link_row_name: link.name,
@@ -112,7 +119,7 @@ async function moveLinkToColumn(
 		// so the "same position" the owner sees would not survive the move.
 		target_index: target.links.length,
 	})
-	toast.success(`Moved to ${target.title}`)
+	if (moved) toast.success(`Moved to ${target.title}`)
 }
 
 async function moveSection(columnIndex: number, offset: number) {
@@ -138,8 +145,8 @@ function addSection() {
 		],
 		confirmLabel: "Add",
 		onConfirm: async ({ values }) => {
-			await mutate("add_section", { title: values.title })
-			toast.success("Column added")
+			if (await mutate("add_section", { title: values.title }))
+				toast.success("Column added")
 		},
 	})
 }
@@ -157,11 +164,11 @@ function renameSection(section: FooterSection) {
 		],
 		confirmLabel: "Rename",
 		onConfirm: async ({ values }) => {
-			await mutate("rename_section", {
+			const renamed = await mutate("rename_section", {
 				old_name: section.name,
 				new_name: values.title,
 			})
-			toast.success("Column renamed")
+			if (renamed) toast.success("Column renamed")
 		},
 	})
 }
@@ -175,8 +182,8 @@ function removeSection(section: FooterSection) {
 			: "Pages are not deleted - only this footer column.",
 		confirmLabel: "Delete column",
 		onConfirm: async () => {
-			await mutate("delete_section", { name: section.name })
-			toast.success("Column deleted")
+			if (await mutate("delete_section", { name: section.name }))
+				toast.success("Column deleted")
 		},
 	})
 }
@@ -187,11 +194,11 @@ function removeLink(section: FooterSection, link: FooterLink) {
 		message: "The page it points at is not deleted - only this footer link.",
 		confirmLabel: "Remove link",
 		onConfirm: async () => {
-			await mutate("delete_link", {
+			const removed = await mutate("delete_link", {
 				section_name: section.name,
 				link_row_name: link.name,
 			})
-			toast.success("Link removed")
+			if (removed) toast.success("Link removed")
 		},
 	})
 }
@@ -205,19 +212,21 @@ function openLinkDialog(
 	linkDialogOpen.value = true
 }
 
+/** Resolves to whether the save landed, so the dialog knows whether it may close. */
 async function saveLink({ label, url }: { label: string; url: string }) {
 	const section = linkDialogSection.value
 	const link = linkDialogLink.value
-	if (!section) return
+	if (!section) return false
 
-	if (link)
-		await mutate("update_link", {
-			section_name: section.name,
-			link_row_name: link.name,
-			label,
-			url,
-		})
-	else await mutate("add_link", { section_name: section.name, label, url })
+	const saved = link
+		? await mutate("update_link", {
+				section_name: section.name,
+				link_row_name: link.name,
+				label,
+				url,
+			})
+		: await mutate("add_link", { section_name: section.name, label, url })
+	return Boolean(saved)
 }
 
 async function toggleSection(section: FooterSection) {

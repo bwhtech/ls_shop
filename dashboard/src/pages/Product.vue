@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CollectionCombobox from "@/components/CollectionCombobox.vue"
+import ErrorState from "@/components/ErrorState.vue"
 import OptionRow from "@/components/OptionRow.vue"
 import type { ProductDetail, ProductVariant } from "@/types"
 import { formatPriceRange, publishTheme, sumStock } from "@/utils/format"
@@ -13,7 +14,7 @@ import {
 	toast,
 	useCall,
 } from "frappe-ui"
-import { computed, reactive, watch } from "vue"
+import { computed, reactive, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 const route = useRoute()
@@ -26,11 +27,15 @@ const product = useCall<ProductDetail, { item_template: string }>({
 })
 
 const details = reactive({ title: "", collection: "", description: "" })
+const seededProduct = ref("")
 
+// Seeded once per product, not on every response: publishing an option reloads the product, and
+// re-seeding there would replace a description the owner is halfway through typing.
 watch(
 	() => product.data,
 	(data) => {
-		if (!data) return
+		if (!data || seededProduct.value === productName.value) return
+		seededProduct.value = productName.value
 		details.title = data.title ?? ""
 		details.collection = data.collection ?? ""
 		details.description = data.description ?? ""
@@ -157,6 +162,13 @@ function saveDetails() {
 		</header>
 
 		<LoadingText v-if="product.loading && !product.data" class="p-5" :lines="4" />
+
+		<ErrorState
+			v-else-if="product.error"
+			title="Could not load this product"
+			:message="product.error.message"
+			@retry="product.reload()"
+		/>
 
 		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
 			<!-- Main pane: the options are the work surface, so they get the width. -->

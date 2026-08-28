@@ -9,8 +9,8 @@ const props = defineProps<{
 	/** The link being edited, or null when adding a new one. */
 	link: FooterLink | null
 	pages: FooterPage[]
-	/** Runs the server call. Awaited, so the dialog only closes once the save lands. */
-	submit: (payload: { label: string; url: string }) => Promise<void>
+	/** Runs the server call. Resolves false when the server refused it, and the dialog stays open. */
+	submit: (payload: { label: string; url: string }) => Promise<boolean>
 }>()
 
 const open = defineModel<boolean>("open", { required: true })
@@ -63,13 +63,12 @@ async function save() {
 		return
 	}
 
-	try {
-		await props.submit({ label: label.value, url: url.value })
-		open.value = false
-		toast.success(isEdit.value ? "Link saved" : "Link added")
-	} catch (exception) {
-		error.value = (exception as Error).message
-	}
+	// A refused save resolves false rather than throwing, so closing the dialog waits on the
+	// answer - closing it regardless would throw away what the owner typed.
+	if (!(await props.submit({ label: label.value, url: url.value }))) return
+
+	open.value = false
+	toast.success(isEdit.value ? "Link saved" : "Link added")
 }
 </script>
 

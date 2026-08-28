@@ -1,26 +1,19 @@
 import type { MenuNode } from "@/types"
-import { toast, useCall } from "frappe-ui"
 import { computed, ref } from "vue"
+import { createMethodCaller } from "./methodCaller"
 
 interface EditorData {
 	menu: MenuNode[]
 	max_depth: number
 }
 
-const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin.navigation."
-
 const menu = ref<MenuNode[]>([])
 const maxDepth = ref(0)
 const selectedName = ref<string | null>(null)
 
-const method = ref("get_editor_data")
-
-const request = useCall<EditorData, Record<string, unknown>>({
-	url: computed(() => METHOD_PREFIX + method.value),
-	method: "POST",
-	immediate: false,
-	onError: (error) => toast.error(error.message),
-})
+const { call, loading } = createMethodCaller(
+	"/api/v2/method/ls_shop.api.admin.navigation.",
+)
 
 function walk(
 	nodes: MenuNode[],
@@ -99,11 +92,11 @@ function applyExpansion(
 	}
 }
 
-function apply(data: EditorData | undefined) {
-	if (!data) return
+function apply(data: EditorData | null) {
+	if (!data?.menu) return
 
 	const expansion = rememberExpansion()
-	const nodes = data.menu ?? []
+	const nodes = data.menu
 	applyExpansion(nodes, expansion)
 	menu.value = nodes
 	if (data.max_depth) maxDepth.value = data.max_depth
@@ -114,19 +107,11 @@ function apply(data: EditorData | undefined) {
 		selectedName.value = null
 }
 
-async function call<T = EditorData>(
-	name: string,
-	params: Record<string, unknown> = {},
-) {
-	method.value = name
-	const data = (await request.submit(params)) as T
-	return data
-}
-
 /** Run a mutation and adopt the tree it returns. */
 async function mutate(name: string, params: Record<string, unknown> = {}) {
-	const data = await call(name, params)
-	apply(data as EditorData)
+	const data = await call<EditorData>(name, params)
+	if (!data) return null
+	apply(data)
 	// Every menu change funnels through here, so this is the one place the storefront preview has
 	// to be told the menu it rendered is now stale.
 	revision.value += 1
@@ -136,7 +121,7 @@ async function mutate(name: string, params: Record<string, unknown> = {}) {
 const revision = ref(0)
 
 async function load() {
-	apply(await call("get_editor_data"))
+	apply(await call<EditorData>("get_editor_data"))
 }
 
 export function useNavMenu() {
@@ -146,7 +131,7 @@ export function useNavMenu() {
 		revision,
 		selectedName,
 		selected,
-		loading: computed(() => request.loading),
+		loading,
 		load,
 		call,
 		mutate,

@@ -1,8 +1,6 @@
 import type { FooterEditorData, FooterSection } from "@/types"
-import { toast, useCall } from "frappe-ui"
-import { computed, ref } from "vue"
-
-const METHOD_PREFIX = "/api/v2/method/ls_shop.api.admin.footer."
+import { ref } from "vue"
+import { createMethodCaller } from "./methodCaller"
 
 const sections = ref<FooterSection[]>([])
 const pages = ref<FooterEditorData["pages"]>([])
@@ -11,35 +9,28 @@ const pages = ref<FooterEditorData["pages"]>([])
 // it has to fetch again. Every mutation bumps this.
 const previewToken = ref(0)
 
-const method = ref("get_editor_data")
+const { call, loading } = createMethodCaller(
+	"/api/v2/method/ls_shop.api.admin.footer.",
+)
 
-const request = useCall<FooterEditorData, Record<string, unknown>>({
-	url: computed(() => METHOD_PREFIX + method.value),
-	method: "POST",
-	immediate: false,
-	onError: (error) => toast.error(error.message),
-})
-
-function apply(data: FooterEditorData | undefined) {
+function apply(data: FooterEditorData | null) {
 	if (!data) return
 
 	sections.value = data.columns ?? []
 	pages.value = data.pages ?? []
 }
 
-async function call(name: string, params: Record<string, unknown> = {}) {
-	method.value = name
-	return (await request.submit(params)) as FooterEditorData
-}
-
-/** Run a mutation and adopt the footer it returns. */
+/** Run a mutation and adopt the footer it returns, or null when the server refused it. */
 async function mutate(name: string, params: Record<string, unknown> = {}) {
-	apply(await call(name, params))
+	const data = await call<FooterEditorData>(name, params)
+	if (!data) return null
+	apply(data)
 	previewToken.value += 1
+	return data
 }
 
 async function load() {
-	apply(await call("get_editor_data"))
+	apply(await call<FooterEditorData>("get_editor_data"))
 }
 
 /** The order a list ends up in after `oldIndex` is lifted out and dropped at `newIndex`. */
@@ -55,7 +46,7 @@ export function useFooter() {
 		sections,
 		pages,
 		previewToken,
-		loading: computed(() => request.loading),
+		loading,
 		load,
 		mutate,
 		reordered,

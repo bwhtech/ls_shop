@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ErrorState from "@/components/ErrorState.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import OrderProgress from "@/components/orders/OrderProgress.vue"
 import type { OrderProgressStep } from "@/components/orders/types"
@@ -84,6 +85,13 @@ function confirmFulfil() {
 		</header>
 
 		<LoadingText v-if="order.loading && !order.data" class="p-5" :lines="4" />
+
+		<ErrorState
+			v-else-if="order.error"
+			title="Could not load this order"
+			:message="order.error.message"
+			@retry="order.reload()"
+		/>
 
 		<div v-else-if="order.data" class="min-h-0 flex-1 overflow-y-auto">
 			<div class="body-container pb-40 pt-5">

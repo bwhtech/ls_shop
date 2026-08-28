@@ -1,34 +1,38 @@
 <script setup lang="ts">
 import AddProductDialog from "@/components/AddProductDialog.vue"
+import ErrorState from "@/components/ErrorState.vue"
+import ListPager from "@/components/ListPager.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import { showAddProduct } from "@/components/addProduct"
+import { usePagedList } from "@/composables/usePagedList"
 import type { ProductRow } from "@/types"
 import { cellAlignClass, formatRowPrice, publishTheme } from "@/utils/format"
-import { Badge, Breadcrumbs, Button, FormControl, useCall } from "frappe-ui"
+import { Badge, Breadcrumbs, Button, FormControl } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
-import { computed, ref, watch } from "vue"
+import { computed } from "vue"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
-const search = ref("")
 
-const products = useCall<
-	{ products: ProductRow[]; total: number },
-	{ search: string }
->({
-	url: "/api/v2/method/ls_shop.api.admin.catalog.get_products",
-	params: () => ({ search: search.value }),
-})
+// Matches the endpoint's own default, so the first screenful is the page it already returns.
+const PAGE_LENGTH = 20
 
-// Typing should not fire a request per keystroke; wait until the owner pauses.
-let searchTimer: ReturnType<typeof setTimeout>
-watch(search, () => {
-	clearTimeout(searchTimer)
-	searchTimer = setTimeout(() => products.reload(), 300)
-})
+const {
+	search,
+	request: products,
+	rows: loadedProducts,
+	total,
+	hasMore,
+	loadMore,
+	reload,
+} = usePagedList<{ products: ProductRow[]; total: number }, ProductRow>(
+	"/api/v2/method/ls_shop.api.admin.catalog.get_products",
+	PAGE_LENGTH,
+	(data) => data.products,
+)
 
 const rows = computed(() =>
-	(products.data?.products ?? []).map((product) => ({
+	loadedProducts.value.map((product) => ({
 		...product,
 		price: formatRowPrice(product),
 		status: product.published_count
@@ -102,6 +106,14 @@ const listOptions = {
 			:columns="columns"
 		/>
 
+		<ErrorState
+			v-else-if="products.error"
+			class="min-h-0 flex-1"
+			title="Could not load your products"
+			:message="products.error.message"
+			@retry="reload"
+		/>
+
 		<ListView
 			v-else
 			class="min-h-0 flex-1 px-3 sm:px-5"
@@ -144,6 +156,16 @@ const listOptions = {
 				>
 			</template>
 		</ListView>
+
+		<ListPager
+			v-if="products.data && rows.length"
+			:loaded="rows.length"
+			:total="total"
+			noun="products"
+			:has-more="hasMore"
+			:loading="products.loading"
+			@load-more="loadMore"
+		/>
 
 		<AddProductDialog
 			v-model:open="showAddProduct"

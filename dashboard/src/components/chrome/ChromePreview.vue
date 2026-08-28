@@ -79,7 +79,7 @@ const source = computed(
 					:label="collapsed ? `Show ${title.toLowerCase()}` : title"
 					@click="collapsed = !collapsed"
 				/>
-				<TabButtons v-if="!collapsed" v-model="language" :buttons="LANGUAGES" />
+				<TabButtons v-if="!collapsed" v-model="language" :options="LANGUAGES" />
 			</div>
 
 			<Button

@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import ErrorState from "@/components/ErrorState.vue"
+import ListPager from "@/components/ListPager.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
+import { usePagedList } from "@/composables/usePagedList"
 import type { InventoryRow } from "@/types"
 import { availabilityTheme, cellAlignClass } from "@/utils/format"
 import {
@@ -13,9 +16,8 @@ import {
 	useCall,
 } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 
-const search = ref("")
 const availability = ref("low")
 const receiveQuantities = ref<Record<string, string>>({})
 
@@ -25,20 +27,26 @@ const tabs = [
 	{ label: "All", value: "" },
 ]
 
-const inventory = useCall<
-	{ rows: InventoryRow[]; total: number; low_stock_threshold: number },
-	{ availability: string; search: string }
->({
-	url: "/api/v2/method/ls_shop.api.admin.inventory.get_inventory",
-	params: () => ({ availability: availability.value, search: search.value }),
-	refetch: true,
-})
+// Matches the endpoint's own default, so the first screenful is the page it already returns.
+const PAGE_LENGTH = 50
 
-let searchTimer: ReturnType<typeof setTimeout>
-watch(search, () => {
-	clearTimeout(searchTimer)
-	searchTimer = setTimeout(() => inventory.reload(), 300)
-})
+const {
+	search,
+	request: inventory,
+	rows,
+	total,
+	hasMore,
+	loadMore,
+	reload,
+} = usePagedList<
+	{ rows: InventoryRow[]; total: number; low_stock_threshold: number },
+	InventoryRow
+>(
+	"/api/v2/method/ls_shop.api.admin.inventory.get_inventory",
+	PAGE_LENGTH,
+	(data) => data.rows,
+	() => ({ availability: availability.value }),
+)
 
 const receiveStock = useCall<
 	unknown,
@@ -50,17 +58,21 @@ const receiveStock = useCall<
 	onSuccess: () => {
 		toast.success("Stock received")
 		receiveQuantities.value = {}
-		inventory.reload()
+		reload()
 	},
 	onError: (error: Error) => toast.error(error.message),
 })
 
-const rows = computed(() => inventory.data?.rows ?? [])
-const pending = computed(() =>
-	Object.entries(receiveQuantities.value).filter(
-		([, quantity]) => Number(quantity) > 0,
+// Only the sizes the owner actually typed a quantity into: the map keeps a key for every field
+// that was ever focused, and the blanks and zeroes among them are not part of the receipt.
+const pendingReceipt = computed(() =>
+	Object.fromEntries(
+		Object.entries(receiveQuantities.value).filter(
+			([, quantity]) => Number(quantity) > 0,
+		),
 	),
 )
+const pendingCount = computed(() => Object.keys(pendingReceipt.value).length)
 
 const columns = [
 	{ label: "Product", key: "product", width: 2.2 },
@@ -81,20 +93,27 @@ const columns = [
 		</header>
 
 		<div class="flex items-center gap-3 px-3 py-3 sm:px-5">
-			<TabButtons v-model="availability" :buttons="tabs" />
+			<TabButtons v-model="availability" :options="tabs" />
 			<FormControl
 				v-model="search"
 				type="text"
 				placeholder="Search products"
 				class="w-56"
 			/>
-			<span class="ml-auto text-sm text-ink-gray-5">{{ inventory.data?.total ?? 0 }} sizes</span>
 		</div>
 
 		<ListSkeleton
 			v-if="inventory.loading && !inventory.data"
 			class="px-3 sm:px-5"
 			:columns="columns"
+		/>
+
+		<ErrorState
+			v-else-if="inventory.error"
+			class="min-h-0 flex-1"
+			title="Could not load your stock"
+			:message="inventory.error.message"
+			@retry="reload"
 		/>
 
 		<ListView
@@ -139,14 +158,24 @@ const columns = [
 			</template>
 		</ListView>
 
+		<ListPager
+			v-if="inventory.data && rows.length"
+			:loaded="rows.length"
+			:total="total"
+			noun="sizes"
+			:has-more="hasMore"
+			:loading="inventory.loading"
+			@load-more="loadMore"
+		/>
+
 		<!-- One receipt covers whatever the owner typed across the whole screen, so a stock take
 		     is a single action rather than one submission per size. -->
 		<div
-			v-if="pending.length"
+			v-if="pendingCount"
 			class="flex items-center gap-2 border-t border-outline-gray-1 px-3 py-3 sm:px-5"
 		>
 			<span class="mr-auto text-sm text-ink-gray-5">
-				Receiving {{ pending.length }} {{ pending.length === 1 ? "size" : "sizes" }}
+				Receiving {{ pendingCount }} {{ pendingCount === 1 ? "size" : "sizes" }}
 			</span>
 			<Button label="Discard" @click="receiveQuantities = {}" />
 			<Button
@@ -155,7 +184,7 @@ const columns = [
 				icon-left="lucide-package-plus"
 				:loading="receiveStock.loading"
 				label="Receive stock"
-				@click="receiveStock.submit({ received_quantities: receiveQuantities })"
+				@click="receiveStock.submit({ received_quantities: pendingReceipt })"
 			/>
 		</div>
 	</div>

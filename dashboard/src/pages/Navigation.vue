@@ -79,11 +79,13 @@ async function onDragEnd(info: DropInfo | null) {
 
 	// `move_node` reparents and positions in one call, so a reorder within one parent and a
 	// move across parents are the same request - `to` is simply unchanged in the first case.
-	await mutate("move_node", {
+	const moved = await mutate("move_node", {
 		name: String(info.node.name),
 		to_parent: info.to === null ? "" : String(info.to),
 		target_index: info.newIndex,
 	})
+	// Tree has already drawn the drop, so a refusal is undone by reading the menu back.
+	if (!moved) await load()
 }
 
 function addEntry(parent = "") {
@@ -134,10 +136,11 @@ function importGroups() {
 		confirmLabel: "Import",
 		onConfirm: async ({ values }) => {
 			const before = countEntries(menu.value)
-			await mutate("import_from_item_group", {
+			const imported = await mutate("import_from_item_group", {
 				item_group: values.item_group,
 				parent,
 			})
+			if (!imported) return
 			const added = countEntries(menu.value) - before
 			toast.success(
 				added
@@ -155,6 +158,7 @@ async function removeEntry(node: MenuNode) {
 			name: node.name,
 		},
 	)
+	if (!preview) return
 
 	dialog.danger({
 		title: `Delete "${preview.label}"?`,
@@ -162,22 +166,22 @@ async function removeEntry(node: MenuNode) {
 			? `This also removes ${preview.count} ${preview.count === 1 ? "entry" : "entries"} nested inside it. Products are not deleted.`
 			: "Products are not deleted - only this menu entry.",
 		onConfirm: async () => {
-			await mutate("delete_node", { name: node.name })
-			toast.success("Menu entry deleted")
+			if (await mutate("delete_node", { name: node.name }))
+				toast.success("Menu entry deleted")
 		},
 	})
 }
 
 async function clearMenu() {
 	const preview = await call<{ count: number }>("get_delete_all_preview")
+	if (!preview) return
 
 	dialog.danger({
 		title: "Delete the whole menu?",
 		message: `All ${preview.count} entries are removed and shoppers lose the navigation until you build it again. Products are not deleted.`,
 		confirmLabel: "Delete everything",
 		onConfirm: async () => {
-			await mutate("delete_all_nodes")
-			toast.success("Menu cleared")
+			if (await mutate("delete_all_nodes")) toast.success("Menu cleared")
 		},
 	})
 }

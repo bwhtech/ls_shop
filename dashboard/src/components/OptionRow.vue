@@ -19,7 +19,7 @@ import {
 	ListRow,
 	ListRows,
 } from "frappe-ui/list"
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps<{ variant: ProductVariant }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -77,19 +77,43 @@ const priceLabel = computed(() =>
 )
 const stockTotal = computed(() => sumStock(props.variant.sizes))
 
-const isLive = computed({
-	get: () => props.variant.is_published,
-	set: (value: boolean) =>
-		setPublished.submit({
-			style_attribute_variant: props.variant.name,
-			publish: value ? 1 : 0,
-		}),
-})
+// The switch answers the click, then the server. Bound straight to the prop it would sit unflipped
+// for the whole round trip, so it holds the owner's choice and goes back only if the save is refused.
+const isLive = ref(props.variant.is_published)
+const publishing = ref(false)
 
+watch(
+	() => props.variant.is_published,
+	(published) => {
+		isLive.value = published
+	},
+)
+
+async function setLive(published: boolean) {
+	isLive.value = published
+	publishing.value = true
+	try {
+		await setPublished.submit({
+			style_attribute_variant: props.variant.name,
+			publish: published ? 1 : 0,
+		})
+		if (setPublished.error) isLive.value = props.variant.is_published
+	} finally {
+		publishing.value = false
+	}
+}
+
+// Only the sizes with a quantity typed into them: the map keeps a key for every field that was
+// ever focused, and the blanks and zeroes among them are not part of the receipt.
 const pendingReceipt = computed(() =>
-	Object.values(receiveQuantities.value).some(
-		(quantity) => Number(quantity) > 0,
+	Object.fromEntries(
+		Object.entries(receiveQuantities.value).filter(
+			([, quantity]) => Number(quantity) > 0,
+		),
 	),
+)
+const hasPendingReceipt = computed(
+	() => Object.keys(pendingReceipt.value).length > 0,
 )
 
 function rateFor(size: ProductSize) {
@@ -173,8 +197,9 @@ function confirmRemoveImage(fileUrl: string) {
 				<Tooltip :text="blockerText" :disabled="canPublish">
 					<div class="flex justify-end">
 						<Switch
-							v-model="isLive"
-							:disabled="!variant.is_published && !canPublish"
+							:model-value="isLive"
+							:disabled="publishing || (!variant.is_published && !canPublish)"
+							@update:model-value="setLive"
 						/>
 					</div>
 				</Tooltip>
@@ -269,13 +294,13 @@ function confirmRemoveImage(fileUrl: string) {
 					<Button :loading="savePrices.loading" label="Save prices" @click="submitPrices" />
 					<Button
 						:loading="receiveStock.loading"
-						:disabled="!pendingReceipt"
+						:disabled="!hasPendingReceipt"
 						icon-left="lucide-package-plus"
 						label="Add stock"
 						@click="
 							receiveStock.submit({
 								style_attribute_variant: variant.name,
-								received_quantities: receiveQuantities,
+								received_quantities: pendingReceipt,
 							})
 						"
 					/>

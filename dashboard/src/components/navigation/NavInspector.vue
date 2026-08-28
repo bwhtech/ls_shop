@@ -5,7 +5,6 @@ import type { MenuLinkType, MenuNode } from "@/types"
 import {
 	Button,
 	Combobox,
-	ErrorMessage,
 	FormControl,
 	MultiSelect,
 	Switch,
@@ -38,7 +37,6 @@ const form = reactive({
 })
 
 const saving = ref(false)
-const error = ref("")
 
 const isRoot = computed(() => Boolean(selected.value && !selected.value.parent))
 
@@ -48,7 +46,6 @@ watch(
 	() => selected.value?.name,
 	() => {
 		const node = selected.value
-		error.value = ""
 		if (!node) return
 		form.label = node.label
 		form.route_slug = node.route_slug
@@ -109,10 +106,11 @@ async function save() {
 	const node = selected.value
 	if (!node) return
 
-	error.value = ""
 	saving.value = true
 	try {
-		await mutate("update_node", {
+		// A refused save resolves to null rather than throwing, so success is read off the answer;
+		// the reason is already on screen as a toast.
+		const saved = await mutate("update_node", {
 			name: node.name,
 			display_name: form.label,
 			link_type: form.link_type,
@@ -125,9 +123,7 @@ async function save() {
 			meta_description: form.meta_description,
 			noindex: form.noindex ? 1 : 0,
 		})
-		toast.success("Menu entry saved")
-	} catch (exception) {
-		error.value = (exception as Error).message
+		if (saved) toast.success("Menu entry saved")
 	} finally {
 		saving.value = false
 	}
@@ -238,8 +234,6 @@ async function save() {
 					description="Asks crawlers not to list this page."
 				/>
 			</div>
-
-			<ErrorMessage v-if="error" class="mt-4" :message="error" />
 		</div>
 
 		<div class="flex justify-end border-t border-outline-gray-1 px-5 py-3">

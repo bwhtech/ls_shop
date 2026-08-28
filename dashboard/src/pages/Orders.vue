@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import ErrorState from "@/components/ErrorState.vue"
+import ListPager from "@/components/ListPager.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
+import { usePagedList } from "@/composables/usePagedList"
 import type { OrderRow } from "@/types"
 import { cellAlignClass } from "@/utils/format"
-import { Breadcrumbs, FormControl, TabButtons, useCall } from "frappe-ui"
+import { Breadcrumbs, FormControl, TabButtons } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 
-const search = ref("")
 const status = ref("open")
 
 const statusTabs = [
@@ -17,23 +19,26 @@ const statusTabs = [
 	{ label: "All", value: "" },
 ]
 
-const orders = useCall<
-	{ orders: OrderRow[]; total: number },
-	{ status: string; search: string }
->({
-	url: "/api/v2/method/ls_shop.api.admin.orders.get_orders",
-	params: () => ({ status: status.value, search: search.value }),
-	refetch: true,
-})
+// Matches the endpoint's own default, so the first screenful is the page it already returns.
+const PAGE_LENGTH = 20
 
-let searchTimer: ReturnType<typeof setTimeout>
-watch(search, () => {
-	clearTimeout(searchTimer)
-	searchTimer = setTimeout(() => orders.reload(), 300)
-})
+const {
+	search,
+	request: orders,
+	rows: loadedOrders,
+	total,
+	hasMore,
+	loadMore,
+	reload,
+} = usePagedList<{ orders: OrderRow[]; total: number }, OrderRow>(
+	"/api/v2/method/ls_shop.api.admin.orders.get_orders",
+	PAGE_LENGTH,
+	(data) => data.orders,
+	() => ({ status: status.value }),
+)
 
 const rows = computed(() =>
-	(orders.data?.orders ?? []).map((order) => ({
+	loadedOrders.value.map((order) => ({
 		...order,
 		items: `${order.item_count}`,
 		amount: `${order.currency} ${order.total}`,
@@ -89,6 +94,14 @@ const listOptions = {
 			:columns="columns"
 		/>
 
+		<ErrorState
+			v-else-if="orders.error"
+			class="min-h-0 flex-1"
+			title="Could not load your orders"
+			:message="orders.error.message"
+			@retry="reload"
+		/>
+
 		<ListView
 			v-else
 			class="min-h-0 flex-1 px-3 sm:px-5"
@@ -115,5 +128,15 @@ const listOptions = {
 				>
 			</template>
 		</ListView>
+
+		<ListPager
+			v-if="orders.data && rows.length"
+			:loaded="rows.length"
+			:total="total"
+			noun="orders"
+			:has-more="hasMore"
+			:loading="orders.loading"
+			@load-more="loadMore"
+		/>
 	</div>
 </template>
