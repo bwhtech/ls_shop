@@ -60,3 +60,44 @@ jobs:
           python-version: '3.13'
           cache: pip
       - uses: pre-commit/action@v3.0.1
+
+  duplication:
+    name: 'Code Duplication'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          check-latest: true
+
+      # Mirrors the `dupes:py` / `dupes:vue` scripts in package.json. Run separately
+      # because jscpd applies --threshold per format, so a combined run reports a
+      # different number. Lower the threshold as cleanup lands; never raise it.
+      - name: Run jscpd (python)
+        run: npx --yes jscpd@4 ls_shop --format python --threshold 1
+
+      - name: Run jscpd (dashboard)
+        run: npx --yes jscpd@4 dashboard/src --format vue,typescript,javascript --threshold 1
+
+  dashboard-typecheck:
+    name: 'Dashboard Typecheck'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          check-latest: true
+          cache: yarn
+          cache-dependency-path: dashboard/yarn.lock
+
+      - name: Install dashboard dependencies
+        run: yarn --cwd dashboard install --frozen-lockfile
+
+      - name: Run vue-tsc
+        run: yarn --cwd dashboard typecheck

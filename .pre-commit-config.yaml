@@ -17,3 +17,23 @@ repos:
       hooks:
       -   id: biome-check
           additional_dependencies: ["@biomejs/biome@1.4.1"]
+
+  # Whole-tree scans: too slow to justify per-commit, and they need node_modules,
+  # so they run on push. Enable with: pre-commit install --hook-type pre-push
+  - repo: local
+    hooks:
+      - id: jscpd
+        name: "Run jscpd duplication check"
+        entry: npm run --silent dupes
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        files: ^(ls_shop/.*\.py|dashboard/src/.*\.(vue|ts|js))$
+
+      - id: dashboard-typecheck
+        name: "Run vue-tsc typecheck"
+        entry: bash -c 'cd dashboard && npm run --silent typecheck'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        files: ^dashboard/src/.*\.(vue|ts)$

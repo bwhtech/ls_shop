@@ -7,7 +7,9 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
-		"lint": "biome check --write ."
+		"lint": "biome check --write .",
+		"typecheck": "vue-tsc --noEmit",
+		"check": "npm run lint && npm run typecheck"
 	},
 	"dependencies": {
 		"@vueuse/core": "^14.4.0",
@@ -26,6 +28,7 @@
 		"postcss": "^8.4.5",
 		"tailwindcss": "^3.4.15",
 		"typescript": "^5.9.3",
-		"vite": "^7.2.4"
+		"vite": "^7.2.4",
+		"vue-tsc": "^2"
 	}
 }
