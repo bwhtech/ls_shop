@@ -8,7 +8,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "biome check --write .",
-		"typecheck": "vue-tsc --noEmit",
+		"typecheck": "./scripts/typecheck.sh",
 		"check": "npm run lint && npm run typecheck"
 	},
 	"dependencies": {
