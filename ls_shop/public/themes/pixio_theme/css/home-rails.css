@@ -26,7 +26,7 @@
 /* --- Shortlist promo panel: two assets the vendor pack never shipped --- */
 
 /* style.css masks the panel photo with ../images/bg-media.svg, which is absent from
-   pixio-package - the wave is redrawn here as a data URI so the panel keeps its scalloped
+   reference_themes/pixio - the wave is redrawn here as a data URI so the panel keeps its scalloped
    edge instead of falling back to an unmasked rectangle.
 
    The aspect ratio is the load-bearing part, not the wave: style.css sizes the mask `auto 100%`
