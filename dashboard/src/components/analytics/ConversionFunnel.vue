@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, FunnelReport } from "@/types"
+import type { FunnelReport } from "@/types"
 import { formatCount } from "@/utils/format"
-import { TabButtons, useCall } from "frappe-ui"
+import { TabButtons } from "frappe-ui"
 import { ChartCard, FunnelChart } from "frappe-ui/charts"
 import { computed, ref } from "vue"
 
@@ -20,19 +20,14 @@ const deviceOptions = [
 	{ label: "Tablet", value: "tablet" },
 ]
 
-const funnel = useCall<FunnelReport, AnalyticsRangeParams & { device: string }>(
-	{
-		url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_funnel",
-		params: () => ({ ...rangeParams.value, device: device.value }),
-		refetch: true,
-	},
+const { data, loading, error } = useAnalyticsReport<FunnelReport>(
+	"get_funnel",
+	() => ({ ...rangeParams.value, device: device.value }),
 )
-
-onAnalyticsRefresh(() => funnel.reload())
 
 // Every stage is a share of the first one, so a funnel with no sessions has nothing to divide by.
 const stages = computed(() => {
-	const rows = funnel.data?.stages ?? []
+	const rows = data.value?.stages ?? []
 	return rows[0]?.count ? rows : []
 })
 </script>
@@ -46,8 +41,8 @@ const stages = computed(() => {
 			category="label"
 			value="count"
 			:format="formatCount"
-			:loading="funnel.loading && !funnel.data"
-			:error="funnel.error?.message ?? null"
+			:loading="loading"
+			:error="error"
 		>
 			<template #actions>
 				<TabButtons v-model="device" :options="deviceOptions" />

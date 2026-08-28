@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-	Button,
 	Checkbox,
 	FormControl,
 	SettingsBody,
@@ -9,6 +8,7 @@ import {
 } from "frappe-ui"
 import IntegrationList from "../integrations/IntegrationList.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
+import SettingsSaveButton from "./SettingsSaveButton.vue"
 import { useSettingsForm } from "./useSettingsForm"
 
 const FIELDS = [
@@ -73,16 +73,7 @@ const { form, text, checked, changed, save, submit } = useSettingsForm(
 				</SettingsRow>
 			</div>
 
-			<div class="flex justify-end pt-4">
-				<Button
-					variant="solid"
-					theme="gray"
-					:loading="save.loading"
-					:disabled="!changed"
-					label="Save"
-					@click="submit()"
-				/>
-			</div>
+			<SettingsSaveButton :loading="save.loading" :disabled="!changed" @save="submit()" />
 		</div>
 	</SettingsBody>
 </template>

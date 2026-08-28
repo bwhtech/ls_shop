@@ -7,7 +7,7 @@ import {
 	SettingsPanel,
 	SettingsSidebar,
 } from "frappe-ui"
-import { markRaw } from "vue"
+import { type Component, markRaw } from "vue"
 import AdvancedSettings from "./AdvancedSettings.vue"
 import AnalyticsSettings from "./AnalyticsSettings.vue"
 import AppearanceSettings from "./AppearanceSettings.vue"
@@ -16,72 +16,23 @@ import PaymentSettings from "./PaymentSettings.vue"
 import ProfileSettings from "./ProfileSettings.vue"
 import ShippingSettings from "./ShippingSettings.vue"
 import StoreSettings from "./StoreSettings.vue"
-import { activeSettingsTab, showSettings } from "./index"
+import { activeSettingsTab, settingsTabs, showSettings } from "./index"
 
-const tabs = [
-	{
-		label: "Profile",
-		slug: "profile",
-		icon: "lucide-circle-user",
-		component: markRaw(ProfileSettings),
-		group: "Account",
-	},
-	{
-		label: "Appearance",
-		slug: "appearance",
-		icon: "lucide-palette",
-		component: markRaw(AppearanceSettings),
-		group: "Account",
-	},
-	{
-		label: "Store details",
-		slug: "store",
-		icon: "lucide-store",
-		component: markRaw(StoreSettings),
-		group: "Store",
-	},
-	{
-		label: "Shipping & returns",
-		slug: "shipping",
-		icon: "lucide-truck",
-		component: markRaw(ShippingSettings),
-		group: "Store",
-	},
-	{
-		label: "Payments",
-		slug: "payments",
-		icon: "lucide-credit-card",
-		component: markRaw(PaymentSettings),
-		group: "Store",
-	},
-	{
-		label: "Analytics & tracking",
-		slug: "analytics",
-		icon: "lucide-chart-line",
-		component: markRaw(AnalyticsSettings),
-		group: "Store",
-	},
-	{
-		label: "Footer & social",
-		slug: "footer",
-		icon: "lucide-panel-bottom",
-		component: markRaw(FooterSettings),
-		group: "Store",
-	},
-	{
-		label: "Advanced",
-		slug: "advanced",
-		icon: "lucide-settings-2",
-		component: markRaw(AdvancedSettings),
-		group: "Advanced",
-	},
-]
+const panels: Record<string, Component> = {
+	profile: markRaw(ProfileSettings),
+	appearance: markRaw(AppearanceSettings),
+	store: markRaw(StoreSettings),
+	shipping: markRaw(ShippingSettings),
+	payments: markRaw(PaymentSettings),
+	analytics: markRaw(AnalyticsSettings),
+	footer: markRaw(FooterSettings),
+	advanced: markRaw(AdvancedSettings),
+}
 
-const tabGroups = [
-	{ label: "Account", tabs: tabs.filter((tab) => tab.group === "Account") },
-	{ label: "Store", tabs: tabs.filter((tab) => tab.group === "Store") },
-	{ label: "Advanced", tabs: tabs.filter((tab) => tab.group === "Advanced") },
-]
+const tabGroups = ["Account", "Store", "Advanced"].map((label) => ({
+	label,
+	tabs: settingsTabs.filter((tab) => tab.group === label),
+}))
 </script>
 
 <template>
@@ -101,8 +52,8 @@ const tabGroups = [
 		</SettingsSidebar>
 
 		<SettingsContent>
-			<SettingsPanel v-for="tab in tabs" :key="tab.slug" :value="tab.slug">
-				<component :is="tab.component" />
+			<SettingsPanel v-for="tab in settingsTabs" :key="tab.slug" :value="tab.slug">
+				<component :is="panels[tab.slug]" />
 			</SettingsPanel>
 		</SettingsContent>
 	</SettingsDialog>

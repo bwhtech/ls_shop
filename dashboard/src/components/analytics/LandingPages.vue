@@ -1,54 +1,43 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, LandingPageRow } from "@/types"
-import { formatCount, formatPercent } from "@/utils/format"
-import { useCall } from "frappe-ui"
+import type { LandingPageRow } from "@/types"
 import { computed } from "vue"
 import AnalyticsPanel from "./AnalyticsPanel.vue"
 import AnalyticsTable from "./AnalyticsTable.vue"
-import type { AnalyticsTableColumn } from "./AnalyticsTable.vue"
+import {
+	type AnalyticsTableColumn,
+	countColumn,
+	percentColumn,
+} from "./columns"
 
 const { rangeParams, rangeCaption } = useAnalyticsRange()
 
-const columns: AnalyticsTableColumn[] = [
+const columns: AnalyticsTableColumn<LandingPageRow>[] = [
 	{ key: "path", label: "Landing page" },
-	{ key: "sessions", label: "Sessions", numeric: true },
-	{ key: "conversion_rate", label: "Conversion", numeric: true },
+	countColumn("sessions", "Sessions"),
+	percentColumn("conversion_rate", "Conversion"),
 ]
 
-const landingPages = useCall<
-	LandingPageRow[],
-	AnalyticsRangeParams & { limit: number }
->({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_landing_pages",
-	params: () => ({ ...rangeParams.value, limit: 8 }),
-	refetch: true,
-})
+const { data, loading, error } = useAnalyticsReport<LandingPageRow[]>(
+	"get_landing_pages",
+	() => ({ ...rangeParams.value, limit: 8 }),
+)
 
-onAnalyticsRefresh(() => landingPages.reload())
-
-const rows = computed(() => landingPages.data ?? [])
+const rows = computed(() => data.value ?? [])
 </script>
 
 <template>
 	<AnalyticsPanel
 		title="Landing pages"
 		:subtitle="`Where sessions start · ${rangeCaption}`"
-		:loading="landingPages.loading && !landingPages.data"
-		:error="landingPages.error?.message ?? null"
+		:loading="loading"
+		:error="error"
 		:empty="!rows.length"
 		empty-message="No landing pages were tracked in this period."
 	>
-		<AnalyticsTable :columns="columns" :rows="rows" row-key="path">
-			<template #sessions="{ row }">
-				{{ formatCount(Number(row.sessions)) }}
-			</template>
-			<template #conversion_rate="{ row }">
-				{{ formatPercent(Number(row.conversion_rate)) }}
-			</template>
-		</AnalyticsTable>
+		<AnalyticsTable :columns="columns" :rows="rows" row-key="path" />
 	</AnalyticsPanel>
 </template>

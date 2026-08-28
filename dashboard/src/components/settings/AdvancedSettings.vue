@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-	Button,
+	Alert,
 	SettingsBody,
 	SettingsHeader,
 	SettingsRow,
@@ -9,6 +9,7 @@ import {
 } from "frappe-ui"
 import { computed, reactive, watch } from "vue"
 import SettingsField from "./SettingsField.vue"
+import SettingsSaveButton from "./SettingsSaveButton.vue"
 import type { AdvancedField } from "./types"
 import { type SettingsValue, normalizeValue } from "./useSettingsForm"
 
@@ -74,15 +75,11 @@ const save = useCall<unknown, Record<string, SettingsValue>>({
 
 	<SettingsBody>
 		<div class="space-y-8 pt-6">
-			<div
-				class="flex items-start gap-2 rounded-5 border border-outline-amber-2 bg-surface-amber-2 px-3 py-2.5"
-			>
-				<span class="lucide-triangle-alert mt-0.5 size-4 shrink-0 text-ink-amber-3" aria-hidden="true" />
-				<p class="text-p-sm text-ink-gray-8">
-					These are setup values, not everyday settings. Changing them can break your
-					storefront &mdash; edit only what you recognise.
-				</p>
-			</div>
+			<Alert
+				theme="amber"
+				title="These are setup values, not everyday settings"
+				description="Changing them can break your storefront — edit only what you recognise."
+			/>
 
 			<section v-for="group in advanced.data?.groups ?? []" :key="group.label">
 				<h3 class="text-base font-medium text-ink-gray-8">{{ group.label }}</h3>
@@ -115,16 +112,11 @@ const save = useCall<unknown, Record<string, SettingsValue>>({
 				</ul>
 			</section>
 
-			<div class="flex justify-end">
-				<Button
-					variant="solid"
-					theme="gray"
-					:loading="save.loading"
-					:disabled="!changed"
-					label="Save"
-					@click="save.submit({ ...changedValues })"
-				/>
-			</div>
+			<SettingsSaveButton
+				:loading="save.loading"
+				:disabled="!changed"
+				@save="save.submit({ ...changedValues })"
+			/>
 		</div>
 	</SettingsBody>
 </template>

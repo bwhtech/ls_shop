@@ -1,37 +1,33 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, SalesTimeseries } from "@/types"
+import type { SalesTimeseries } from "@/types"
 import { formatCount, formatMoney, formatShortDate } from "@/utils/format"
-import { useCall } from "frappe-ui"
 import { ChartCard, LineChart } from "frappe-ui/charts"
 import { computed } from "vue"
 
 const props = defineProps<{ currency: string }>()
 
-const { rangeParams, rangeCaption } = useAnalyticsRange()
+const { rangeCaption } = useAnalyticsRange()
 
-const timeseries = useCall<SalesTimeseries, AnalyticsRangeParams>({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_sales_timeseries",
-	params: () => rangeParams.value,
-	refetch: true,
-})
-
-onAnalyticsRefresh(() => timeseries.reload())
+const { data, loading, error } = useAnalyticsReport<SalesTimeseries>(
+	"get_sales_timeseries",
+)
 
 const rows = computed(() => {
-	const data = timeseries.data
-	if (!data) return []
+	const timeseries = data.value
+	if (!timeseries) return []
 	// A period every store has slept through plots as a flat pair of zero lines, which reads as
 	// a broken chart rather than as an empty one - so it is handed no rows at all.
-	const hasActivity = data.sales.some(Boolean) || data.orders.some(Boolean)
+	const hasActivity =
+		timeseries.sales.some(Boolean) || timeseries.orders.some(Boolean)
 	if (!hasActivity) return []
-	return data.labels.map((day, index) => ({
+	return timeseries.labels.map((day, index) => ({
 		day,
-		sales: data.sales[index],
-		orders: data.orders[index],
+		sales: timeseries.sales[index],
+		orders: timeseries.orders[index],
 	}))
 })
 
@@ -53,8 +49,8 @@ const formatSales = (value: number) => formatMoney(value, props.currency, true)
 				sales: { label: 'Sales', type: 'area' },
 				orders: { label: 'Orders', axis: 'y2' },
 			}"
-			:loading="timeseries.loading && !timeseries.data"
-			:error="timeseries.error?.message ?? null"
+			:loading="loading"
+			:error="error"
 		>
 			<template #empty>
 				<span class="text-p-sm text-ink-gray-5">

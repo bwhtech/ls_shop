@@ -1,33 +1,26 @@
-<script setup lang="ts">
-export type AnalyticsTableColumn = {
-	/** Doubles as the slot name, so a cell that needs a badge or a link overrides just that one. */
-	key: string
-	label: string
-	numeric?: boolean
-}
-
-type AnalyticsTableRow = Record<string, unknown>
+<script setup lang="ts" generic="TRow extends Record<string, unknown>">
+import type { AnalyticsTableColumn } from "./columns"
 
 withDefaults(
 	defineProps<{
-		columns: AnalyticsTableColumn[]
-		rows: AnalyticsTableRow[]
+		columns: AnalyticsTableColumn<TRow>[]
+		rows: TRow[]
 		rowKey: string
 		clickable?: boolean
 	}>(),
 	{ clickable: false },
 )
 
-const emit = defineEmits<{ select: [row: AnalyticsTableRow] }>()
+const emit = defineEmits<{ select: [row: TRow] }>()
 
-function selectRow(row: AnalyticsTableRow) {
+function selectRow(row: TRow) {
 	emit("select", row)
 }
 </script>
 
 <!--
-	The dense numeric table half the analytics widgets are. Every column is a named slot, so a
-	widget styles the two cells it cares about and lets the rest print themselves.
+	The dense numeric table half the analytics widgets are. A column prints itself through its
+	own `format`, and is a named slot for the cells that need more than text - a badge, a link.
 -->
 <template>
 	<div class="-mx-1 overflow-x-auto">
@@ -68,7 +61,9 @@ function selectRow(row: AnalyticsTableRow) {
 								: 'max-w-[16rem] truncate text-left'
 						"
 					>
-						<slot :name="column.key" :row="row">{{ row[column.key] }}</slot>
+						<slot :name="column.key" :row="row">
+							{{ column.format ? column.format(row[column.key], row) : row[column.key] }}
+						</slot>
 					</td>
 				</tr>
 			</tbody>

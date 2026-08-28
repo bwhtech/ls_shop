@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {
-	Button,
 	FormControl,
 	SettingsBody,
 	SettingsHeader,
 	SettingsRow,
 } from "frappe-ui"
 import SettingsAttach from "./SettingsAttach.vue"
+import SettingsSaveButton from "./SettingsSaveButton.vue"
 import { useSettingsForm } from "./useSettingsForm"
 
 const FIELDS = [
@@ -81,16 +81,7 @@ const { form, text, changed, save, submit } = useSettingsForm(
 				</div>
 			</section>
 
-			<div class="flex justify-end">
-				<Button
-					variant="solid"
-					theme="gray"
-					:loading="save.loading"
-					:disabled="!changed"
-					label="Save"
-					@click="submit()"
-				/>
-			</div>
+			<SettingsSaveButton :loading="save.loading" :disabled="!changed" @save="submit()" />
 		</div>
 	</SettingsBody>
 </template>

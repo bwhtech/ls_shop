@@ -1,34 +1,32 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, DeviceSplitRow } from "@/types"
-import { formatCount, formatPercent } from "@/utils/format"
-import { useCall } from "frappe-ui"
+import type { DeviceSplitRow } from "@/types"
+import { formatCount } from "@/utils/format"
 import { DonutChart } from "frappe-ui/charts"
 import { computed } from "vue"
 import AnalyticsPanel from "./AnalyticsPanel.vue"
 import AnalyticsTable from "./AnalyticsTable.vue"
-import type { AnalyticsTableColumn } from "./AnalyticsTable.vue"
+import {
+	type AnalyticsTableColumn,
+	countColumn,
+	percentColumn,
+} from "./columns"
 
-const { rangeParams, rangeCaption } = useAnalyticsRange()
+const { rangeCaption } = useAnalyticsRange()
 
-const columns: AnalyticsTableColumn[] = [
+const columns: AnalyticsTableColumn<DeviceSplitRow>[] = [
 	{ key: "device", label: "Device" },
-	{ key: "sessions", label: "Sessions", numeric: true },
-	{ key: "conversion_rate", label: "Conversion", numeric: true },
+	countColumn("sessions", "Sessions"),
+	percentColumn("conversion_rate", "Conversion"),
 ]
 
-const deviceSplit = useCall<DeviceSplitRow[], AnalyticsRangeParams>({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_device_split",
-	params: () => rangeParams.value,
-	refetch: true,
-})
+const { data, loading, error } =
+	useAnalyticsReport<DeviceSplitRow[]>("get_device_split")
 
-onAnalyticsRefresh(() => deviceSplit.reload())
-
-const rows = computed(() => deviceSplit.data ?? [])
+const rows = computed(() => data.value ?? [])
 </script>
 
 <!--
@@ -39,8 +37,8 @@ const rows = computed(() => deviceSplit.data ?? [])
 	<AnalyticsPanel
 		title="Devices"
 		:subtitle="`Sessions and conversion by device · ${rangeCaption}`"
-		:loading="deviceSplit.loading && !deviceSplit.data"
-		:error="deviceSplit.error?.message ?? null"
+		:loading="loading"
+		:error="error"
 		:empty="!rows.length"
 		empty-message="No sessions were recorded in this period."
 	>
@@ -54,14 +52,7 @@ const rows = computed(() => deviceSplit.data ?? [])
 					:format="formatCount"
 				/>
 			</div>
-			<AnalyticsTable :columns="columns" :rows="rows" row-key="device">
-				<template #sessions="{ row }">
-					{{ formatCount(Number(row.sessions)) }}
-				</template>
-				<template #conversion_rate="{ row }">
-					{{ formatPercent(Number(row.conversion_rate)) }}
-				</template>
-			</AnalyticsTable>
+			<AnalyticsTable :columns="columns" :rows="rows" row-key="device" />
 		</div>
 	</AnalyticsPanel>
 </template>

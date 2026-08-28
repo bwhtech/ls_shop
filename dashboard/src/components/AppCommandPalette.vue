@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { openAddProduct } from "@/components/addProduct"
 import { showPalette, showShortcuts } from "@/components/commandPalette"
-import { openSettings } from "@/components/settings"
+import { openSettings, settingsTabs } from "@/components/settings"
+import { colorSchemeOptions, navDestinations } from "@/navigation"
 import type { OrderRow, ProductRow } from "@/types"
 import {
 	KeyboardShortcut,
@@ -46,50 +47,13 @@ function go(route: string) {
 
 // The shortcut chip rides on the row, so the keyboard route to a destination is learnt from
 // the mouse route to it.
-const destinations: PaletteItem[] = [
-	{
-		name: "home",
-		title: "Home",
-		shortcut: "Mod+Shift+H",
-		icon: "lucide-house",
-		action: () => go("Home"),
-	},
-	{
-		name: "orders",
-		title: "Orders",
-		shortcut: "Mod+Shift+O",
-		icon: "lucide-receipt",
-		action: () => go("Orders"),
-	},
-	{
-		name: "products",
-		title: "Products",
-		shortcut: "Mod+Shift+P",
-		icon: "lucide-package",
-		action: () => go("Products"),
-	},
-	{
-		name: "inventory",
-		title: "Inventory",
-		shortcut: "Mod+Shift+U",
-		icon: "lucide-boxes",
-		action: () => go("Inventory"),
-	},
-	{
-		name: "navigation",
-		title: "Navigation",
-		shortcut: "Mod+Shift+M",
-		icon: "lucide-menu",
-		action: () => go("Navigation"),
-	},
-	{
-		name: "footer",
-		title: "Footer",
-		shortcut: "Mod+Shift+F",
-		icon: "lucide-panel-bottom",
-		action: () => go("Footer"),
-	},
-]
+const destinations: PaletteItem[] = navDestinations.map((destination) => ({
+	name: destination.route,
+	title: destination.label,
+	shortcut: destination.shortcut,
+	icon: destination.icon,
+	action: () => go(destination.route),
+}))
 
 const actions: PaletteItem[] = [
 	{
@@ -116,73 +80,19 @@ const actions: PaletteItem[] = [
 	},
 ]
 
-// One entry per settings tab, mirroring AppSettingsDialog's slugs, so the palette reaches every
-// panel rather than only the two the dialog opens on.
-const settingsTabs: PaletteItem[] = [
-	{
-		name: "settings-profile",
-		title: "Profile",
-		icon: "lucide-circle-user",
-		action: () => openSettings("profile"),
-	},
-	{
-		name: "settings-appearance",
-		title: "Appearance",
-		icon: "lucide-palette",
-		action: () => openSettings("appearance"),
-	},
-	{
-		name: "settings-store",
-		title: "Store details",
-		icon: "lucide-store",
-		action: () => openSettings("store"),
-	},
-	{
-		name: "settings-shipping",
-		title: "Shipping & returns",
-		icon: "lucide-truck",
-		action: () => openSettings("shipping"),
-	},
-	{
-		name: "settings-payments",
-		title: "Payments",
-		icon: "lucide-credit-card",
-		action: () => openSettings("payments"),
-	},
-	{
-		name: "settings-footer",
-		title: "Footer & social",
-		icon: "lucide-panel-bottom",
-		action: () => openSettings("footer"),
-	},
-	{
-		name: "settings-advanced",
-		title: "Advanced",
-		icon: "lucide-settings-2",
-		action: () => openSettings("advanced"),
-	},
-]
+const settingsItems: PaletteItem[] = settingsTabs.map((tab) => ({
+	name: `settings-${tab.slug}`,
+	title: tab.label,
+	icon: tab.icon,
+	action: () => openSettings(tab.slug),
+}))
 
-const colorSchemes: PaletteItem[] = [
-	{
-		name: "theme-light",
-		title: "Light mode",
-		icon: "lucide-sun",
-		action: () => setColorScheme("light"),
-	},
-	{
-		name: "theme-dark",
-		title: "Dark mode",
-		icon: "lucide-moon",
-		action: () => setColorScheme("dark"),
-	},
-	{
-		name: "theme-system",
-		title: "System theme",
-		icon: "lucide-monitor",
-		action: () => setColorScheme("system"),
-	},
-]
+const colorSchemes: PaletteItem[] = colorSchemeOptions.map((option) => ({
+	name: `theme-${option.value}`,
+	title: option.label,
+	icon: option.icon,
+	action: () => setColorScheme(option.value),
+}))
 
 const productSearch = useCall<
 	{ products: ProductRow[] },
@@ -249,7 +159,7 @@ const groups = computed(() =>
 	[
 		{ title: "Go to", items: matches(destinations) },
 		{ title: "Actions", items: matches(actions) },
-		{ title: "Settings", items: matches(settingsTabs) },
+		{ title: "Settings", items: matches(settingsItems) },
 		{ title: "Theme", items: matches(colorSchemes) },
 		{ title: "Products", items: productMatches.value },
 		{ title: "Orders", items: orderMatches.value },
@@ -260,6 +170,24 @@ function runCommand(command: CommandPaletteValue) {
 	const item = command as PaletteItem
 	item.action()
 }
+
+// Every combo here is drawn as a chip on its own palette row, and the palette holds focus in
+// its own input inside a dialog - so both gates stay open, or the chip would advertise a
+// shortcut that cannot fire from where it is being read.
+const navigationShortcuts = navDestinations.flatMap((destination) =>
+	destination.shortcut
+		? [
+				{
+					combo: destination.shortcut,
+					description: `Go to ${destination.label}`,
+					group: "Navigation",
+					allowInInput: true,
+					allowInDialog: true,
+					handler: () => go(destination.route),
+				},
+			]
+		: [],
+)
 
 // One registry: every shortcut declares its own description and group, which is what
 // KeyboardShortcutsDialog lists - so the help stays in step with the bindings by construction.
@@ -299,59 +227,7 @@ useKeyboardShortcut([
 		group: "General",
 		handler: () => toggleColorScheme(),
 	},
-	// Every combo below is drawn as a chip on its own palette row, and the palette holds focus in
-	// its own input inside a dialog - so both gates stay open, or the chip would advertise a
-	// shortcut that cannot fire from where it is being read.
-	{
-		combo: "Mod+Shift+H",
-		description: "Go to Home",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Home"),
-	},
-	{
-		combo: "Mod+Shift+O",
-		description: "Go to Orders",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Orders"),
-	},
-	{
-		combo: "Mod+Shift+P",
-		description: "Go to Products",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Products"),
-	},
-	{
-		// Not Mod+Shift+I: that is the browser's own devtools shortcut on every platform, so the
-		// keystroke is swallowed before the app ever sees it.
-		combo: "Mod+Shift+U",
-		description: "Go to Inventory",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Inventory"),
-	},
-	{
-		combo: "Mod+Shift+M",
-		description: "Go to Navigation",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Navigation"),
-	},
-	{
-		combo: "Mod+Shift+F",
-		description: "Go to Footer",
-		group: "Navigation",
-		allowInInput: true,
-		allowInDialog: true,
-		handler: () => go("Footer"),
-	},
+	...navigationShortcuts,
 	{
 		combo: "Mod+Shift+A",
 		description: "Add product",

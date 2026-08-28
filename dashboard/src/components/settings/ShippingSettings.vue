@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-	Button,
 	FormControl,
 	SettingsBody,
 	SettingsHeader,
@@ -9,6 +8,7 @@ import {
 import { computed } from "vue"
 import IntegrationList from "../integrations/IntegrationList.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
+import SettingsSaveButton from "./SettingsSaveButton.vue"
 import type { ShippingSettingsData } from "./types"
 import { useSettingsForm } from "./useSettingsForm"
 
@@ -56,16 +56,7 @@ const returnReasons = computed(() => settings.data?.reason_for_return ?? [])
 				</SettingsRow>
 			</div>
 
-			<div class="flex justify-end pt-4">
-				<Button
-					variant="solid"
-					theme="gray"
-					:loading="save.loading"
-					:disabled="!changed"
-					label="Save"
-					@click="submit()"
-				/>
-			</div>
+			<SettingsSaveButton :loading="save.loading" :disabled="!changed" @save="submit()" />
 
 			<div class="mt-8">
 				<h3 class="text-base font-medium text-ink-gray-8">Return reasons</h3>

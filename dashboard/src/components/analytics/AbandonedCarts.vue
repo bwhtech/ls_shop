@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
 import type {
+	AbandonedCartRow,
 	AbandonedCartStatus,
 	AbandonedCarts,
-	AnalyticsRangeParams,
 	BadgeTheme,
 } from "@/types"
 import {
@@ -15,22 +15,30 @@ import {
 	formatMoney,
 	formatPercent,
 } from "@/utils/format"
-import { Badge, useCall } from "frappe-ui"
+import { Badge } from "frappe-ui"
+import { NumberCard } from "frappe-ui/charts"
 import { computed } from "vue"
 import AnalyticsPanel from "./AnalyticsPanel.vue"
 import AnalyticsTable from "./AnalyticsTable.vue"
-import type { AnalyticsTableColumn } from "./AnalyticsTable.vue"
-import StatChip from "./StatChip.vue"
+import { type AnalyticsTableColumn, countColumn, moneyColumn } from "./columns"
 
 const props = defineProps<{ currency: string }>()
 
-const { rangeParams, rangeCaption } = useAnalyticsRange()
+const { rangeCaption } = useAnalyticsRange()
 
-const columns: AnalyticsTableColumn[] = [
-	{ key: "customer", label: "Customer" },
-	{ key: "items_count", label: "Items", numeric: true },
-	{ key: "value", label: "Value", numeric: true },
-	{ key: "last_activity", label: "Last activity" },
+const columns: AnalyticsTableColumn<AbandonedCartRow>[] = [
+	{
+		key: "customer",
+		label: "Customer",
+		format: (_, row) => row.customer || row.email || "Guest",
+	},
+	countColumn("items_count", "Items"),
+	moneyColumn("value", "Value", () => props.currency),
+	{
+		key: "last_activity",
+		label: "Last activity",
+		format: (value) => formatDateTime(String(value)),
+	},
 	{ key: "status", label: "Status" },
 	{ key: "quotation", label: "" },
 ]
@@ -42,26 +50,22 @@ const statusThemes: Record<AbandonedCartStatus, BadgeTheme> = {
 	Recovered: "green",
 }
 
-const abandonedCarts = useCall<AbandonedCarts, AnalyticsRangeParams>({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_abandoned_carts",
-	params: () => rangeParams.value,
-	refetch: true,
-})
+const { data, loading, error } = useAnalyticsReport<AbandonedCarts>(
+	"get_abandoned_carts",
+)
 
-onAnalyticsRefresh(() => abandonedCarts.reload())
+const carts = computed(() => data.value?.carts ?? [])
 
-const stats = computed(() => abandonedCarts.data?.stats)
-const carts = computed(() => abandonedCarts.data?.carts ?? [])
-
-const chips = computed(() => {
-	if (!stats.value) return []
+const tiles = computed(() => {
+	const stats = data.value?.stats
+	if (!stats) return []
 	return [
-		{ label: "Abandoned carts", value: formatCount(stats.value.count) },
+		{ title: "Abandoned carts", value: formatCount(stats.count) },
 		{
-			label: "Abandoned value",
-			value: formatMoney(stats.value.value, props.currency),
+			title: "Abandoned value",
+			value: formatMoney(stats.value, props.currency),
 		},
-		{ label: "Abandonment rate", value: formatPercent(stats.value.rate) },
+		{ title: "Abandonment rate", value: formatPercent(stats.rate) },
 	]
 })
 </script>
@@ -70,18 +74,20 @@ const chips = computed(() => {
 	<AnalyticsPanel
 		title="Abandoned carts"
 		:subtitle="`Carts left behind — and what they are worth · ${rangeCaption}`"
-		:loading="abandonedCarts.loading && !abandonedCarts.data"
-		:error="abandonedCarts.error?.message ?? null"
-		:empty="!chips.length"
+		:loading="loading"
+		:error="error"
+		:empty="!tiles.length"
 		empty-message="No carts were started in this period."
 	>
 		<div class="space-y-3">
+			<!-- card=false: the panel already draws the surface these readings sit on. -->
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-				<StatChip
-					v-for="chip in chips"
-					:key="chip.label"
-					:label="chip.label"
-					:value="chip.value"
+				<NumberCard
+					v-for="tile in tiles"
+					:key="tile.title"
+					:title="tile.title"
+					:value="tile.value"
+					:card="false"
 				/>
 			</div>
 
@@ -91,23 +97,11 @@ const chips = computed(() => {
 				:rows="carts"
 				row-key="session_id"
 			>
-				<template #customer="{ row }">
-					{{ row.customer || row.email || "Guest" }}
-				</template>
-				<template #items_count="{ row }">
-					{{ formatCount(Number(row.items_count)) }}
-				</template>
-				<template #value="{ row }">
-					{{ formatMoney(Number(row.value), props.currency) }}
-				</template>
-				<template #last_activity="{ row }">
-					{{ formatDateTime(String(row.last_activity)) }}
-				</template>
 				<template #status="{ row }">
 					<Badge
-						:theme="statusThemes[row.status as AbandonedCartStatus]"
+						:theme="statusThemes[row.status]"
 						variant="subtle"
-						:label="String(row.status)"
+						:label="row.status"
 					/>
 				</template>
 				<template #quotation="{ row }">

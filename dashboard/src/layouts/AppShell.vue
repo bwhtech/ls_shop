@@ -3,6 +3,7 @@ import AppCommandPalette from "@/components/AppCommandPalette.vue"
 import { showPalette, showShortcuts } from "@/components/commandPalette"
 import { openSettings } from "@/components/settings"
 import AppSettingsDialog from "@/components/settings/AppSettingsDialog.vue"
+import { colorSchemeOptions, navSections } from "@/navigation"
 import {
 	Button,
 	type ColorScheme,
@@ -43,26 +44,12 @@ const menuItems = computed(() => [
 	{
 		icon: "lucide-moon",
 		label: "Toggle theme",
-		submenu: [
-			{
-				label: "Light Mode",
-				icon: "lucide-sun",
-				slots: { suffix: () => themeCheckmark("light") },
-				onClick: () => setColorScheme("light"),
-			},
-			{
-				label: "Dark Mode",
-				icon: "lucide-moon",
-				slots: { suffix: () => themeCheckmark("dark") },
-				onClick: () => setColorScheme("dark"),
-			},
-			{
-				label: "System Default",
-				icon: "lucide-monitor",
-				slots: { suffix: () => themeCheckmark("system") },
-				onClick: () => setColorScheme("system"),
-			},
-		],
+		submenu: colorSchemeOptions.map((option) => ({
+			label: option.label,
+			icon: option.icon,
+			slots: { suffix: () => themeCheckmark(option.value) },
+			onClick: () => setColorScheme(option.value),
+		})),
 	},
 	{
 		icon: "lucide-keyboard",
@@ -84,47 +71,6 @@ const menuItems = computed(() => [
 		},
 	},
 ])
-
-type SidebarSection = {
-	id: string
-	/** Omitted for the pinned top-level run, which carries no group heading. */
-	label?: string
-	items: { label: string; route: string; icon: string }[]
-}
-
-// Grouped by the job the owner came to do, not by which doctype backs the page. A section
-// without a label renders as pinned top-level items, the way CRM and Gameplan pin their
-// everyday destinations above the first group header.
-const sections: SidebarSection[] = [
-	{
-		id: "daily",
-		items: [
-			{ label: "Home", route: "Home", icon: "lucide-house" },
-			{ label: "Orders", route: "Orders", icon: "lucide-receipt" },
-			{
-				label: "Analytics",
-				route: "Analytics",
-				icon: "lucide-chart-no-axes-column",
-			},
-		],
-	},
-	{
-		id: "catalog",
-		label: "Catalog",
-		items: [
-			{ label: "Products", route: "Products", icon: "lucide-package" },
-			{ label: "Inventory", route: "Inventory", icon: "lucide-boxes" },
-		],
-	},
-	{
-		id: "storefront",
-		label: "Storefront",
-		items: [
-			{ label: "Navigation", route: "Navigation", icon: "lucide-menu" },
-			{ label: "Footer", route: "Footer", icon: "lucide-panel-bottom" },
-		],
-	},
-]
 </script>
 
 <template>
@@ -145,15 +91,15 @@ const sections: SidebarSection[] = [
 					     several unnamed "navigation" regions, and the pinned first section has no
 					     heading to name itself with. -->
 					<nav aria-label="Main">
-						<div v-for="section in sections" :key="section.id" class="mb-3">
+						<div v-for="section in navSections" :key="section.label" class="mb-3">
 							<SidebarLabel v-if="section.label">{{ section.label }}</SidebarLabel>
 							<div class="mt-0.5 space-y-0.5">
 								<SidebarItem
-									v-for="item in section.items"
-									:key="item.route"
-									:to="{ name: item.route }"
-									:icon="item.icon"
-									:label="item.label"
+									v-for="destination in section.destinations"
+									:key="destination.route"
+									:to="{ name: destination.route }"
+									:icon="destination.icon"
+									:label="destination.label"
 								/>
 							</div>
 						</div>

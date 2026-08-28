@@ -1,6 +1,9 @@
 import type { AnalyticsRangeParams } from "@/types"
 import { formatShortDate } from "@/utils/format"
+import { useCall } from "frappe-ui"
 import { computed, ref, watch } from "vue"
+
+export const METHOD_PREFIX = "/api/v2/method/ls_shop.api.analytics_dashboard."
 
 export type AnalyticsRangePreset = "today" | "7" | "30" | "90"
 
@@ -69,4 +72,39 @@ export function refreshAnalytics() {
  */
 export function onAnalyticsRefresh(reload: () => void) {
 	watch(refreshToken, () => reload())
+}
+
+export type AnalyticsReportParams = Record<string, string | number>
+
+/**
+ * One report endpoint behind one analytics widget: the call, its place in the page's refresh,
+ * and the three shapes every widget hands its panel.
+ *
+ * `params` is the whole param set, not an addition to the range - `get_live_view` and
+ * `get_tracking_health` take no window at all, and sending them one would refetch them every
+ * time the reader moved the range.
+ */
+export function useAnalyticsReport<TData>(
+	method: string,
+	params: () => AnalyticsReportParams = () => rangeParams.value,
+) {
+	const report = useCall<TData, AnalyticsReportParams>({
+		url: `${METHOD_PREFIX}${method}`,
+		params,
+		refetch: true,
+	})
+
+	function reload() {
+		report.reload()
+	}
+
+	onAnalyticsRefresh(reload)
+
+	return {
+		data: computed(() => report.data),
+		// A reload keeps the previous reading on screen rather than flashing the skeleton again.
+		loading: computed(() => report.loading && !report.data),
+		error: computed(() => report.error?.message ?? null),
+		reload,
+	}
 }

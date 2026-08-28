@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+	Alert,
 	Badge,
 	Button,
 	Checkbox,
@@ -9,6 +10,7 @@ import {
 	SettingsRow,
 } from "frappe-ui"
 import { computed, reactive, watch } from "vue"
+import SettingsSaveButton from "./SettingsSaveButton.vue"
 import SettingsSecretField from "./SettingsSecretField.vue"
 import type { AnalyticsSettingsData, CustomTrackingScript } from "./types"
 import { useSettingsForm } from "./useSettingsForm"
@@ -207,17 +209,11 @@ async function saveAnalyticsSettings() {
 					Snippets from Google Tag Manager, PostHog, Hotjar and the like, injected on every
 					storefront page exactly as you paste them.
 				</p>
-				<div
-					class="mt-3 flex items-start gap-2 rounded-5 border border-outline-amber-2 bg-surface-amber-2 px-3 py-2.5"
-				>
-					<span
-						class="lucide-triangle-alert mt-0.5 size-4 shrink-0 text-ink-amber-3"
-						aria-hidden="true"
-					/>
-					<p class="text-p-sm text-ink-gray-8">
-						These run unchanged on your storefront. Only paste snippets from a tool you trust.
-					</p>
-				</div>
+				<Alert
+					class="mt-3"
+					theme="amber"
+					description="These run unchanged on your storefront. Only paste snippets from a tool you trust."
+				/>
 
 				<div class="mt-4 space-y-4">
 					<div
@@ -258,16 +254,11 @@ async function saveAnalyticsSettings() {
 				</div>
 			</section>
 
-			<div class="flex justify-end">
-				<Button
-					variant="solid"
-					theme="gray"
-					:loading="save.loading"
-					:disabled="!anythingChanged"
-					label="Save"
-					@click="saveAnalyticsSettings()"
-				/>
-			</div>
+			<SettingsSaveButton
+				:loading="save.loading"
+				:disabled="!anythingChanged"
+				@save="saveAnalyticsSettings()"
+			/>
 		</div>
 	</SettingsBody>
 </template>

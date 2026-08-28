@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { useAnalyticsRange } from "@/composables/useAnalyticsRange"
+import {
+	METHOD_PREFIX,
+	useAnalyticsRange,
+} from "@/composables/useAnalyticsRange"
 import type { AnalyticsRangeParams, ItemAnalytics } from "@/types"
 import {
 	formatCount,
@@ -8,11 +11,10 @@ import {
 	formatShortDate,
 } from "@/utils/format"
 import { Dialog, useCall } from "frappe-ui"
-import { ChartCard, LineChart } from "frappe-ui/charts"
+import { ChartCard, LineChart, NumberCard } from "frappe-ui/charts"
 import { computed, watch } from "vue"
 import AnalyticsTable from "./AnalyticsTable.vue"
-import type { AnalyticsTableColumn } from "./AnalyticsTable.vue"
-import StatChip from "./StatChip.vue"
+import { type AnalyticsTableColumn, countColumn, moneyColumn } from "./columns"
 
 const props = defineProps<{ itemCode: string | null; currency: string }>()
 
@@ -20,29 +22,37 @@ const open = defineModel<boolean>("open", { required: true })
 
 const { rangeParams, rangeCaption } = useAnalyticsRange()
 
-const deviceColumns: AnalyticsTableColumn[] = [
+type DeviceRow = ItemAnalytics["devices"][number]
+type SourceRow = ItemAnalytics["sources"][number] & { group: string }
+type RecentOrderRow = ItemAnalytics["recent_orders"][number]
+
+const deviceColumns: AnalyticsTableColumn<DeviceRow>[] = [
 	{ key: "device", label: "Device" },
-	{ key: "views", label: "Views", numeric: true },
+	countColumn("views", "Views"),
 ]
 
-const sourceColumns: AnalyticsTableColumn[] = [
-	{ key: "source", label: "Source" },
-	{ key: "views", label: "Views", numeric: true },
-	{ key: "adds", label: "Adds", numeric: true },
+const sourceColumns: AnalyticsTableColumn<SourceRow>[] = [
+	{ key: "group", label: "Source" },
+	countColumn("views", "Views"),
+	countColumn("adds", "Adds"),
 ]
 
-const orderColumns: AnalyticsTableColumn[] = [
+const orderColumns: AnalyticsTableColumn<RecentOrderRow>[] = [
 	{ key: "order", label: "Order" },
-	{ key: "date", label: "Date" },
-	{ key: "qty", label: "Qty", numeric: true },
-	{ key: "amount", label: "Amount", numeric: true },
+	{
+		key: "date",
+		label: "Date",
+		format: (value) => formatShortDate(String(value)),
+	},
+	countColumn("qty", "Qty"),
+	moneyColumn("amount", "Amount", () => props.currency),
 ]
 
 const itemAnalytics = useCall<
 	ItemAnalytics,
 	AnalyticsRangeParams & { item_code: string }
 >({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_item_analytics",
+	url: `${METHOD_PREFIX}get_item_analytics`,
 	params: () => ({ item_code: props.itemCode ?? "", ...rangeParams.value }),
 	immediate: false,
 })
@@ -58,30 +68,30 @@ watch(
 
 const report = computed(() => itemAnalytics.data)
 
-const chips = computed(() => {
+/** The one comparison that makes a single product's rate mean anything. */
+function storeAverageCaption(totals: ItemAnalytics["totals"]) {
+	const direction =
+		totals.purchase_to_view_rate >= totals.store_avg_purchase_to_view_rate
+			? "above"
+			: "below"
+	return `${direction} store avg ${formatPercent(totals.store_avg_purchase_to_view_rate)}`
+}
+
+const tiles = computed(() => {
 	const totals = report.value?.totals
 	if (!totals) return []
 	return [
-		{ label: "Views", value: formatCount(totals.views) },
-		{ label: "Adds", value: formatCount(totals.adds) },
-		{ label: "Checkouts", value: formatCount(totals.checkouts) },
-		{ label: "Units sold", value: formatCount(totals.units_sold) },
-		{ label: "Revenue", value: formatMoney(totals.revenue, props.currency) },
+		{ title: "Views", value: formatCount(totals.views) },
+		{ title: "Adds", value: formatCount(totals.adds) },
+		{ title: "Checkouts", value: formatCount(totals.checkouts) },
+		{ title: "Units sold", value: formatCount(totals.units_sold) },
+		{ title: "Revenue", value: formatMoney(totals.revenue, props.currency) },
 		{
-			label: "View → purchase",
+			title: "View → purchase",
 			value: formatPercent(totals.purchase_to_view_rate),
+			caption: storeAverageCaption(totals),
 		},
 	]
-})
-
-/** The one comparison that makes a single product's rate mean anything. */
-const storeAverageCaption = computed(() => {
-	const totals = report.value?.totals
-	if (!totals) return ""
-	const above =
-		totals.purchase_to_view_rate >= totals.store_avg_purchase_to_view_rate
-	const direction = above ? "above" : "below"
-	return `${direction} store avg ${formatPercent(totals.store_avg_purchase_to_view_rate)}`
 })
 
 const dailyRows = computed(() => {
@@ -100,7 +110,7 @@ const dailyRows = computed(() => {
 	}))
 })
 
-const sourceRows = computed(() =>
+const sourceRows = computed<SourceRow[]>(() =>
 	(report.value?.sources ?? []).map((row) => ({
 		...row,
 		group: row.medium ? `${row.source} / ${row.medium}` : row.source,
@@ -133,19 +143,14 @@ const sourceRows = computed(() =>
 
 				<template v-else-if="report">
 					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-						<StatChip
-							v-for="chip in chips"
-							:key="chip.label"
-							:label="chip.label"
-							:value="chip.value"
-						>
-							<span
-								v-if="chip.label === 'View → purchase'"
-								class="mt-0.5 block truncate text-p-xs text-ink-gray-5"
-							>
-								{{ storeAverageCaption }}
-							</span>
-						</StatChip>
+						<NumberCard
+							v-for="tile in tiles"
+							:key="tile.title"
+							:title="tile.title"
+							:value="tile.value"
+							:delta-caption="tile.caption"
+							:card="false"
+						/>
 					</div>
 
 					<ChartCard class="h-72">
@@ -178,11 +183,7 @@ const sourceRows = computed(() =>
 								:columns="deviceColumns"
 								:rows="report.devices"
 								row-key="device"
-							>
-								<template #views="{ row }">
-									{{ formatCount(Number(row.views)) }}
-								</template>
-							</AnalyticsTable>
+							/>
 							<p v-else class="text-p-sm text-ink-gray-5">No device data.</p>
 						</section>
 
@@ -193,15 +194,7 @@ const sourceRows = computed(() =>
 								:columns="sourceColumns"
 								:rows="sourceRows"
 								row-key="group"
-							>
-								<template #source="{ row }">{{ row.group }}</template>
-								<template #views="{ row }">
-									{{ formatCount(Number(row.views)) }}
-								</template>
-								<template #adds="{ row }">
-									{{ formatCount(Number(row.adds)) }}
-								</template>
-							</AnalyticsTable>
+							/>
 							<p v-else class="text-p-sm text-ink-gray-5">No source data.</p>
 						</section>
 					</div>
@@ -223,13 +216,6 @@ const sourceRows = computed(() =>
 								>
 									{{ row.order }}
 								</a>
-							</template>
-							<template #date="{ row }">
-								{{ formatShortDate(String(row.date)) }}
-							</template>
-							<template #qty="{ row }">{{ formatCount(Number(row.qty)) }}</template>
-							<template #amount="{ row }">
-								{{ formatMoney(Number(row.amount), props.currency) }}
 							</template>
 						</AnalyticsTable>
 						<p v-else class="text-p-sm text-ink-gray-5">

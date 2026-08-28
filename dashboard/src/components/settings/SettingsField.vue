@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Checkbox, FormControl } from "frappe-ui"
+import { TEXTAREA_FIELDTYPES } from "@/utils/docfield"
 import { computed } from "vue"
-import SettingsAttach from "./SettingsAttach.vue"
+import DocFieldControl from "./DocFieldControl.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
 import type { AdvancedField } from "./types"
 import { type SettingsValue, normalizeValue } from "./useSettingsForm"
@@ -9,83 +9,31 @@ import { type SettingsValue, normalizeValue } from "./useSettingsForm"
 const props = defineProps<{ field: AdvancedField; modelValue: SettingsValue }>()
 const emit = defineEmits<{ "update:modelValue": [value: SettingsValue] }>()
 
-const TEXTAREA_FIELDTYPES = [
-	"Small Text",
-	"Text",
-	"Long Text",
-	"Text Editor",
-	"Code",
-	"JSON",
-]
-const NUMBER_FIELDTYPES = ["Int", "Float", "Currency", "Percent"]
-
-const value = computed({
-	get: () => props.modelValue,
-	set: (next: SettingsValue) => emit("update:modelValue", next),
-})
-
-// Attach, Link and Checkbox each take one shape, while a generic Advanced field holds any of
-// them - so each control reads the value as what it accepts and writes the plain value back.
 const text = computed<string | null>({
 	get: () =>
 		props.modelValue === null ? null : normalizeValue(props.modelValue),
 	set: (next) => emit("update:modelValue", next),
 })
 
-const checked = computed({
-	get: () => normalizeValue(props.modelValue) === "1",
-	set: (next: boolean) => emit("update:modelValue", next),
-})
-
-/** Data fields carry their input hint in `options` (Email / URL / Phone). */
-const textInputType = computed(() => {
-	const hint = (props.field.options ?? "").toLowerCase()
-	if (hint === "email") return "email"
-	if (hint === "url") return "url"
-	if (hint === "phone") return "tel"
-	return "text"
-})
-
-const selectOptions = computed(() =>
-	(props.field.options ?? "")
-		.split("\n")
-		.map((option) => ({ label: option, value: option })),
+/** Only the multi-line control is widened; the rest size themselves in SettingsRow's column. */
+const isTextarea = computed(() =>
+	TEXTAREA_FIELDTYPES.includes(props.field.fieldtype),
 )
 </script>
 
 <template>
+	<!-- Advanced links search a Lifestyle Settings-scoped endpoint rather than Frappe's global
+	     link search, so the Link branch stays here and the rest of the ladder is shared. -->
 	<SettingsLinkField
 		v-if="props.field.fieldtype === 'Link'"
 		v-model="text"
 		:doctype="props.field.options ?? ''"
 	/>
-	<SettingsAttach
-		v-else-if="props.field.fieldtype === 'Attach Image'"
-		v-model="text"
+	<DocFieldControl
+		v-else
+		:field="props.field"
+		:model-value="props.modelValue"
+		:class="isTextarea ? 'w-72' : undefined"
+		@update:model-value="emit('update:modelValue', $event)"
 	/>
-	<SettingsAttach
-		v-else-if="props.field.fieldtype === 'Attach'"
-		v-model="text"
-		:image="false"
-	/>
-	<Checkbox v-else-if="props.field.fieldtype === 'Check'" v-model="checked" />
-	<FormControl
-		v-else-if="props.field.fieldtype === 'Select'"
-		v-model="value"
-		type="select"
-		:options="selectOptions"
-	/>
-	<FormControl
-		v-else-if="TEXTAREA_FIELDTYPES.includes(props.field.fieldtype)"
-		v-model="value"
-		type="textarea"
-		:rows="props.field.fieldtype === 'Code' ? 8 : 3"
-		class="w-72"
-	/>
-	<FormControl
-		v-else-if="NUMBER_FIELDTYPES.includes(props.field.fieldtype)"
-		v-model="value"
-		type="number"
-	/>
-	<FormControl v-else v-model="value" :type="textInputType" />
 </template>

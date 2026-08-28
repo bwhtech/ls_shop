@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, TopProduct } from "@/types"
+import type { TopProduct } from "@/types"
 import { formatCount, formatMoney } from "@/utils/format"
-import { TabButtons, useCall } from "frappe-ui"
+import { TabButtons } from "frappe-ui"
 import { BarChart, ChartCard } from "frappe-ui/charts"
 import type { ChartDatapointEvent } from "frappe-ui/charts"
 import { computed, ref } from "vue"
@@ -22,19 +22,13 @@ const sortOptions = [
 	{ label: "Units", value: "units" },
 ]
 
-const topProducts = useCall<
-	TopProduct[],
-	AnalyticsRangeParams & { sort_by: "revenue" | "units"; limit: number }
->({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_top_products",
-	params: () => ({ ...rangeParams.value, sort_by: sortBy.value, limit: 10 }),
-	refetch: true,
-})
-
-onAnalyticsRefresh(() => topProducts.reload())
+const { data, loading, error } = useAnalyticsReport<TopProduct[]>(
+	"get_top_products",
+	() => ({ ...rangeParams.value, sort_by: sortBy.value, limit: 10 }),
+)
 
 // Horizontal bars run bottom-up, so the best seller has to go last to sit at the top.
-const rows = computed(() => [...(topProducts.data ?? [])].reverse())
+const rows = computed(() => [...(data.value ?? [])].reverse())
 
 const formatValue = computed(() =>
 	sortBy.value === "revenue"
@@ -62,8 +56,8 @@ function openProduct(event: ChartDatapointEvent) {
 				revenue: { label: 'Revenue' },
 				units: { label: 'Units' },
 			}"
-			:loading="topProducts.loading && !topProducts.data"
-			:error="topProducts.error?.message ?? null"
+			:loading="loading"
+			:error="error"
 			@select="openProduct"
 		>
 			<template #actions>

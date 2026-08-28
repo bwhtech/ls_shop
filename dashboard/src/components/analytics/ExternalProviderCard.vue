@@ -2,7 +2,7 @@
 import { openSettings } from "@/components/settings"
 import type { ProviderReadback } from "@/types"
 import { formatCount } from "@/utils/format"
-import { Button } from "frappe-ui"
+import { Alert, Button } from "frappe-ui"
 import { AreaChart } from "frappe-ui/charts"
 import { computed } from "vue"
 import AnalyticsPanel from "./AnalyticsPanel.vue"

@@ -1,16 +1,9 @@
 <script setup lang="ts">
-import {
-	Button,
-	Checkbox,
-	Dialog,
-	ErrorMessage,
-	FormControl,
-	Password,
-	Switch,
-	toast,
-} from "frappe-ui"
+import { isSecret, plainText } from "@/utils/docfield"
+import { Button, Dialog, ErrorMessage, Switch, toast } from "frappe-ui"
 import { computed, reactive, ref, watch } from "vue"
 import DocLink from "../DocLink.vue"
+import DocFieldControl from "../settings/DocFieldControl.vue"
 import { normalizeValue } from "../settings/useSettingsForm"
 import type {
 	Integration,
@@ -30,9 +23,6 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>("open", { required: true })
 
-const TEXTAREA_FIELDTYPES = ["Small Text", "Text", "Long Text", "Code", "JSON"]
-const NUMBER_FIELDTYPES = ["Int", "Float", "Currency", "Percent"]
-
 const enabled = ref(false)
 const values = reactive<IntegrationValues>({})
 /** A stored secret comes back blank; it is only sent once the owner types a new one. */
@@ -41,10 +31,6 @@ const touchedSecrets = reactive<Record<string, boolean>>({})
 const fields = computed(() =>
 	(props.integration?.groups ?? []).flatMap((group) => group.fields),
 )
-
-function isSecret(field: IntegrationField) {
-	return field.is_secret || field.fieldtype === "Password"
-}
 
 function initialValue(field: IntegrationField) {
 	if (isSecret(field)) return ""
@@ -74,34 +60,17 @@ const changed = computed(() => {
 	})
 })
 
-function selectOptions(field: IntegrationField) {
-	return (field.options ?? "")
-		.split("\n")
-		.map((option) => ({ label: option, value: option }))
-}
-
-/** Data fields carry their input hint in `options` (Email / URL / Phone). */
-function textInputType(field: IntegrationField) {
-	const hint = (field.options ?? "").toLowerCase()
-	if (hint === "email") return "email"
-	if (hint === "url") return "url"
-	if (hint === "phone") return "tel"
-	return "text"
-}
-
-/** Docfield descriptions are authored as HTML; the form only has room for their text. */
-function plainText(value: string | null) {
-	if (!value) return undefined
-	return value.replace(/<[^>]*>/g, "").trim() || undefined
-}
-
-function secretDescription(field: IntegrationField) {
-	if (field.is_set) return "Saved — leave blank to keep it"
+function fieldDescription(field: IntegrationField) {
+	if (isSecret(field) && field.is_set) return "Saved — leave blank to keep it"
 	return plainText(field.description)
 }
 
-function markSecretTouched(field: IntegrationField) {
-	touchedSecrets[field.fieldname] = true
+function secretPlaceholder(field: IntegrationField) {
+	return isSecret(field) && field.is_set ? "••••••••" : undefined
+}
+
+function markTouched(field: IntegrationField) {
+	if (isSecret(field)) touchedSecrets[field.fieldname] = true
 }
 
 function payloadValues(): IntegrationValues {
@@ -151,62 +120,24 @@ async function copyWebhookUrl() {
 					<h4 class="text-sm text-ink-gray-5">{{ group.label }}</h4>
 
 					<template v-for="field in group.fields" :key="field.fieldname">
-						<Checkbox
-							v-if="field.fieldtype === 'Check'"
-							v-model="values[field.fieldname] as boolean"
-							:label="field.label"
-							:description="plainText(field.description)"
-						/>
-						<Password
-							v-else-if="isSecret(field)"
-							v-model="values[field.fieldname] as string"
-							:label="field.label"
-							:required="field.required"
-							:description="secretDescription(field)"
-							:placeholder="field.is_set ? '••••••••' : ''"
-							@update:model-value="markSecretTouched(field)"
-						/>
-						<FormControl
-							v-else-if="field.fieldtype === 'Select'"
-							v-model="values[field.fieldname]"
-							type="select"
-							:label="field.label"
-							:required="field.required"
-							:description="plainText(field.description)"
-							:options="selectOptions(field)"
-						/>
-						<FormControl
-							v-else-if="TEXTAREA_FIELDTYPES.includes(field.fieldtype)"
-							v-model="values[field.fieldname]"
-							type="textarea"
-							:rows="3"
-							:label="field.label"
-							:required="field.required"
-							:description="plainText(field.description)"
-						/>
-						<FormControl
-							v-else-if="NUMBER_FIELDTYPES.includes(field.fieldtype)"
-							v-model="values[field.fieldname]"
-							type="number"
-							:label="field.label"
-							:required="field.required"
-							:description="plainText(field.description)"
-						/>
+						<!-- Integration links search any doctype through Frappe's own link search;
+						     the settings tabs search a scoped endpoint, so each keeps its Link branch. -->
 						<DocLink
-							v-else-if="field.fieldtype === 'Link'"
+							v-if="field.fieldtype === 'Link'"
 							v-model="values[field.fieldname] as string"
 							:doctype="field.options ?? ''"
 							:label="field.label"
 							:required="field.required"
-							:description="plainText(field.description)"
+							:description="fieldDescription(field)"
 						/>
-						<FormControl
+						<DocFieldControl
 							v-else
 							v-model="values[field.fieldname]"
-							:type="textInputType(field)"
+							:field="field"
 							:label="field.label"
-							:required="field.required"
-							:description="plainText(field.description)"
+							:description="fieldDescription(field)"
+							:placeholder="secretPlaceholder(field)"
+							@update:model-value="markTouched(field)"
 						/>
 					</template>
 				</div>

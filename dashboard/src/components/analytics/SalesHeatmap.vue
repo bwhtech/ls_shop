@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import {
-	onAnalyticsRefresh,
 	useAnalyticsRange,
+	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsRangeParams, SalesHeatmap } from "@/types"
+import type { SalesHeatmap } from "@/types"
 import { formatCount } from "@/utils/format"
-import { useCall } from "frappe-ui"
 import { ChartCard, HeatmapChart } from "frappe-ui/charts"
 import { computed } from "vue"
 
-const { rangeParams, rangeCaption } = useAnalyticsRange()
+const { rangeCaption } = useAnalyticsRange()
 
 // Row 0 of the matrix is Monday, the way the API builds it from `weekday()`.
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -18,19 +17,14 @@ const hours = Array.from(
 	(_, hour) => `${String(hour).padStart(2, "0")}:00`,
 )
 
-const heatmap = useCall<SalesHeatmap, AnalyticsRangeParams>({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_sales_heatmap",
-	params: () => rangeParams.value,
-	refetch: true,
-})
-
-onAnalyticsRefresh(() => heatmap.reload())
+const { data, loading, error } =
+	useAnalyticsReport<SalesHeatmap>("get_sales_heatmap")
 
 const cells = computed(() => {
-	const data = heatmap.data
+	const heatmap = data.value
 	// A grid of 168 zeroes colours as one flat block; it is an empty chart, not a cold week.
-	if (!data?.max) return []
-	return data.matrix.flatMap((row, weekday) =>
+	if (!heatmap?.max) return []
+	return heatmap.matrix.flatMap((row, weekday) =>
 		row.map((orders, hour) => ({
 			weekday: weekdays[weekday],
 			hour: hours[hour],
@@ -50,10 +44,10 @@ const cells = computed(() => {
 			y="weekday"
 			value="orders"
 			:min="0"
-			:max="heatmap.data?.max ?? 0"
+			:max="data?.max ?? 0"
 			:format="formatCount"
-			:loading="heatmap.loading && !heatmap.data"
-			:error="heatmap.error?.message ?? null"
+			:loading="loading"
+			:error="error"
 		>
 			<template #empty>
 				<span class="text-p-sm text-ink-gray-5">

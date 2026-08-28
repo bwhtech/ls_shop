@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { colorSchemeOptions } from "@/navigation"
 import {
 	type ColorScheme,
 	Select,
@@ -10,12 +11,6 @@ import {
 import { computed } from "vue"
 
 const { colorScheme, setColorScheme } = useColorScheme()
-
-const themeOptions = [
-	{ label: "Light", value: "light" },
-	{ label: "Dark", value: "dark" },
-	{ label: "System Default", value: "system" },
-]
 
 const selectedTheme = computed({
 	get: () => colorScheme.value,
@@ -35,7 +30,7 @@ const selectedTheme = computed({
 					title="Theme"
 					description="Choose a light, dark, or system-matched interface"
 				>
-					<Select v-model="selectedTheme" :options="themeOptions">
+					<Select v-model="selectedTheme" :options="colorSchemeOptions">
 						<template #item-prefix="{ item }">
 							<div
 								v-if="item.value === 'system'"
