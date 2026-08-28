@@ -16,8 +16,8 @@
 	<li class="cat-item">
 		{% if node.is_leaf %}
 		<a href="javascript:void(0);"
-			:class='{ "selected": is_selected("subcategory", {{ node.name | tojson }}) }'
-			@click='toggle_filter("subcategory", {{ node.name | tojson }})'>{{ _(node.display_name) }}</a>
+			:class='{ "selected": is_selected("subcategory", {{ node.item_groups | tojson }}) }'
+			@click='toggle_filter("subcategory", {{ node.item_groups | tojson }})'>{{ _(node.display_name) }}</a>
 		{% else %}
 		<span class="cat-parent">{{ _(node.display_name) }}</span>
 		{% endif %}

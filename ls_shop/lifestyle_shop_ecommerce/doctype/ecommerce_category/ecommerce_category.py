@@ -5,10 +5,13 @@ from urllib.parse import quote
 
 import frappe
 from frappe.query_builder.functions import Max
-from frappe.utils import cint
+from frappe.utils import cint, now
 from frappe.utils.nestedset import NestedSet, update_move_node
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input import require_safe_url
+from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
+
+ITEM_GROUP_LINK_DOCTYPE = "Ecommerce Category Item Group Link"
 
 # root tab -> mega-menu column -> link. Deeper levels exist in no storefront theme.
 MAX_MENU_DEPTH = 3
@@ -33,6 +36,10 @@ class EcommerceCategory(NestedSet):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category_item_group_link.ecommerce_category_item_group_link import (
+			EcommerceCategoryItemGroupLink,
+		)
+
 		category_name: DF.Data
 		display_name: DF.Data
 		display_order: DF.Int
@@ -40,7 +47,7 @@ class EcommerceCategory(NestedSet):
 		icon: DF.Data | None
 		image: DF.AttachImage | None
 		is_group: DF.Check
-		item_group: DF.Link | None
+		item_groups: DF.TableMultiSelect[EcommerceCategoryItemGroupLink]
 		lft: DF.Int
 		link_brand: DF.Link | None
 		link_type: DF.Literal["", "Item Group", "Brand", "URL"]
@@ -105,7 +112,7 @@ class EcommerceCategory(NestedSet):
 		endpoint — the model is the only place that covers every write path.
 		"""
 		if self.link_type != "Item Group":
-			self.item_group = None
+			self.set("item_groups", [])
 		if self.link_type != "Brand":
 			self.link_brand = None
 		if self.link_type != "URL":
@@ -156,9 +163,14 @@ class EcommerceCategory(NestedSet):
 			self.display_name = self.category_name
 
 
-def build_listing_href(root_slug, item_group, language):
-	"""Product listing URL for one item group, as the `?subcategory=` filter expects."""
-	subcategory = quote(item_group)
+def build_listing_href(root_slug, item_groups, language):
+	"""Product listing URL for a menu entry's item groups, as the `?subcategory=` filter expects.
+
+	The filter reads the parameter as a comma-separated list and matches any of the groups, so an
+	entry linking several of them lands on one listing holding all their products. The comma itself
+	stays unencoded — it is the separator, not part of a group name.
+	"""
+	subcategory = ",".join(quote(item_group) for item_group in item_groups)
 	if root_slug:
 		return f"/{language}/products?category={root_slug}&subcategory={subcategory}"
 	return f"/{language}/products?subcategory={subcategory}"
@@ -189,6 +201,56 @@ def get_subtree_height(name):
 	return height
 
 
+def get_item_groups_by_entry(entry_names):
+	"""Item groups each menu entry links, keyed by entry and in the order the editor stored them.
+
+	One query for the whole menu rather than one per node — the storefront renders this tree on
+	every page.
+	"""
+	item_groups_by_entry = {}
+	for offset in range(0, len(entry_names), IN_CLAUSE_CHUNK_SIZE):
+		rows = frappe.get_all(
+			ITEM_GROUP_LINK_DOCTYPE,
+			filters={
+				"parenttype": "Ecommerce Category",
+				"parent": ["in", entry_names[offset : offset + IN_CLAUSE_CHUNK_SIZE]],
+			},
+			fields=["parent", "item_group"],
+			order_by="parent asc, idx asc",
+		)
+		for row in rows:
+			item_groups_by_entry.setdefault(row.parent, []).append(row.item_group)
+	return item_groups_by_entry
+
+
+def add_item_group_links(item_groups_by_entry):
+	"""Link the given item groups to the given menu entries, in the order they are passed.
+
+	Writes the child rows directly rather than through the parent: migrations call this over the
+	whole menu, and loading every entry would re-run tree validation for a change that touches
+	nothing else. An entry that already links groups is left alone, so a re-run adds nothing.
+	"""
+	already_linked = get_item_groups_by_entry(list(item_groups_by_entry))
+	timestamp = now()
+
+	for entry, item_groups in item_groups_by_entry.items():
+		if already_linked.get(entry):
+			continue
+
+		for index, item_group in enumerate(item_groups, start=1):
+			link = frappe.new_doc(ITEM_GROUP_LINK_DOCTYPE)
+			link.parent = entry
+			link.parenttype = "Ecommerce Category"
+			link.parentfield = "item_groups"
+			link.idx = index
+			link.item_group = item_group
+			link.creation = timestamp
+			link.modified = timestamp
+			link.owner = frappe.session.user
+			link.modified_by = frappe.session.user
+			link.db_insert()
+
+
 def get_menu_tree(enabled_only=False):
 	"""The whole menu as nested nodes, in one query.
 
@@ -208,7 +270,6 @@ def get_menu_tree(enabled_only=False):
 			"display_order",
 			"route_slug",
 			"link_type",
-			"item_group",
 			"link_brand",
 			"link_url",
 			"icon",
@@ -225,6 +286,7 @@ def get_menu_tree(enabled_only=False):
 		return []
 
 	language = frappe.local.lang or "en"
+	item_groups_by_entry = get_item_groups_by_entry([entry.name for entry in entries])
 	nodes = {}
 	roots = []
 	for entry in entries:
@@ -234,7 +296,9 @@ def get_menu_tree(enabled_only=False):
 			"parent": entry.parent_ecommerce_category or "",
 			"route_slug": entry.route_slug or "",
 			"link_type": entry.link_type or "",
-			"item_group": entry.item_group or "",
+			# Always a list, never None: the menu editor counts it and the storefront joins it, and
+			# both would have to guard a null first.
+			"item_groups": item_groups_by_entry.get(entry.name, []),
 			"brand": entry.link_brand or "",
 			"url": entry.link_url or "",
 			"icon": entry.icon or "",
@@ -281,8 +345,8 @@ def get_node_href(node, root_slug, language):
 		return node["url"] or None
 	if node["link_type"] == "Brand":
 		return f"/{language}/products?brands={quote(node['brand'])}" if node["brand"] else None
-	if node["link_type"] == "Item Group" and node["item_group"]:
-		return build_listing_href(root_slug, node["item_group"], language)
+	if node["link_type"] == "Item Group" and node["item_groups"]:
+		return build_listing_href(root_slug, node["item_groups"], language)
 	if not node["parent"]:
 		return f"/{language}/products?category={root_slug}"
 	return None

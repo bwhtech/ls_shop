@@ -22,10 +22,13 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.nestedset import get_descendants_of, get_root_of, rebuild_tree
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import (
+	ITEM_GROUP_LINK_DOCTYPE,
 	MAX_MENU_DEPTH,
+	get_item_groups_by_entry,
 	get_menu_tree,
 )
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar import navbar_manager
+from ls_shop.tests import delete_menu_entries
 
 PREFIX = "Test NF"
 
@@ -68,7 +71,7 @@ class TestNavbarFlow(IntegrationTestCase):
 		self.brand = frappe.get_doc({"doctype": "Brand", "brand": f"{PREFIX} Brand {self.tag}"}).insert().name
 
 	def tearDown(self):
-		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
+		delete_menu_entries({"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Brand", {"name": ["like", f"{PREFIX}%"]})
 		# Rollback is per-class, so each test hands its leftovers to the next one. These raw deletes
@@ -204,7 +207,7 @@ class TestNavbarFlow(IntegrationTestCase):
 
 		self.assert_master_data_untouched(before)
 		roots = navbar_manager.get_menu_editor_data()["menu"]
-		linked_at_root = {root["item_group"] for root in roots if root["item_group"]}
+		linked_at_root = {item_group for root in roots for item_group in root["item_groups"]}
 		top_level = set(
 			frappe.get_all(
 				"Item Group", filters={"parent_item_group": get_root_of("Item Group")}, pluck="name"
@@ -233,7 +236,7 @@ class TestNavbarFlow(IntegrationTestCase):
 		)
 		# The fourth catalog level is skipped rather than thrown, and never reaches the menu.
 		self.assertFalse(frappe.db.exists("Ecommerce Category", {"display_name": self.too_deep}))
-		self.assertFalse(frappe.db.exists("Ecommerce Category", {"item_group": self.too_deep}))
+		self.assertFalse(frappe.db.exists(ITEM_GROUP_LINK_DOCTYPE, {"item_group": self.too_deep}))
 		self.assert_nested_set_valid("after a repeated import")
 
 	def test_import_leaves_bounds_a_rebuild_would_not_change(self):
@@ -384,11 +387,12 @@ class TestNavbarFlow(IntegrationTestCase):
 	def test_delete_node_removes_the_row_and_its_item_group_link(self):
 		men = self.add_node(None, f"{PREFIX} Men {self.tag}")
 		bags = self.add_node(men, f"{PREFIX} Bags", "Item Group", self.bags)
-		self.assertEqual(frappe.db.get_value("Ecommerce Category", bags, "item_group"), self.bags)
+		self.assertEqual(get_item_groups_by_entry([bags]), {bags: [self.bags]})
 
 		navbar_manager.delete_node(bags)
 
 		self.assertFalse(frappe.db.exists("Ecommerce Category", bags))
+		self.assertEqual(get_item_groups_by_entry([bags]), {})
 		self.assertTrue(frappe.db.exists("Ecommerce Category", men), "the parent must survive")
 		self.assert_nested_set_valid("after deleting a linked node")
 

@@ -18,6 +18,7 @@ from frappe.tests import IntegrationTestCase
 
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar import navbar_manager
 from ls_shop.shop_data import get_category_facets, get_header_data, get_storefront_menu
+from ls_shop.tests import delete_menu_entries
 
 APP_ROOT = Path(frappe.get_app_path("ls_shop"))
 
@@ -43,7 +44,7 @@ class TestStorefrontNav(IntegrationTestCase):
 		frappe.local.ls_shop_storefront_menu = None
 
 	def tearDown(self):
-		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
+		delete_menu_entries({"name": ["like", f"{PREFIX}%"]})
 		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 		frappe.local.ls_shop_storefront_menu = None
 
@@ -139,7 +140,7 @@ class TestStorefrontNav(IntegrationTestCase):
 		all_tabs = get_category_facets("")
 		self.assertIn(f"{PREFIX} Men {self.tag}", all_tabs)
 		facets = all_tabs[f"{PREFIX} Men {self.tag}"]
-		self.assertEqual({facet["name"] for facet in facets}, {shirts, belts})
+		self.assertEqual({facet["item_groups"][0] for facet in facets}, {shirts, belts})
 		self.assertTrue(all(facet["is_leaf"] for facet in facets))
 
 		# Selecting the tab narrows to that tab only, keyed by whatever ?category= carried.

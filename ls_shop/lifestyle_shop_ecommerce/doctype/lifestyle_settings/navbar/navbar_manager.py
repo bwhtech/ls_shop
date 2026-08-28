@@ -78,14 +78,27 @@ def get_unique_category_name(parent, display_name):
 	return candidate
 
 
+def get_link_item_groups(link_target):
+	"""The item group names on a menu entry, whatever shape the caller passed them in.
+
+	The dashboard's multi-select posts a JSON array, while the Desk link field and the item-group
+	import pass a single name; a form-encoded request delivers the array as text, which is the only
+	reason the string is inspected before it is parsed.
+	"""
+	if isinstance(link_target, str) and not link_target.strip().startswith("["):
+		link_target = [link_target]
+	names = (cstr(value).strip() for value in parse_list(link_target))
+	return list(dict.fromkeys(name for name in names if name))
+
+
 def set_link(doc, link_type, link_target):
 	doc.link_type = link_type or ""
-	doc.item_group = None
+	doc.set("item_groups", [])
 	doc.link_brand = None
 	doc.link_url = None
 
 	if link_type == "Item Group":
-		doc.item_group = link_target
+		doc.set("item_groups", [{"item_group": name} for name in get_link_item_groups(link_target)])
 	elif link_type == "Brand":
 		doc.link_brand = link_target
 	elif link_type == "URL":
@@ -299,8 +312,8 @@ def get_linked_nodes():
 	linked = {}
 
 	def index(node):
-		if node["item_group"]:
-			linked[(node["parent"], node["item_group"])] = node["name"]
+		for item_group in node["item_groups"]:
+			linked[(node["parent"], item_group)] = node["name"]
 		for child in node["children"]:
 			index(child)
 
@@ -420,8 +433,7 @@ def get_subtree_item_groups(node):
 	pending = [node]
 	while pending:
 		current = pending.pop()
-		if current["item_group"]:
-			item_groups.append(current["item_group"])
+		item_groups.extend(current["item_groups"])
 		pending.extend(current["children"])
 	return list(dict.fromkeys(item_groups))
 

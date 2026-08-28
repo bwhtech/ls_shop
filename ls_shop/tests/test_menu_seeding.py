@@ -4,18 +4,24 @@
 """The menu is a copy of the Item Group tree, taken once.
 
 A fresh store gets one Ecommerce Category per Item Group so the storefront has navigation before
-anyone opens the editor, and an existing store gets its `link_item_groups` rows moved onto the
-single `item_group` link. After that the two trees are independent: the shop owner reorders, renames
-and prunes the menu without any of it reaching the catalogue.
+anyone opens the editor, and an existing store gets its item-group links moved onto the entry's own
+`item_groups` table — first from the standalone child table, then from the single link that briefly
+replaced it. After that the two trees are independent: the shop owner reorders, renames and prunes
+the menu without any of it reaching the catalogue.
 """
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils.nestedset import get_root_of
 
-from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import get_menu_tree
+from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_category import (
+	get_item_groups_by_entry,
+	get_menu_tree,
+)
 from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.navbar import navbar_manager
-from ls_shop.patches import move_ecommerce_category_to_item_group_link as migration
+from ls_shop.patches import move_ecommerce_category_to_item_group_link as child_table_migration
+from ls_shop.patches import move_item_group_link_to_item_groups_table as single_link_migration
+from ls_shop.tests import delete_menu_entries
 from ls_shop.www.sitemap_segment import SEGMENT_CONFIG, get_segment_filters
 
 PREFIX = "Test Seed"
@@ -77,12 +83,22 @@ def add_legacy_link(category, item_group, idx):
 	).insert()
 
 
+def add_legacy_column():
+	"""Restore the dropped `item_group` column so the migration runs against a real one.
+
+	Left in place afterwards: dropping it is DDL on a shared test database, and an orphan column is
+	exactly what a migrated site carries anyway — the migration only ever reads and clears it.
+	"""
+	if "item_group" not in frappe.db.get_table_columns("Ecommerce Category"):
+		frappe.db.add_column("Ecommerce Category", "item_group", "Link")
+
+
 def purge_stale_fixtures():
 	"""The legacy migration drops a table, and DDL commits the open transaction in MariaDB. Anything
 	this module wrote before that point survives the framework's end-of-class rollback — worse, the
 	rollback then undoes tearDown's own deletes and resurrects it. Names are unique per test so a
 	stale row can never collide, and this sweep keeps a developer's site from collecting them."""
-	frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
+	delete_menu_entries({"name": ["like", f"{PREFIX}%"]})
 	frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 
 
@@ -113,13 +129,17 @@ class TestMenuSeeding(IntegrationTestCase):
 		frappe.local.ls_shop_storefront_menu = None
 
 	def seeded_entries(self):
+		"""The menu entries this test seeded, keyed by the item group each one links."""
+		entries = frappe.get_all(
+			"Ecommerce Category",
+			filters={"category_name": ["like", f"{self.prefix}%"]},
+			fields=["name", "parent_ecommerce_category", "is_group", "lft", "rgt"],
+		)
+		item_groups_by_entry = get_item_groups_by_entry([entry.name for entry in entries])
 		return {
-			entry.item_group: entry
-			for entry in frappe.get_all(
-				"Ecommerce Category",
-				filters={"category_name": ["like", f"{self.prefix}%"]},
-				fields=["name", "item_group", "parent_ecommerce_category", "is_group", "lft", "rgt"],
-			)
+			item_groups_by_entry[entry.name][0]: entry
+			for entry in entries
+			if item_groups_by_entry.get(entry.name)
 		}
 
 	def item_group_snapshot(self):
@@ -186,13 +206,13 @@ class TestMenuSeeding(IntegrationTestCase):
 		self.assertNotIn(sandals, self.seeded_entries())
 
 	def test_install_seeds_the_menu_only_when_the_store_has_none(self):
-		frappe.db.delete("Ecommerce Category")
+		delete_menu_entries()
 
 		navbar_manager.seed_menu_when_empty()
 		self.assertIn(self.shoes, self.seeded_entries())
 
 		# A shop owner who built their own menu must not have the catalogue poured back into it.
-		frappe.db.delete("Ecommerce Category")
+		delete_menu_entries()
 		navbar_manager.create_node("", f"{self.prefix} Hand Built")
 
 		navbar_manager.seed_menu_when_empty()
@@ -208,13 +228,15 @@ class TestMenuSeeding(IntegrationTestCase):
 				**get_segment_filters(SEGMENT_CONFIG["collections"]),
 				"category_name": ["like", f"{self.prefix}%"],
 			},
-			pluck="item_group",
+			pluck="name",
 		)
 
-		self.assertEqual(routable, [self.shoes])
+		self.assertEqual(routable, [self.seeded_entries()[self.shoes].name])
 
 
-class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
+class TestLegacyChildTableMigration(IntegrationTestCase):
+	"""The standalone child table that once held the links moves onto the entry's own table."""
+
 	def setUp(self):
 		purge_stale_fixtures()
 		self.prefix = f"{PREFIX} {frappe.generate_hash(length=8)}"
@@ -225,8 +247,8 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		self.entry = navbar_manager.create_node(
 			self.tab, f"{self.prefix} Tops", "Item Group", self.shirts
 		).name
-		# The migration reads the child rows, so the field it will fill has to start empty.
-		frappe.db.set_value("Ecommerce Category", self.entry, "item_group", None)
+		# The migration reads the legacy rows, so the table it will fill has to start empty.
+		frappe.db.delete("Ecommerce Category Item Group Link", {"parent": self.entry})
 
 	def tearDown(self):
 		if frappe.db.exists("DocType", LEGACY_CHILD_DOCTYPE):
@@ -234,54 +256,59 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		purge_stale_fixtures()
 		frappe.local.ls_shop_storefront_menu = None
 
+	def linked_item_groups(self):
+		return get_item_groups_by_entry([self.entry]).get(self.entry, [])
+
 	def siblings_of_entry(self):
 		return frappe.get_all(
 			"Ecommerce Category",
 			filters={"parent_ecommerce_category": self.tab, "name": ["!=", self.entry]},
-			pluck="item_group",
+			pluck="name",
 		)
 
 	def test_the_linked_group_lands_on_the_entry(self):
 		add_legacy_link(self.entry, self.shirts, 1)
 
-		migration.execute()
+		child_table_migration.execute()
 
-		self.assertEqual(frappe.db.get_value("Ecommerce Category", self.entry, "item_group"), self.shirts)
+		self.assertEqual(self.linked_item_groups(), [self.shirts])
 		self.assertEqual(self.siblings_of_entry(), [])
 
-	def test_extra_linked_groups_are_rehomed_as_siblings(self):
-		"""One entry links one group now, and a dropped group would vanish from the navigation."""
+	def test_every_linked_group_lands_on_the_same_entry(self):
+		"""An entry links any number of groups, so none of them has to be rehomed elsewhere."""
 		add_legacy_link(self.entry, self.shirts, 1)
 		add_legacy_link(self.entry, self.belts, 2)
 
-		migration.execute()
+		child_table_migration.execute()
 
-		self.assertEqual(frappe.db.get_value("Ecommerce Category", self.entry, "item_group"), self.shirts)
-		self.assertEqual(self.siblings_of_entry(), [self.belts])
+		self.assertEqual(self.linked_item_groups(), [self.shirts, self.belts])
+		self.assertEqual(self.siblings_of_entry(), [])
 
 	def test_rows_left_behind_by_a_link_type_switch_are_ignored(self):
 		"""A type switch never cleared the table, so those rows are a link the owner already replaced."""
 		add_legacy_link(self.entry, self.shirts, 1)
 		frappe.db.set_value("Ecommerce Category", self.entry, "link_type", "URL")
 
-		migration.execute()
+		child_table_migration.execute()
 
-		self.assertIsNone(frappe.db.get_value("Ecommerce Category", self.entry, "item_group"))
+		self.assertEqual(self.linked_item_groups(), [])
 		self.assertEqual(self.siblings_of_entry(), [])
 
 	def test_the_migrated_menu_still_renders(self):
 		add_legacy_link(self.entry, self.shirts, 1)
+		add_legacy_link(self.entry, self.belts, 2)
 
-		migration.execute()
+		child_table_migration.execute()
 
 		node = find_node(get_menu_tree(), self.entry)
-		self.assertEqual(node["item_group"], self.shirts)
+		self.assertEqual(node["item_groups"], [self.shirts, self.belts])
 		self.assertIn(f"subcategory={self.shirts.replace(' ', '%20')}", node["href"])
+		self.assertIn(f"{self.belts.replace(' ', '%20')}", node["href"])
 
 	def test_the_legacy_table_is_dropped(self):
 		add_legacy_link(self.entry, self.shirts, 1)
 
-		migration.execute()
+		child_table_migration.execute()
 
 		self.assertFalse(frappe.db.exists("DocType", LEGACY_CHILD_DOCTYPE))
 		# Deleting the DocType does not take its table with it, and an orphan table survives every
@@ -292,22 +319,74 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		add_legacy_link(self.entry, self.shirts, 1)
 		add_legacy_link(self.entry, self.belts, 2)
 
-		migration.execute()
-		after_first_run = frappe.get_all(
-			"Ecommerce Category",
-			filters={"category_name": ["like", f"{self.prefix}%"]},
-			fields=["name", "item_group"],
-			order_by="name asc",
+		child_table_migration.execute()
+		after_first_run = self.linked_item_groups()
+
+		child_table_migration.execute()
+
+		self.assertEqual(self.linked_item_groups(), after_first_run)
+
+
+class TestSingleItemGroupLinkMigration(IntegrationTestCase):
+	"""The single link that briefly replaced the child table moves onto the entry's own table."""
+
+	def setUp(self):
+		purge_stale_fixtures()
+		self.prefix = f"{PREFIX} {frappe.generate_hash(length=8)}"
+		self.shirts = make_item_group(f"{self.prefix} Shirts").name
+		self.belts = make_item_group(f"{self.prefix} Belts").name
+		self.tab = navbar_manager.create_node("", f"{self.prefix} Menswear").name
+		self.entry = navbar_manager.create_node(self.tab, f"{self.prefix} Tops", "Item Group").name
+		add_legacy_column()
+
+	def tearDown(self):
+		purge_stale_fixtures()
+		frappe.local.ls_shop_storefront_menu = None
+
+	def set_legacy_link(self, item_group):
+		category = frappe.qb.DocType("Ecommerce Category")
+		(
+			frappe.qb.update(category)
+			.set(category.item_group, item_group)
+			.where(category.name == self.entry)
+			.run()
 		)
 
-		migration.execute()
-
-		self.assertEqual(
-			frappe.get_all(
-				"Ecommerce Category",
-				filters={"category_name": ["like", f"{self.prefix}%"]},
-				fields=["name", "item_group"],
-				order_by="name asc",
-			),
-			after_first_run,
+	def get_legacy_link(self):
+		category = frappe.qb.DocType("Ecommerce Category")
+		return (
+			frappe.qb.from_(category)
+			.select(category.item_group)
+			.where(category.name == self.entry)
+			.run(pluck=True)[0]
 		)
+
+	def linked_item_groups(self):
+		return get_item_groups_by_entry([self.entry]).get(self.entry, [])
+
+	def test_the_column_link_lands_on_the_entry(self):
+		self.set_legacy_link(self.shirts)
+
+		single_link_migration.execute()
+
+		self.assertEqual(self.linked_item_groups(), [self.shirts])
+		self.assertIsNone(self.get_legacy_link())
+
+	def test_an_entry_that_already_links_groups_is_left_alone(self):
+		"""The column is stale once the editor has written the table, and must not append to it."""
+		navbar_manager.update_node(self.entry, link_type="Item Group", link_target=[self.shirts, self.belts])
+		self.set_legacy_link(self.belts)
+
+		single_link_migration.execute()
+
+		self.assertEqual(self.linked_item_groups(), [self.shirts, self.belts])
+
+	def test_running_the_migration_twice_changes_nothing(self):
+		self.set_legacy_link(self.shirts)
+
+		single_link_migration.execute()
+		after_first_run = self.linked_item_groups()
+
+		single_link_migration.execute()
+
+		self.assertEqual(self.linked_item_groups(), after_first_run)

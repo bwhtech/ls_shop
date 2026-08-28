@@ -4,6 +4,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from ls_shop.tests import delete_menu_entries
+
 # ls_shop makes Item Group.custom_displayname mandatory, so core's link-dependency loader cannot
 # build its stock test records. Nothing here links to one.
 IGNORE_TEST_RECORD_DEPENDENCIES = ["Item Group", "Brand"]
@@ -16,7 +18,7 @@ class TestEcommerceCategory(IntegrationTestCase):
 		self.tag = frappe.generate_hash(length=8)
 
 	def tearDown(self):
-		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
+		delete_menu_entries({"name": ["like", f"{PREFIX}%"]})
 
 	def make_category(self, link_type=None, link_url=None):
 		return frappe.get_doc(

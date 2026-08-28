@@ -12,33 +12,28 @@
         });
         window.location.reload()
     },
+    // A category facet may link several item groups, so `value` is either one option or the
+    // list a facet filters on: it is ticked only when every one of its groups is selected, and
+    // toggling it moves them together.
+    selected_values(query_key) {
+        return this.query_state[query_key] ? this.query_state[query_key].split(',') : [];
+    },
     toggle_filter(key, value, is_subcategory = false) {
-        // Determine the correct query param key
         let query_key = is_subcategory ? 'subcategory' : key;
-    
-        // Get current selections
-        let current_selections = this.query_state[query_key] 
-            ? this.query_state[query_key].split(',') 
-            : [];
-    
-        // For subcategories, just use the value directly without adding the key prefix
-        let formatted_value = value;
-    
-        if (current_selections.includes(formatted_value)) {
-            // Remove if already selected
-            current_selections = current_selections.filter(item => item !== formatted_value);
+        let values = [].concat(value).map(String);
+        let current_selections = this.selected_values(query_key);
+
+        if (this.is_checked(key, value, is_subcategory)) {
+            current_selections = current_selections.filter(item => !values.includes(item));
         } else {
-            // Add if not selected
-            current_selections.push(formatted_value);
+            current_selections = current_selections.concat(values.filter(item => !current_selections.includes(item)));
         }
-    
-        // Update state (store as a comma-separated string)
+
         this.query_state[query_key] = current_selections.length ? current_selections.join(',') : '';
-    
-        // Refresh the page
+
         if(window.innerWidth > 768){
-        window.location.reload();
-    }
+            window.location.reload();
+        }
     },
     toggle_price_filter(key,value){
         // Update state (store as a comma-separated string)
@@ -49,7 +44,9 @@
     },
     is_checked(key, value, is_subcategory = false) {
         let query_key = is_subcategory ? 'subcategory' : key;
-        return this.query_state[query_key] && this.query_state[query_key].split(',').includes(value);
+        let values = [].concat(value).map(String);
+        let current_selections = this.selected_values(query_key);
+        return values.length > 0 && values.every(item => current_selections.includes(item));
     },
     apply_filters(){
         window.location.reload()
@@ -93,7 +90,7 @@
                         </template>
                     </div>
                 </div>
-                {# Category facets come from the menu tree: `name` is the item group the
+                {# Category facets come from the menu tree: `item_groups` are the groups the
                    `?subcategory=` filter round-trips, `display_name` is the shop owner's label. #}
                 {% block storefront_filter_categories %}
                 <div x-show="current_tab === key && Array.isArray(values) && values.length > 0 && values[0].display_name" x-transition
@@ -110,9 +107,9 @@
 
                                 <!-- Leaf node gets a checkbox -->
                                 <div x-show="node.is_leaf" class="flex items-center">
-                                    <input type="checkbox" :id="`${key}-${node_index}`" :value="node.name"
-                                        @change="toggle_filter(key, node.name, true)"
-                                        :checked="is_checked(key, node.name, true)"
+                                    <input type="checkbox" :id="`${key}-${node_index}`" :value="node.item_groups.join(',')"
+                                        @change="toggle_filter(key, node.item_groups, true)"
+                                        :checked="is_checked(key, node.item_groups, true)"
                                         class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                     <label :for="`${key}-${node_index}`" class="ms-2 text-sm text-gray-700 capitalize"
                                         x-text="$store.i18n.t(node.display_name)"></label>
@@ -136,9 +133,9 @@
                                             <div x-show="child.is_leaf" class="flex items-center">
                                                 <input type="checkbox"
                                                     :id="`${key}-${node_index}-${child_index}`"
-                                                    :value="child.name"
-                                                    @change="toggle_filter(key, child.name, true)"
-                                                    :checked="is_checked(key, child.name, true)"
+                                                    :value="child.item_groups.join(',')"
+                                                    @change="toggle_filter(key, child.item_groups, true)"
+                                                    :checked="is_checked(key, child.item_groups, true)"
                                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                 <label :for="`${key}-${node_index}-${child_index}`"
                                                     class="ms-2 text-sm text-gray-700 capitalize"
@@ -152,9 +149,9 @@
                                                     <div class="flex items-center">
                                                         <input type="checkbox"
                                                             :id="`${key}-${node_index}-${child_index}-${grandchild_index}`"
-                                                            :value="grandchild.name"
-                                                            @change="toggle_filter(key, grandchild.name, true)"
-                                                            :checked="is_checked(key, grandchild.name, true)"
+                                                            :value="grandchild.item_groups.join(',')"
+                                                            @change="toggle_filter(key, grandchild.item_groups, true)"
+                                                            :checked="is_checked(key, grandchild.item_groups, true)"
                                                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                         <label
                                                             :for="`${key}-${node_index}-${child_index}-${grandchild_index}`"

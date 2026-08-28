@@ -13,7 +13,9 @@
 {% set facet_labels = namespace(pairs=[]) %}
 {% macro collect_facet_labels(nodes) %}
 {%- for node in nodes -%}
-{%- set facet_labels.pairs = facet_labels.pairs + [(node.name, node.display_name)] -%}
+{%- for item_group in node.item_groups -%}
+{%- set facet_labels.pairs = facet_labels.pairs + [(item_group, node.display_name)] -%}
+{%- endfor -%}
 {{- collect_facet_labels(node.children) if node.children else "" -}}
 {%- endfor -%}
 {% endmacro %}

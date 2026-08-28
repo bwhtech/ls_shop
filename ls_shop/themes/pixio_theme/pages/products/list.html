@@ -128,15 +128,21 @@
 					return this.query_state[key] ? this.query_state[key].split(',') : [];
 				},
 
+				// A category facet may link several item groups, so `value` is either one option
+				// or the list a facet filters on: it counts as selected only when every one of
+				// its groups is, and toggling it moves them together.
 				is_selected(key, value) {
-					return this.get_selected(key).includes(String(value));
+					const values = [].concat(value).map(String);
+					const selected = this.get_selected(key);
+					return values.length > 0 && values.every((entry) => selected.includes(entry));
 				},
 
 				toggle_filter(key, value) {
+					const values = [].concat(value).map(String);
 					const selected = this.get_selected(key);
-					const next = selected.includes(String(value))
-						? selected.filter((entry) => entry !== String(value))
-						: selected.concat(String(value));
+					const next = this.is_selected(key, value)
+						? selected.filter((entry) => !values.includes(entry))
+						: selected.concat(values.filter((entry) => !selected.includes(entry)));
 					this.set_filter(key, next.join(','));
 				},
 
