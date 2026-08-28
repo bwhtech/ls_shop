@@ -70,12 +70,13 @@ export function orderStateBadge(state: OrderState) {
 	return orderStateBadges[state.key] ?? unknownOrderStateBadge
 }
 
-export function availabilityTheme(availability: string) {
-	return (
-		{ "Out of stock": "red", Low: "orange", "In stock": "green" }[
-			availability
-		] ?? "gray"
-	)
+export function availabilityTheme(availability: string): BadgeTheme {
+	const themes: Record<string, BadgeTheme> = {
+		"Out of stock": "red",
+		Low: "amber",
+		"In stock": "green",
+	}
+	return themes[availability] ?? "gray"
 }
 
 /**

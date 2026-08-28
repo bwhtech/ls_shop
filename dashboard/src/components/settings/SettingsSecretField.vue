@@ -53,7 +53,7 @@ function clearStoredSecret() {
 <template>
 	<div class="flex flex-col items-end gap-2">
 		<template v-if="props.cleared">
-			<Badge theme="orange" variant="subtle" label="Removed on save" />
+			<Badge theme="amber" variant="subtle" label="Removed on save" />
 			<Button
 				variant="ghost"
 				label="Undo"

@@ -19,7 +19,7 @@ import { useRoute } from "vue-router"
 const route = useRoute()
 const productName = computed(() => String(route.params.name))
 
-const product = useCall<ProductDetail>({
+const product = useCall<ProductDetail, { item_template: string }>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.get_product",
 	params: () => ({ item_template: productName.value }),
 	refetch: true,
@@ -46,7 +46,15 @@ const detailsChanged = computed(
 			details.description !== (product.data.description ?? "")),
 )
 
-const updateProduct = useCall({
+const updateProduct = useCall<
+	unknown,
+	{
+		item_template: string
+		title: string
+		collection: string
+		description: string
+	}
+>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.update_product",
 	method: "POST",
 	immediate: false,
@@ -57,7 +65,10 @@ const updateProduct = useCall({
 	onError: (error: Error) => toast.error(error.message),
 })
 
-const publishAll = useCall<{ updated: string[]; skipped: string[] }>({
+const publishAll = useCall<
+	{ updated: string[]; skipped: string[] },
+	{ item_template: string; publish: number }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.set_product_published",
 	method: "POST",
 	immediate: false,
@@ -150,12 +161,12 @@ function saveDetails() {
 		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
 			<!-- Main pane: the options are the work surface, so they get the width. -->
 			<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
-				<!-- Alert has no default slot and no orange theme in beta-37: body text passed as
-				     children is dropped and an unknown theme leaves it unstyled and icon-less. -->
+				<!-- Alert has no default slot: body text passed as children is dropped, so the
+				     sentence goes through `description`. -->
 				<Alert
 					v-if="blockedOptions.length"
 					class="mb-5"
-					theme="yellow"
+					theme="amber"
 					:dismissible="false"
 					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
 					:description="`${blockedOptions.join(', ')} still ${blockedOptions.length > 1 ? 'need' : 'needs'} a photo before ${blockedOptions.length > 1 ? 'they' : 'it'} can go live.`"

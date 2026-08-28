@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { FunnelReport } from "@/types"
+import type { AnalyticsRangeParams, FunnelReport } from "@/types"
 import { formatCount } from "@/utils/format"
 import { TabButtons, useCall } from "frappe-ui"
 import { ChartCard, FunnelChart } from "frappe-ui/charts"
@@ -20,11 +20,13 @@ const deviceOptions = [
 	{ label: "Tablet", value: "tablet" },
 ]
 
-const funnel = useCall<FunnelReport>({
-	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_funnel",
-	params: () => ({ ...rangeParams.value, device: device.value }),
-	refetch: true,
-})
+const funnel = useCall<FunnelReport, AnalyticsRangeParams & { device: string }>(
+	{
+		url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_funnel",
+		params: () => ({ ...rangeParams.value, device: device.value }),
+		refetch: true,
+	},
+)
 
 onAnalyticsRefresh(() => funnel.reload())
 

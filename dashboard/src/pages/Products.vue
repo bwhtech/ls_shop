@@ -12,7 +12,10 @@ import { useRouter } from "vue-router"
 const router = useRouter()
 const search = ref("")
 
-const products = useCall<{ products: ProductRow[]; total: number }>({
+const products = useCall<
+	{ products: ProductRow[]; total: number },
+	{ search: string }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.get_products",
 	params: () => ({ search: search.value }),
 })

@@ -37,8 +37,10 @@ watch(
 	{ immediate: true },
 )
 
-function saveProfileCall(onSuccess?: () => void) {
-	return useCall<Profile>({
+function saveProfileCall<TParams extends Record<string, unknown>>(
+	onSuccess?: () => void,
+) {
+	return useCall<Profile, TParams>({
 		url: "/api/v2/method/ls_shop.api.admin.settings.save_profile",
 		method: "POST",
 		immediate: false,
@@ -50,10 +52,10 @@ function saveProfileCall(onSuccess?: () => void) {
 	})
 }
 
-const save = saveProfileCall()
+const save = saveProfileCall<{ first_name: string; last_name: string }>()
 
 // Its own resource, so the confirmation toast cannot fire on a name save.
-const savePicture = saveProfileCall(() =>
+const savePicture = saveProfileCall<{ user_image: string }>(() =>
 	toast.success("Profile picture updated"),
 )
 

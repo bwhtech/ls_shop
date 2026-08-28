@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BadgeTheme } from "@/types"
 import { Badge, Button, Switch, Tooltip } from "frappe-ui"
 import { computed } from "vue"
 import IntegrationLogo from "./IntegrationLogo.vue"
@@ -13,7 +14,7 @@ const emit = defineEmits<{
 
 type Status = {
 	label: string
-	theme: "green" | "orange" | "gray"
+	theme: BadgeTheme
 }
 
 const status = computed<Status>(() => {
@@ -21,7 +22,7 @@ const status = computed<Status>(() => {
 	if (!integration.available) return { label: "Unavailable", theme: "gray" }
 	if (integration.enabled) return { label: "Live", theme: "green" }
 	if (!integration.configured)
-		return { label: "Not configured", theme: "orange" }
+		return { label: "Not configured", theme: "amber" }
 	return { label: "Off", theme: "gray" }
 })
 

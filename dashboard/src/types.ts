@@ -47,6 +47,12 @@ export type ProductRow = {
 	stock: number
 }
 
+/** Every analytics endpoint reads the same inclusive window from the one page-level range control. */
+export type AnalyticsRangeParams = {
+	from_date: string
+	to_date: string
+}
+
 /** Taken from the Badge component itself, so our map cannot drift from what frappe-ui ships. */
 export type BadgeTheme = NonNullable<BadgeProps["theme"]>
 export type BadgeVariant = NonNullable<BadgeProps["variant"]>

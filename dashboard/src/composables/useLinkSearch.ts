@@ -22,7 +22,7 @@ export function useLinkSearch<TOption>(
 		300,
 	)
 
-	const results = useCall<TOption[]>({
+	const results = useCall<TOption[], Record<string, string>>({
 		url,
 		params: () => ({ ...extraParams(), search_text: searchText.value }),
 		refetch: true,

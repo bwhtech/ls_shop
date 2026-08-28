@@ -1,3 +1,4 @@
+import type { AnalyticsRangeParams } from "@/types"
 import { formatShortDate } from "@/utils/format"
 import { computed, ref, watch } from "vue"
 
@@ -42,7 +43,7 @@ const fromDate = computed(() => {
 	return toApiDate(start)
 })
 
-const rangeParams = computed(() => ({
+const rangeParams = computed<AnalyticsRangeParams>(() => ({
 	from_date: fromDate.value,
 	to_date: toDate.value,
 }))

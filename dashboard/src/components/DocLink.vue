@@ -41,7 +41,7 @@ const searchText = refDebounced(
 	300,
 )
 
-const results = useCall<LinkSearchResult[]>({
+const results = useCall<LinkSearchResult[], { doctype: string; txt: string }>({
 	url: "/api/v2/method/frappe.desk.search.search_link",
 	params: () => ({ doctype: props.doctype, txt: searchText.value }),
 	immediate: searchable.value,

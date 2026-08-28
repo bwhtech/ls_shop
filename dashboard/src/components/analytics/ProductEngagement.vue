@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { ProductEngagementRow } from "@/types"
+import type { AnalyticsRangeParams, ProductEngagementRow } from "@/types"
 import { formatCount, formatPercent } from "@/utils/format"
 import { Badge, useCall } from "frappe-ui"
 import { computed } from "vue"
@@ -23,7 +23,10 @@ const columns: AnalyticsTableColumn[] = [
 	{ key: "purchase_to_view_rate", label: "View → purchase", numeric: true },
 ]
 
-const engagement = useCall<ProductEngagementRow[]>({
+const engagement = useCall<
+	ProductEngagementRow[],
+	AnalyticsRangeParams & { limit: number }
+>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_product_engagement",
 	params: () => ({ ...rangeParams.value, limit: 8 }),
 	refetch: true,

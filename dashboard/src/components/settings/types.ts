@@ -10,8 +10,22 @@ export type AdvancedField = {
 /** One row of the Analytics Settings custom tracking script table. */
 export type CustomTrackingScript = {
 	title: string
-	enabled: number
+	enabled: 0 | 1
 	script: string
+}
+
+/** One row of the Reason for Return table that rides along with the shipping settings. */
+export type ReturnReason = {
+	name: string
+	display_name: string
+	description: string | null
+}
+
+/** What ls_shop.api.admin.settings.get_shipping_settings returns. */
+export type ShippingSettingsData = {
+	shipping_rule: string | null
+	return_period: number | null
+	reason_for_return: ReturnReason[]
 }
 
 /** What ls_shop.api.admin.analytics.get_analytics_settings returns - never a secret value. */

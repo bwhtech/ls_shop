@@ -9,25 +9,17 @@ import {
 import { computed } from "vue"
 import IntegrationList from "../integrations/IntegrationList.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
+import type { ShippingSettingsData } from "./types"
 import { useSettingsForm } from "./useSettingsForm"
-
-type ReturnReason = {
-	name: string
-	display_name: string
-	description: string | null
-}
 
 const FIELDS = ["shipping_rule", "return_period"] as const
 
-const { settings, form, changed, save, submit } = useSettingsForm(
-	"shipping_settings",
-	FIELDS,
-	"Shipping and returns saved",
-)
+const { settings, form, text, changed, save, submit } = useSettingsForm<
+	(typeof FIELDS)[number],
+	ShippingSettingsData
+>("shipping_settings", FIELDS, "Shipping and returns saved")
 
-const returnReasons = computed(
-	() => (settings.data?.reason_for_return ?? []) as unknown as ReturnReason[],
-)
+const returnReasons = computed(() => settings.data?.reason_for_return ?? [])
 </script>
 
 <template>
@@ -54,7 +46,7 @@ const returnReasons = computed(
 					title="Shipping rule"
 					description="Decides the delivery charge applied at checkout"
 				>
-					<SettingsLinkField v-model="form.shipping_rule" doctype="Shipping Rule" />
+					<SettingsLinkField v-model="text.shipping_rule" doctype="Shipping Rule" />
 				</SettingsRow>
 				<SettingsRow
 					title="Return period"

@@ -30,7 +30,7 @@ const SOCIAL_LINKS = [
 	{ fieldname: "tiktok_url", title: "TikTok" },
 ]
 
-const { form, changed, save, submit } = useSettingsForm(
+const { form, text, changed, save, submit } = useSettingsForm(
 	"footer_settings",
 	FIELDS,
 	"Footer and social saved",
@@ -73,10 +73,10 @@ const { form, changed, save, submit } = useSettingsForm(
 						<FormControl v-model="form.copyright_text" />
 					</SettingsRow>
 					<SettingsRow title="Payment methods image" description="Card and wallet logos">
-						<SettingsAttach v-model="form.payment_methods_image" />
+						<SettingsAttach v-model="text.payment_methods_image" />
 					</SettingsRow>
 					<SettingsRow title="VAT certificate image">
-						<SettingsAttach v-model="form.vat_certificate_image" />
+						<SettingsAttach v-model="text.vat_certificate_image" />
 					</SettingsRow>
 				</div>
 			</section>

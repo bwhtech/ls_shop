@@ -19,7 +19,11 @@ import {
 	refreshAnalytics,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { AnalyticsOverview, ExternalSummaries } from "@/types"
+import type {
+	AnalyticsOverview,
+	AnalyticsRangeParams,
+	ExternalSummaries,
+} from "@/types"
 import {
 	Button,
 	PageHeader,
@@ -34,7 +38,7 @@ const { preset, rangeParams } = useAnalyticsRange()
 
 // The overview owns the store currency, so every money figure on the page reads it from here
 // rather than each widget asking the server for the same string.
-const overview = useCall<AnalyticsOverview>({
+const overview = useCall<AnalyticsOverview, AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_overview",
 	params: () => rangeParams.value,
 	refetch: true,

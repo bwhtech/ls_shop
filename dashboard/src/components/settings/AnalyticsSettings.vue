@@ -25,16 +25,12 @@ const FIELDS = [
 const SECRET_FIELDS = ["ga4_service_account_json", "fb_access_token"] as const
 type SecretFieldname = (typeof SECRET_FIELDS)[number]
 
-const { settings, form, changed, save, submit } = useSettingsForm(
-	"analytics_settings",
-	FIELDS,
-	"Analytics settings saved",
-	"analytics",
-)
+const { settings, form, checked, changed, save, submit } = useSettingsForm<
+	(typeof FIELDS)[number],
+	AnalyticsSettingsData
+>("analytics_settings", FIELDS, "Analytics settings saved", "analytics")
 
-const data = computed(
-	() => settings.data as unknown as AnalyticsSettingsData | undefined,
-)
+const data = computed(() => settings.data)
 
 /** Typed by the owner and sent once; blank means "keep whatever is already stored". */
 const secretInputs = reactive<Record<SecretFieldname, string>>({
@@ -117,7 +113,7 @@ async function saveAnalyticsSettings() {
 						title="Record events in your own database"
 						description="Page views, product views, add to cart, checkout and purchase. This is what fills the Storefront Analytics page - no external service involved."
 					>
-						<Checkbox v-model="form.enable_first_party" />
+						<Checkbox v-model="checked.enable_first_party" />
 					</SettingsRow>
 				</div>
 			</section>
@@ -136,9 +132,9 @@ async function saveAnalyticsSettings() {
 						title="Send events to GA4"
 						description="Also reads Sessions and Active Users back onto your analytics page."
 					>
-						<Checkbox v-model="form.enable_ga4" />
+						<Checkbox v-model="checked.enable_ga4" />
 					</SettingsRow>
-					<template v-if="form.enable_ga4">
+					<template v-if="checked.enable_ga4">
 						<SettingsRow
 							title="Measurement ID"
 							description="Your web stream ID, G-XXXXXXXXXX (Admin → Data Streams)"
@@ -181,9 +177,9 @@ async function saveAnalyticsSettings() {
 						title="Send events to Meta"
 						description="Also reads pixel totals back onto your analytics page."
 					>
-						<Checkbox v-model="form.enable_facebook" />
+						<Checkbox v-model="checked.enable_facebook" />
 					</SettingsRow>
-					<template v-if="form.enable_facebook">
+					<template v-if="checked.enable_facebook">
 						<SettingsRow
 							title="Pixel ID"
 							description="The numeric dataset ID in Meta Events Manager → Data sources"
@@ -235,7 +231,11 @@ async function saveAnalyticsSettings() {
 								class="flex-1"
 								placeholder="What is this snippet?"
 							/>
-							<Checkbox v-model="row.enabled" label="Enabled" />
+							<Checkbox
+								:model-value="row.enabled"
+								label="Enabled"
+								@update:model-value="(enabled) => (row.enabled = enabled ? 1 : 0)"
+							/>
 							<Button
 								variant="ghost"
 								icon-left="lucide-trash-2"

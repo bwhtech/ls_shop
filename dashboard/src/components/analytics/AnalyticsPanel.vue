@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ListSkeleton from "@/components/ListSkeleton.vue"
+import { Skeleton } from "frappe-ui"
 import { ChartCard } from "frappe-ui/charts"
 
 withDefaults(
@@ -38,7 +38,9 @@ withDefaults(
 				</div>
 			</div>
 
-			<ListSkeleton v-if="loading" :rows="skeletonRows" />
+			<div v-if="loading" class="flex flex-col gap-3 py-2">
+				<Skeleton v-for="row in skeletonRows" :key="row" class="h-4 w-full" />
+			</div>
 
 			<div
 				v-else-if="error"

@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { TopProduct } from "@/types"
+import type { AnalyticsRangeParams, TopProduct } from "@/types"
 import { formatCount, formatMoney } from "@/utils/format"
 import { TabButtons, useCall } from "frappe-ui"
 import { BarChart, ChartCard } from "frappe-ui/charts"
@@ -22,7 +22,10 @@ const sortOptions = [
 	{ label: "Units", value: "units" },
 ]
 
-const topProducts = useCall<TopProduct[]>({
+const topProducts = useCall<
+	TopProduct[],
+	AnalyticsRangeParams & { sort_by: "revenue" | "units"; limit: number }
+>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_top_products",
 	params: () => ({ ...rangeParams.value, sort_by: sortBy.value, limit: 10 }),
 	refetch: true,

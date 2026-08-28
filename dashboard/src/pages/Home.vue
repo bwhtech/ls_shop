@@ -20,7 +20,7 @@ const orderTabs = [
 	{ label: "To fulfil", value: "open" },
 ]
 
-const overview = useCall<Overview>({
+const overview = useCall<Overview, { order_status: string }>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.get_overview",
 	params: () => ({ order_status: orderStatus.value }),
 	refetch: true,

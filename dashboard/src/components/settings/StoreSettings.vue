@@ -21,7 +21,7 @@ const FIELDS = [
 	"company",
 ] as const
 
-const { form, changed, save, submit } = useSettingsForm(
+const { form, text, changed, save, submit } = useSettingsForm(
 	"store_settings",
 	FIELDS,
 	"Store details saved",
@@ -41,13 +41,13 @@ const { form, changed, save, submit } = useSettingsForm(
 					<FormControl v-model="form.store_name" />
 				</SettingsRow>
 				<SettingsRow title="Brand logo" description="Used in the storefront header">
-					<SettingsAttach v-model="form.brand_logo" />
+					<SettingsAttach v-model="text.brand_logo" />
 				</SettingsRow>
 				<SettingsRow title="Footer logo">
-					<SettingsAttach v-model="form.footer_logo" />
+					<SettingsAttach v-model="text.footer_logo" />
 				</SettingsRow>
 				<SettingsRow title="Favicon" description="The small icon in the browser tab">
-					<SettingsAttach v-model="form.favicon" :image="false" />
+					<SettingsAttach v-model="text.favicon" :image="false" />
 				</SettingsRow>
 				<SettingsRow title="Contact email" description="Where customers reach you">
 					<FormControl v-model="form.contact_email" type="email" />
@@ -59,7 +59,7 @@ const { form, changed, save, submit } = useSettingsForm(
 					<FormControl v-model="form.working_hours" />
 				</SettingsRow>
 				<SettingsRow title="Company" description="The ERPNext company orders are booked against">
-					<SettingsLinkField v-model="form.company" doctype="Company" />
+					<SettingsLinkField v-model="text.company" doctype="Company" />
 				</SettingsRow>
 			</div>
 

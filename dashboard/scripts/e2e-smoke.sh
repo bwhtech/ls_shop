@@ -53,5 +53,15 @@ done
 
 agent-browser --session "$SESSION" eval 'JSON.stringify(window.__probe, null, 1)' 2>&1 | tail -1 > "$OUT/console.json"
 agent-browser --session "$SESSION" close >/dev/null 2>&1
-count=$(grep -c 'ERROR:\|UNCAUGHT:\|REJECT:' "$OUT/console.json" || true)
+# The probe is written as one JSON line, so counting lines reports 1 no matter how many errors
+# there were. Parse the entries instead.
+count=$(python3 -c "
+import json, sys
+raw = open(sys.argv[1]).read().strip()
+data = json.loads(raw)
+if isinstance(data, str): data = json.loads(data)
+print(len(data))
+for message, number in __import__('collections').Counter(data).most_common():
+    print(f'  {number} x {message[:100]}', file=sys.stderr)
+" "$OUT/console.json")
 echo "runtime errors captured: $count  ->  $OUT/console.json"

@@ -184,13 +184,19 @@ const colorSchemes: PaletteItem[] = [
 	},
 ]
 
-const productSearch = useCall<{ products: ProductRow[] }>({
+const productSearch = useCall<
+	{ products: ProductRow[] },
+	{ search: string; page_length: number }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.get_products",
 	params: () => ({ search: searchQuery.value, page_length: 5 }),
 	immediate: false,
 })
 
-const orderSearch = useCall<{ orders: OrderRow[] }>({
+const orderSearch = useCall<
+	{ orders: OrderRow[] },
+	{ search: string; page_length: number }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.get_orders",
 	params: () => ({ search: searchQuery.value, page_length: 5 }),
 	immediate: false,

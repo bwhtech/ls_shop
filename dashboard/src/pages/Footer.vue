@@ -266,7 +266,7 @@ function columnActions(section: FooterSection, columnIndex: number) {
 		},
 		{
 			group: "Danger",
-			items: [
+			options: [
 				{
 					label: "Delete column",
 					icon: "trash-2",
@@ -321,7 +321,7 @@ function linkActions(
 		},
 		{
 			group: "Danger",
-			items: [
+			options: [
 				{
 					label: "Remove link",
 					icon: "trash-2",
@@ -397,7 +397,7 @@ function linkActions(
 							<Badge
 								v-if="!section.enabled"
 								variant="subtle"
-								theme="orange"
+								theme="amber"
 								label="Hidden"
 							/>
 							<span class="shrink-0 text-sm text-ink-gray-5">
@@ -459,7 +459,7 @@ function linkActions(
 										<Badge
 											v-if="!link.enabled"
 											variant="subtle"
-											theme="orange"
+											theme="amber"
 											label="Hidden"
 										/>
 										<Dropdown

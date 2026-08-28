@@ -54,7 +54,7 @@ const changedValues = computed(() => {
 
 const changed = computed(() => Object.keys(changedValues.value).length > 0)
 
-const save = useCall({
+const save = useCall<unknown, Record<string, SettingsValue>>({
 	url: "/api/v2/method/ls_shop.api.admin.settings.save_advanced_settings",
 	method: "POST",
 	immediate: false,

@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { LandingPageRow } from "@/types"
+import type { AnalyticsRangeParams, LandingPageRow } from "@/types"
 import { formatCount, formatPercent } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { computed } from "vue"
@@ -19,7 +19,10 @@ const columns: AnalyticsTableColumn[] = [
 	{ key: "conversion_rate", label: "Conversion", numeric: true },
 ]
 
-const landingPages = useCall<LandingPageRow[]>({
+const landingPages = useCall<
+	LandingPageRow[],
+	AnalyticsRangeParams & { limit: number }
+>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_landing_pages",
 	params: () => ({ ...rangeParams.value, limit: 8 }),
 	refetch: true,

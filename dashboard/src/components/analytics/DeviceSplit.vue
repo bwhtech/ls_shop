@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { DeviceSplitRow } from "@/types"
+import type { AnalyticsRangeParams, DeviceSplitRow } from "@/types"
 import { formatCount, formatPercent } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { DonutChart } from "frappe-ui/charts"
@@ -20,7 +20,7 @@ const columns: AnalyticsTableColumn[] = [
 	{ key: "conversion_rate", label: "Conversion", numeric: true },
 ]
 
-const deviceSplit = useCall<DeviceSplitRow[]>({
+const deviceSplit = useCall<DeviceSplitRow[], AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_device_split",
 	params: () => rangeParams.value,
 	refetch: true,

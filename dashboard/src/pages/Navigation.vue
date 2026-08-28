@@ -16,12 +16,14 @@ import {
 	toast,
 	useCall,
 } from "frappe-ui"
+import type { DropInfo, MoveContext, TreeNode } from "frappe-ui"
 import { computed, onMounted } from "vue"
 
 const {
 	menu,
 	selected,
 	selectedName,
+	findNode,
 	loading,
 	load,
 	call,
@@ -33,7 +35,10 @@ const {
 
 const previewCollapsed = useStorage("ls-shop-navbar-preview-collapsed", false)
 
-const itemGroups = useCall<{ name: string }[]>({
+const itemGroups = useCall<
+	{ name: string }[],
+	{ fields: string; limit: number; order_by: string }
+>({
 	url: "/api/v2/document/Item Group",
 	params: {
 		fields: JSON.stringify(["name"]),
@@ -49,30 +54,34 @@ const itemGroupOptions = computed(() =>
 onMounted(load)
 
 /**
+ * Tree takes no generic: the nodes it hands back through slots, `move` and `drag-end` are our own
+ * objects typed as its opaque shape. The key is what it tracks them by, so the menu is asked for
+ * that key rather than the node being asserted into ours.
+ */
+function isMenuNode(node: TreeNode): node is MenuNode {
+	return findNode(String(node.name)) !== null
+}
+
+/**
  * Domain rule for a drop. Tree already rejects dropping onto itself or into its own descendant,
  * so this only has to answer the depth question the server would otherwise throw on.
  */
-function canDrop({
-	node,
-	target,
-	position,
-}: { node: MenuNode; target: MenuNode; position: string }) {
-	const parentDepth =
-		position === "inside" ? depthOf(target.name) : depthOf(target.name) - 1
+function canDrop({ node, target, position }: MoveContext) {
+	if (!isMenuNode(node)) return false
+	const targetDepth = depthOf(String(target.name))
+	const parentDepth = position === "inside" ? targetDepth : targetDepth - 1
 	return canNest(node, parentDepth)
 }
 
-async function onDragEnd(
-	info: { node: MenuNode; to: string | null; newIndex: number } | null,
-) {
+async function onDragEnd(info: DropInfo | null) {
 	// Null means the drag was cancelled or never landed anywhere valid.
 	if (!info) return
 
 	// `move_node` reparents and positions in one call, so a reorder within one parent and a
 	// move across parents are the same request - `to` is simply unchanged in the first case.
 	await mutate("move_node", {
-		name: info.node.name,
-		to_parent: info.to ?? "",
+		name: String(info.node.name),
+		to_parent: info.to === null ? "" : String(info.to),
 		target_index: info.newIndex,
 	})
 }
@@ -194,7 +203,7 @@ function rowActions(node: MenuNode) {
 		},
 		{
 			group: "Danger",
-			items: [
+			options: [
 				{
 					label: "Delete",
 					icon: "trash-2",
@@ -214,7 +223,7 @@ const menuActions = computed(() => [
 	},
 	{
 		group: "Danger",
-		items: [
+		options: [
 			{
 				label: "Delete whole menu",
 				icon: "trash-2",
@@ -272,6 +281,7 @@ const menuActions = computed(() => [
 				>
 					<template #item-label="{ node }">
 						<button
+							v-if="isMenuNode(node)"
 							type="button"
 							class="min-w-0 flex-1 truncate text-left text-base"
 							:class="[
@@ -285,8 +295,8 @@ const menuActions = computed(() => [
 					</template>
 
 					<template #item-suffix="{ node }">
-						<div class="flex items-center gap-2">
-							<Badge v-if="!node.visible" variant="subtle" theme="orange" label="Hidden" />
+						<div v-if="isMenuNode(node)" class="flex items-center gap-2">
+							<Badge v-if="!node.visible" variant="subtle" theme="amber" label="Hidden" />
 							<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
 								{{ node.item_groups.length ? `${node.item_groups.length} groups` : "" }}
 							</span>

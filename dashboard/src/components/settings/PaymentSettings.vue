@@ -18,7 +18,7 @@ const FIELDS = [
 	"charge_account_head",
 ] as const
 
-const { form, changed, save, submit } = useSettingsForm(
+const { form, text, checked, changed, save, submit } = useSettingsForm(
 	"payment_settings",
 	FIELDS,
 	"Payment settings saved",
@@ -49,7 +49,7 @@ const { form, changed, save, submit } = useSettingsForm(
 					title="Accept cash on delivery"
 					description="Let customers pay when the order arrives"
 				>
-					<Checkbox v-model="form.cod_enabled" />
+					<Checkbox v-model="checked.cod_enabled" />
 				</SettingsRow>
 				<SettingsRow title="COD charge" description="Extra fee added to a cash-on-delivery order">
 					<FormControl v-model="form.cod_charge" type="number" min="0" step="0.01" />
@@ -69,7 +69,7 @@ const { form, changed, save, submit } = useSettingsForm(
 					title="Charge account head"
 					description="Where the COD charge posts in your accounts"
 				>
-					<SettingsLinkField v-model="form.charge_account_head" doctype="Account" />
+					<SettingsLinkField v-model="text.charge_account_head" doctype="Account" />
 				</SettingsRow>
 			</div>
 

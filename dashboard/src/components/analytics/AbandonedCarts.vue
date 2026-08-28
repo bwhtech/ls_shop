@@ -3,7 +3,12 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { AbandonedCartStatus, AbandonedCarts, BadgeTheme } from "@/types"
+import type {
+	AbandonedCartStatus,
+	AbandonedCarts,
+	AnalyticsRangeParams,
+	BadgeTheme,
+} from "@/types"
 import {
 	formatCount,
 	formatDateTime,
@@ -37,7 +42,7 @@ const statusThemes: Record<AbandonedCartStatus, BadgeTheme> = {
 	Recovered: "green",
 }
 
-const abandonedCarts = useCall<AbandonedCarts>({
+const abandonedCarts = useCall<AbandonedCarts, AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_abandoned_carts",
 	params: () => rangeParams.value,
 	refetch: true,

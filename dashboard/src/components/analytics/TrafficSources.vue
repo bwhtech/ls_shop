@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { TrafficSourceRow } from "@/types"
+import type { AnalyticsRangeParams, TrafficSourceRow } from "@/types"
 import { formatCount, formatMoney, formatPercent } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { computed } from "vue"
@@ -24,7 +24,7 @@ const columns: AnalyticsTableColumn[] = [
 	{ key: "conversion_rate", label: "Conversion", numeric: true },
 ]
 
-const trafficSources = useCall<TrafficSourceRow[]>({
+const trafficSources = useCall<TrafficSourceRow[], AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_traffic_sources",
 	params: () => rangeParams.value,
 	refetch: true,

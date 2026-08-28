@@ -17,7 +17,10 @@ const statusTabs = [
 	{ label: "All", value: "" },
 ]
 
-const orders = useCall<{ orders: OrderRow[]; total: number }>({
+const orders = useCall<
+	{ orders: OrderRow[]; total: number },
+	{ status: string; search: string }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.get_orders",
 	params: () => ({ status: status.value, search: search.value }),
 	refetch: true,

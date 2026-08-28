@@ -27,13 +27,16 @@ const orderName = computed(() => String(route.params.name))
 
 // The stepper's own shape lives with the component that draws it, so the shared OrderDetail type
 // stays as it is and this screen still gets a checked `progress`.
-const order = useCall<OrderDetail & { progress: OrderProgressStep[] }>({
+const order = useCall<
+	OrderDetail & { progress: OrderProgressStep[] },
+	{ sales_order: string }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.get_order",
 	params: () => ({ sales_order: orderName.value }),
 	refetch: true,
 })
 
-const fulfil = useCall<{ delivery_note: string }>({
+const fulfil = useCall<{ delivery_note: string }, { sales_order: string }>({
 	url: "/api/v2/method/ls_shop.api.admin.orders.fulfil_order",
 	method: "POST",
 	immediate: false,
@@ -51,7 +54,9 @@ function confirmFulfil() {
 		message:
 			"This ships everything outstanding and takes the stock out of your warehouse.",
 		confirmLabel: "Fulfil",
-		onConfirm: () => fulfil.submit({ sales_order: orderName.value }),
+		onConfirm: async () => {
+			await fulfil.submit({ sales_order: orderName.value })
+		},
 	})
 }
 </script>

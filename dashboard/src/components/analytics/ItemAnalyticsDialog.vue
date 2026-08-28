@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAnalyticsRange } from "@/composables/useAnalyticsRange"
-import type { ItemAnalytics } from "@/types"
+import type { AnalyticsRangeParams, ItemAnalytics } from "@/types"
 import {
 	formatCount,
 	formatMoney,
@@ -38,7 +38,10 @@ const orderColumns: AnalyticsTableColumn[] = [
 	{ key: "amount", label: "Amount", numeric: true },
 ]
 
-const itemAnalytics = useCall<ItemAnalytics>({
+const itemAnalytics = useCall<
+	ItemAnalytics,
+	AnalyticsRangeParams & { item_code: string }
+>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_item_analytics",
 	params: () => ({ item_code: props.itemCode ?? "", ...rangeParams.value }),
 	immediate: false,

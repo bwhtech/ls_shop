@@ -25,11 +25,10 @@ const tabs = [
 	{ label: "All", value: "" },
 ]
 
-const inventory = useCall<{
-	rows: InventoryRow[]
-	total: number
-	low_stock_threshold: number
-}>({
+const inventory = useCall<
+	{ rows: InventoryRow[]; total: number; low_stock_threshold: number },
+	{ availability: string; search: string }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.inventory.get_inventory",
 	params: () => ({ availability: availability.value, search: search.value }),
 	refetch: true,
@@ -41,7 +40,10 @@ watch(search, () => {
 	searchTimer = setTimeout(() => inventory.reload(), 300)
 })
 
-const receiveStock = useCall({
+const receiveStock = useCall<
+	unknown,
+	{ received_quantities: Record<string, string> }
+>({
 	url: "/api/v2/method/ls_shop.api.admin.inventory.receive_stock",
 	method: "POST",
 	immediate: false,

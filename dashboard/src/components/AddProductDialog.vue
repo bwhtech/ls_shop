@@ -20,7 +20,19 @@ const sizes = ref("")
 const price = ref("")
 const salePrice = ref("")
 
-const createProduct = useCall<{ name: string }>({
+const createProduct = useCall<
+	{ name: string },
+	{
+		title: string
+		collection: string
+		option_attribute: string
+		options: string[]
+		size_attribute: string
+		sizes: string[]
+		price: string
+		sale_price: string
+	}
+>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.create_product",
 	method: "POST",
 	immediate: false,

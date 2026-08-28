@@ -32,8 +32,11 @@ function reportError(error: Error) {
 	toast.error(error.message)
 }
 
-function call(method: string, onSuccess?: () => void) {
-	return useCall({
+function call<TParams extends Record<string, unknown>>(
+	method: string,
+	onSuccess?: () => void,
+) {
+	return useCall<unknown, TParams>({
 		url: `/api/v2/method/ls_shop.api.admin.catalog.${method}`,
 		method: "POST",
 		immediate: false,
@@ -45,13 +48,24 @@ function call(method: string, onSuccess?: () => void) {
 	})
 }
 
-const addImages = call("add_product_images")
-const removeImage = call("remove_product_image")
-const setPublished = call("set_variant_published")
-const savePrices = call("save_product_prices", () =>
-	toast.success("Prices saved"),
+const addImages = call<{
+	style_attribute_variant: string
+	file_urls: string[]
+}>("add_product_images")
+const removeImage = call<{ style_attribute_variant: string; file_url: string }>(
+	"remove_product_image",
 )
-const receiveStock = call("receive_product_stock", () => {
+const setPublished = call<{ style_attribute_variant: string; publish: number }>(
+	"set_variant_published",
+)
+const savePrices = call<{
+	style_attribute_variant: string
+	size_prices: { item_code: string; default_rate: string }[]
+}>("save_product_prices", () => toast.success("Prices saved"))
+const receiveStock = call<{
+	style_attribute_variant: string
+	received_quantities: Record<string, string>
+}>("receive_product_stock", () => {
 	toast.success("Stock received")
 	receiveQuantities.value = {}
 })
@@ -105,11 +119,12 @@ function confirmRemoveImage(fileUrl: string) {
 		message: "It will no longer appear on the storefront.",
 		theme: "red",
 		confirmLabel: "Remove",
-		onConfirm: () =>
-			removeImage.submit({
+		onConfirm: async () => {
+			await removeImage.submit({
 				style_attribute_variant: props.variant.name,
 				file_url: fileUrl,
-			}),
+			})
+		},
 	})
 }
 </script>

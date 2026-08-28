@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { SalesHeatmap } from "@/types"
+import type { AnalyticsRangeParams, SalesHeatmap } from "@/types"
 import { formatCount } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { ChartCard, HeatmapChart } from "frappe-ui/charts"
@@ -18,7 +18,7 @@ const hours = Array.from(
 	(_, hour) => `${String(hour).padStart(2, "0")}:00`,
 )
 
-const heatmap = useCall<SalesHeatmap>({
+const heatmap = useCall<SalesHeatmap, AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_sales_heatmap",
 	params: () => rangeParams.value,
 	refetch: true,

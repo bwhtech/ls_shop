@@ -4,7 +4,7 @@ import { computed } from "vue"
 import SettingsAttach from "./SettingsAttach.vue"
 import SettingsLinkField from "./SettingsLinkField.vue"
 import type { AdvancedField } from "./types"
-import type { SettingsValue } from "./useSettingsForm"
+import { type SettingsValue, normalizeValue } from "./useSettingsForm"
 
 const props = defineProps<{ field: AdvancedField; modelValue: SettingsValue }>()
 const emit = defineEmits<{ "update:modelValue": [value: SettingsValue] }>()
@@ -22,6 +22,19 @@ const NUMBER_FIELDTYPES = ["Int", "Float", "Currency", "Percent"]
 const value = computed({
 	get: () => props.modelValue,
 	set: (next: SettingsValue) => emit("update:modelValue", next),
+})
+
+// Attach, Link and Checkbox each take one shape, while a generic Advanced field holds any of
+// them - so each control reads the value as what it accepts and writes the plain value back.
+const text = computed<string | null>({
+	get: () =>
+		props.modelValue === null ? null : normalizeValue(props.modelValue),
+	set: (next) => emit("update:modelValue", next),
+})
+
+const checked = computed({
+	get: () => normalizeValue(props.modelValue) === "1",
+	set: (next: boolean) => emit("update:modelValue", next),
 })
 
 /** Data fields carry their input hint in `options` (Email / URL / Phone). */
@@ -43,25 +56,19 @@ const selectOptions = computed(() =>
 <template>
 	<SettingsLinkField
 		v-if="props.field.fieldtype === 'Link'"
-		v-model="value"
+		v-model="text"
 		:doctype="props.field.options ?? ''"
 	/>
 	<SettingsAttach
 		v-else-if="props.field.fieldtype === 'Attach Image'"
-		v-model="value"
+		v-model="text"
 	/>
 	<SettingsAttach
 		v-else-if="props.field.fieldtype === 'Attach'"
-		v-model="value"
+		v-model="text"
 		:image="false"
 	/>
-	<Checkbox v-else-if="props.field.fieldtype === 'Check'" v-model="value" />
-	<FormControl
-		v-else-if="props.field.fieldtype === 'Color'"
-		v-model="value"
-		type="color"
-		class="w-24"
-	/>
+	<Checkbox v-else-if="props.field.fieldtype === 'Check'" v-model="checked" />
 	<FormControl
 		v-else-if="props.field.fieldtype === 'Select'"
 		v-model="value"

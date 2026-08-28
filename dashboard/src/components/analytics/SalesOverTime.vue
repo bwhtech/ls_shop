@@ -3,7 +3,7 @@ import {
 	onAnalyticsRefresh,
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
-import type { SalesTimeseries } from "@/types"
+import type { AnalyticsRangeParams, SalesTimeseries } from "@/types"
 import { formatCount, formatMoney, formatShortDate } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { ChartCard, LineChart } from "frappe-ui/charts"
@@ -13,7 +13,7 @@ const props = defineProps<{ currency: string }>()
 
 const { rangeParams, rangeCaption } = useAnalyticsRange()
 
-const timeseries = useCall<SalesTimeseries>({
+const timeseries = useCall<SalesTimeseries, AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_sales_timeseries",
 	params: () => rangeParams.value,
 	refetch: true,
