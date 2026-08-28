@@ -128,7 +128,13 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		config = shop_theme_config()
 		self.assertEqual(config.doctype, "Shop Default Theme Settings")
 
+	def seeded_route_patterns(self):
+		return sorted(row.url_pattern for row in frappe.get_single("Shop Theme Settings").routes)
+
 	def test_route_table_compiles_and_matches_named_groups(self):
+		# after_install seeds these, but a test may not assume the site it runs on was installed
+		# with a version that already shipped them.
+		seed_default_routes()
 		compiled = build_compiled_routes()
 		matched_route, match = match_route(compiled["routes"], "en/products/some-slug")
 		self.assertIsNotNone(matched_route)
@@ -136,6 +142,7 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.assertEqual(match.group("route"), "some-slug")
 
 	def test_route_table_no_match_for_unknown_path(self):
+		seed_default_routes()
 		compiled = build_compiled_routes()
 		matched_route, _match = match_route(compiled["routes"], "en/not-a-real-route")
 		self.assertIsNone(matched_route)
@@ -146,9 +153,13 @@ class IntegrationTestShopTheme(IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, settings.save)
 
 	def test_seed_default_routes_is_idempotent_on_url_pattern(self):
-		count_before = frappe.db.count("Shop Themed Route")
+		# Scoped to the settings' own rows, and compared as a list so a duplicated pattern shows up.
 		seed_default_routes()
-		self.assertEqual(frappe.db.count("Shop Themed Route"), count_before)
+		patterns_before = self.seeded_route_patterns()
+
+		seed_default_routes()
+
+		self.assertEqual(self.seeded_route_patterns(), patterns_before)
 
 	def test_seed_default_routes_never_reenables_dynamic_pages(self):
 		frappe.db.set_single_value("Shop Theme Settings", "dynamic_pages_enabled", 0)

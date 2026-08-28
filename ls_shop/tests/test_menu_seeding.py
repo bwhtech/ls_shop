@@ -77,6 +77,15 @@ def add_legacy_link(category, item_group, idx):
 	).insert()
 
 
+def purge_stale_fixtures():
+	"""The legacy migration drops a table, and DDL commits the open transaction in MariaDB. Anything
+	this module wrote before that point survives the framework's end-of-class rollback — worse, the
+	rollback then undoes tearDown's own deletes and resurrects it. Names are unique per test so a
+	stale row can never collide, and this sweep keeps a developer's site from collecting them."""
+	frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
+	frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
+
+
 def find_node(nodes, name):
 	for node in nodes:
 		if node["name"] == name:
@@ -89,17 +98,18 @@ def find_node(nodes, name):
 
 class TestMenuSeeding(IntegrationTestCase):
 	def setUp(self):
-		self.shoes = make_item_group(f"{PREFIX} Shoes").name
-		self.sneakers = make_item_group(f"{PREFIX} Sneakers", self.shoes).name
-		self.boots = make_item_group(f"{PREFIX} Boots", self.shoes).name
+		purge_stale_fixtures()
+		# Unique per test: the class-wide rollback runs once at the end, and a sibling class in this
+		# module commits mid-run, so a fixed name is a duplicate-key error waiting for the next run.
+		self.prefix = f"{PREFIX} {frappe.generate_hash(length=8)}"
+		self.shoes = make_item_group(f"{self.prefix} Shoes").name
+		self.sneakers = make_item_group(f"{self.prefix} Sneakers", self.shoes).name
+		self.boots = make_item_group(f"{self.prefix} Boots", self.shoes).name
 
 	def tearDown(self):
-		# IntegrationTestCase rolls back once, after the whole class, so each test clears its own rows
-		# to avoid duplicate-name collisions with the next test's setUp.
 		if frappe.db.exists("DocType", LEGACY_CHILD_DOCTYPE):
 			frappe.delete_doc("DocType", LEGACY_CHILD_DOCTYPE, ignore_permissions=True)
-		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
-		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
+		purge_stale_fixtures()
 		frappe.local.ls_shop_storefront_menu = None
 
 	def seeded_entries(self):
@@ -107,7 +117,7 @@ class TestMenuSeeding(IntegrationTestCase):
 			entry.item_group: entry
 			for entry in frappe.get_all(
 				"Ecommerce Category",
-				filters={"category_name": ["like", f"{PREFIX}%"]},
+				filters={"category_name": ["like", f"{self.prefix}%"]},
 				fields=["name", "item_group", "parent_ecommerce_category", "is_group", "lft", "rgt"],
 			)
 		}
@@ -115,7 +125,7 @@ class TestMenuSeeding(IntegrationTestCase):
 	def item_group_snapshot(self):
 		return frappe.get_all(
 			"Item Group",
-			filters={"name": ["like", f"{PREFIX}%"]},
+			filters={"name": ["like", f"{self.prefix}%"]},
 			fields=["name", "parent_item_group", "is_group", "lft", "rgt", "modified"],
 			order_by="name asc",
 		)
@@ -161,7 +171,7 @@ class TestMenuSeeding(IntegrationTestCase):
 		before = self.item_group_snapshot()
 		sneakers_entry = self.seeded_entries()[self.sneakers].name
 
-		navbar_manager.update_node(sneakers_entry, display_name=f"{PREFIX} Trainers")
+		navbar_manager.update_node(sneakers_entry, display_name=f"{self.prefix} Trainers")
 		navbar_manager.delete_node(self.seeded_entries()[self.boots].name)
 
 		self.assertEqual(before, self.item_group_snapshot())
@@ -171,7 +181,7 @@ class TestMenuSeeding(IntegrationTestCase):
 		"""The copy is a starting point, not a live mirror — only a re-import brings new groups in."""
 		navbar_manager.seed_categories_from_item_groups(item_group=self.shoes)
 
-		sandals = make_item_group(f"{PREFIX} Sandals", self.shoes).name
+		sandals = make_item_group(f"{self.prefix} Sandals", self.shoes).name
 
 		self.assertNotIn(sandals, self.seeded_entries())
 
@@ -183,7 +193,7 @@ class TestMenuSeeding(IntegrationTestCase):
 
 		# A shop owner who built their own menu must not have the catalogue poured back into it.
 		frappe.db.delete("Ecommerce Category")
-		navbar_manager.create_node("", f"{PREFIX} Hand Built")
+		navbar_manager.create_node("", f"{self.prefix} Hand Built")
 
 		navbar_manager.seed_menu_when_empty()
 		self.assertNotIn(self.shoes, self.seeded_entries())
@@ -196,7 +206,7 @@ class TestMenuSeeding(IntegrationTestCase):
 			"Ecommerce Category",
 			filters={
 				**get_segment_filters(SEGMENT_CONFIG["collections"]),
-				"category_name": ["like", f"{PREFIX}%"],
+				"category_name": ["like", f"{self.prefix}%"],
 			},
 			pluck="item_group",
 		)
@@ -206,19 +216,22 @@ class TestMenuSeeding(IntegrationTestCase):
 
 class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 	def setUp(self):
+		purge_stale_fixtures()
+		self.prefix = f"{PREFIX} {frappe.generate_hash(length=8)}"
 		make_legacy_child_doctype()
-		self.shirts = make_item_group(f"{PREFIX} Shirts").name
-		self.belts = make_item_group(f"{PREFIX} Belts").name
-		self.tab = navbar_manager.create_node("", f"{PREFIX} Menswear").name
-		self.entry = navbar_manager.create_node(self.tab, f"{PREFIX} Tops", "Item Group", self.shirts).name
+		self.shirts = make_item_group(f"{self.prefix} Shirts").name
+		self.belts = make_item_group(f"{self.prefix} Belts").name
+		self.tab = navbar_manager.create_node("", f"{self.prefix} Menswear").name
+		self.entry = navbar_manager.create_node(
+			self.tab, f"{self.prefix} Tops", "Item Group", self.shirts
+		).name
 		# The migration reads the child rows, so the field it will fill has to start empty.
 		frappe.db.set_value("Ecommerce Category", self.entry, "item_group", None)
 
 	def tearDown(self):
 		if frappe.db.exists("DocType", LEGACY_CHILD_DOCTYPE):
 			frappe.delete_doc("DocType", LEGACY_CHILD_DOCTYPE, ignore_permissions=True)
-		frappe.db.delete("Ecommerce Category", {"name": ["like", f"{PREFIX}%"]})
-		frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
+		purge_stale_fixtures()
 		frappe.local.ls_shop_storefront_menu = None
 
 	def siblings_of_entry(self):
@@ -282,7 +295,7 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		migration.execute()
 		after_first_run = frappe.get_all(
 			"Ecommerce Category",
-			filters={"category_name": ["like", f"{PREFIX}%"]},
+			filters={"category_name": ["like", f"{self.prefix}%"]},
 			fields=["name", "item_group"],
 			order_by="name asc",
 		)
@@ -292,7 +305,7 @@ class TestLegacyItemGroupLinkMigration(IntegrationTestCase):
 		self.assertEqual(
 			frappe.get_all(
 				"Ecommerce Category",
-				filters={"category_name": ["like", f"{PREFIX}%"]},
+				filters={"category_name": ["like", f"{self.prefix}%"]},
 				fields=["name", "item_group"],
 				order_by="name asc",
 			),
