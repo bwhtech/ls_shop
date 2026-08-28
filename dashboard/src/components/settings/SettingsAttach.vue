@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { UploadedFile } from "@/types"
 import { Button, FileUploader } from "frappe-ui"
 
 const props = withDefaults(
@@ -15,6 +16,10 @@ const emit = defineEmits<{ "update:modelValue": [value: string | null] }>()
 
 function fileName(url: string) {
 	return url.split("/").pop() ?? url
+}
+
+function setFile(file: UploadedFile) {
+	emit("update:modelValue", file.file_url)
 }
 </script>
 
@@ -46,7 +51,7 @@ function fileName(url: string) {
 		<FileUploader
 			:file-types="props.fileTypes ?? (props.image ? ['image/*'] : undefined)"
 			:upload-args="{ private: false }"
-			@success="(file: { file_url: string }) => emit('update:modelValue', file.file_url)"
+			@success="setFile"
 		>
 			<template #default="{ openFileSelector, uploading }">
 				<Button

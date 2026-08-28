@@ -1,5 +1,10 @@
 import type { BadgeProps } from "frappe-ui"
 
+/** The one field we read off frappe-ui's FileUploader success payload. */
+export type UploadedFile = {
+	file_url: string
+}
+
 export type ProductSize = {
 	size: string
 	item_code: string

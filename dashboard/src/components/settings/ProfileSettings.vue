@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { UploadedFile } from "@/types"
 import {
 	Avatar,
 	Button,
@@ -36,13 +37,25 @@ watch(
 	{ immediate: true },
 )
 
-const save = useCall<Profile>({
-	url: "/api/v2/method/ls_shop.api.admin.settings.save_profile",
-	method: "POST",
-	immediate: false,
-	onSuccess: () => profile.reload(),
-	onError: (error: Error) => toast.error(error.message),
-})
+function saveProfileCall(onSuccess?: () => void) {
+	return useCall<Profile>({
+		url: "/api/v2/method/ls_shop.api.admin.settings.save_profile",
+		method: "POST",
+		immediate: false,
+		onSuccess: () => {
+			profile.reload()
+			onSuccess?.()
+		},
+		onError: (error: Error) => toast.error(error.message),
+	})
+}
+
+const save = saveProfileCall()
+
+// Its own resource, so the confirmation toast cannot fire on a name save.
+const savePicture = saveProfileCall(() =>
+	toast.success("Profile picture updated"),
+)
 
 const nameChanged = computed(
 	() =>
@@ -57,6 +70,10 @@ function saveName() {
 	if (!nameChanged.value) return
 	save.submit({ ...form })
 }
+
+function saveProfilePicture(file: UploadedFile) {
+	savePicture.submit({ user_image: file.file_url })
+}
 </script>
 
 <template>
@@ -70,12 +87,7 @@ function saveName() {
 				<FileUploader
 					:file-types="['image/*']"
 					:upload-args="{ private: false }"
-					@success="
-						(file: { file_url: string }) => {
-							save.submit({ user_image: file.file_url })
-							toast.success('Profile picture updated')
-						}
-					"
+					@success="saveProfilePicture"
 				>
 					<template #default="{ openFileSelector, uploading }">
 						<button

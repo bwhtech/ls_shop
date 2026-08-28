@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductSize, ProductVariant } from "@/types"
+import type { ProductSize, ProductVariant, UploadedFile } from "@/types"
 import { formatPriceRange, sumStock } from "@/utils/format"
 import {
 	Button,
@@ -89,6 +89,13 @@ function submitPrices() {
 			item_code: size.item_code,
 			default_rate: rateFor(size),
 		})),
+	})
+}
+
+function addImage(file: UploadedFile) {
+	addImages.submit({
+		style_attribute_variant: props.variant.name,
+		file_urls: [file.file_url],
 	})
 }
 
@@ -182,13 +189,7 @@ function confirmRemoveImage(fileUrl: string) {
 					<FileUploader
 						:file-types="['image/*']"
 						:upload-args="{ private: false }"
-						@success="
-							(file: { file_url: string }) =>
-								addImages.submit({
-									style_attribute_variant: variant.name,
-									file_urls: [file.file_url],
-								})
-						"
+						@success="addImage"
 					>
 						<template #default="{ openFileSelector, uploading, progress }">
 							<button
