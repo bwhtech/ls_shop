@@ -15,7 +15,7 @@ from frappe.utils.data import (
 )
 
 from ls_shop.analytics import facebook, ga4
-from ls_shop.api.admin.orders import get_reporting_currency
+from ls_shop.api.admin.orders import get_reporting_currency, is_webshop_order
 
 KNOWN_PROVIDER_ERRORS = {
 	"meta": "Meta denied pixel stats — the token needs ads_read AND the pixel's connected ad account assigned to the system user",
@@ -63,11 +63,6 @@ def get_days(start, end):
 
 def in_window(field, start, end):
 	return (field >= start) & (field < end)
-
-
-def is_webshop_order(sales_order):
-	# drafts count: the purchase event fires at order placement (COD may stay draft); only cancelled is out
-	return (sales_order.docstatus < 2) & (sales_order.order_type == "Shopping Cart")
 
 
 def distinct_sessions(analytics_event):

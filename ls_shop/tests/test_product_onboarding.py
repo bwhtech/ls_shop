@@ -6,6 +6,9 @@ import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe.tests import IntegrationTestCase
 
+from ls_shop.api.admin.catalog import update_product
+from ls_shop.api.admin.inventory import LOW_STOCK_THRESHOLD, get_inventory
+from ls_shop.api.admin.orders import get_overview
 from ls_shop.api.utils import get_stock_for_items
 from ls_shop.api.variant_pricing import set_variant_prices
 
@@ -352,3 +355,86 @@ class TestReceiveStock(ProductOnboardingTestCase):
 		stock_by_item_code = get_stock_for_items([small, medium])
 		self.assertEqual(stock_by_item_code[small], 7)
 		self.assertEqual(stock_by_item_code[medium], 0)
+
+
+class TestUpdateProduct(ProductOnboardingTestCase):
+	def test_a_blank_title_is_refused_rather_than_ignored(self):
+		original_title = frappe.db.get_value("Item", self.item_template, "item_name")
+
+		for blank in ("", "   "):
+			with self.subTest(title=blank):
+				with self.assertRaises(frappe.ValidationError):
+					update_product(self.item_template, title=blank)
+
+		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_name"), original_title)
+
+	def test_the_framework_would_have_kept_the_old_title_without_complaining(self):
+		"""Without this the guard reads as belt-and-braces: Item backfills a blank item_name from
+		the item_code, which is how a cleared title used to report success and change nothing."""
+		item = frappe.get_doc("Item", self.item_template)
+		item.item_name = "Cotton Shirt"
+		item.save()
+
+		item.item_name = ""
+		item.save()
+
+		self.assertEqual(item.item_name, self.item_template)
+
+	def test_a_real_title_still_saves_trimmed(self):
+		update_product(self.item_template, title="  Cotton Shirt  ")
+
+		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_name"), "Cotton Shirt")
+
+	def test_an_omitted_title_leaves_the_stored_one_alone(self):
+		update_product(self.item_template, title="Cotton Shirt")
+
+		update_product(self.item_template, description="Soft and light")
+
+		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_name"), "Cotton Shirt")
+
+
+class TestRunningLowPanel(ProductOnboardingTestCase):
+	"""Home's "Running low" panel and the Inventory screen's low filter have to be one list.
+
+	Out of stock is not running low - it is the other tab - so a panel that merely shows the
+	smallest numbers in the store is still wrong. The fixture stocks one size well above the
+	threshold and one size just under it, so the panel has something real to include and something
+	real to leave out.
+	"""
+
+	def setUp(self):
+		super().setUp()
+		self.well_stocked_item_code, self.running_low_item_code = self.size_item_codes
+		self.variant.receive_stock({self.well_stocked_item_code: LOW_STOCK_THRESHOLD + 20})
+		self.variant.receive_stock({self.running_low_item_code: 1})
+
+	def get_item_codes(self, **filters):
+		return {row["item_code"] for row in get_inventory(page_length=1000, **filters)["rows"]}
+
+	def test_every_panel_row_is_actually_running_low(self):
+		panel = get_overview()["running_low"]
+
+		for row in panel:
+			with self.subTest(item_code=row["item_code"]):
+				self.assertEqual(row["availability"], "Low")
+				self.assertLessEqual(row["stock"], LOW_STOCK_THRESHOLD)
+				self.assertGreater(row["stock"], 0)
+
+	def test_the_panel_never_lists_a_size_the_inventory_screen_does_not(self):
+		low_item_codes = self.get_item_codes(availability="low")
+
+		for row in get_overview()["running_low"]:
+			with self.subTest(item_code=row["item_code"]):
+				self.assertIn(row["item_code"], low_item_codes)
+
+	def test_a_well_stocked_size_is_on_the_inventory_screen_but_never_running_low(self):
+		self.assertIn(self.well_stocked_item_code, self.get_item_codes())
+		self.assertNotIn(self.well_stocked_item_code, self.get_item_codes(availability="low"))
+
+		panel_item_codes = {row["item_code"] for row in get_overview()["running_low"]}
+		self.assertNotIn(self.well_stocked_item_code, panel_item_codes)
+
+	def test_a_size_just_under_the_threshold_is_what_the_low_filter_is_for(self):
+		"""Guards the fixture itself: without a genuinely low size in the store the panel could be
+		empty and the two tests above would prove nothing."""
+		self.assertIn(self.running_low_item_code, self.get_item_codes(availability="low"))

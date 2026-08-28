@@ -325,6 +325,12 @@ def get_delivery_configuration():
 	return condition.shipping_amount, condition.to_value
 
 
+# The Actual charge row cash on delivery posts through, named once so the checkout that writes it
+# and the order screen that has to label it cannot drift apart. The leading space is historical -
+# live orders carry it - so readers strip before comparing rather than the name losing it.
+COD_CHARGE_DESCRIPTION = " Cash on Delivery Charges"
+
+
 def get_cod_configuration():
 	shoe_arena_settings = frappe.get_cached_doc("Lifestyle Settings")
 	return (

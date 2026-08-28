@@ -152,6 +152,31 @@ class TestStoreSettingsApi(IntegrationTestCase):
 			frappe.db.get_single_value(branding.LEGACY_SETTINGS, "brand_logo"), "/files/legacy-logo.png"
 		)
 
+	def test_a_blank_store_name_is_refused(self):
+		"""The storefront renders the literal "Store" in every title when this is empty, so an
+		accepted blank silently rebrands the live site."""
+		frappe.db.set_single_value(branding.LEGACY_SETTINGS, "store_name", "Pixio")
+
+		for blank in ("", "   "):
+			with self.subTest(store_name=blank):
+				with self.assertRaises(frappe.MandatoryError):
+					admin_settings.save_store_settings(store_name=blank)
+
+		self.assertEqual(frappe.db.get_single_value(branding.LEGACY_SETTINGS, "store_name"), "Pixio")
+
+	def test_a_real_store_name_still_saves(self):
+		saved = admin_settings.save_store_settings(store_name="Pixio")
+
+		self.assertEqual(saved["store_name"], "Pixio")
+		self.assertEqual(frappe.db.get_single_value(branding.LEGACY_SETTINGS, "store_name"), "Pixio")
+
+	def test_a_save_that_does_not_touch_the_store_name_is_unaffected(self):
+		frappe.db.set_single_value(branding.LEGACY_SETTINGS, "store_name", "Pixio")
+
+		admin_settings.save_store_settings(contact_phone="+966500000000")
+
+		self.assertEqual(frappe.db.get_single_value(branding.LEGACY_SETTINGS, "store_name"), "Pixio")
+
 	def test_omitted_branding_keys_are_left_untouched(self):
 		set_brand_settings(website={"footer_logo": "/files/website-footer.png"})
 

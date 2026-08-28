@@ -415,7 +415,12 @@ def update_product(item_template: str, title=None, collection=None, description=
 
 	item = frappe.get_doc("Item", item_template)
 	if title is not None:
-		item.item_name = cstr(title).strip()
+		# Item.validate quietly backfills a blank item_name from the item_code, so without this the
+		# save reports success while the title the owner cleared stays exactly as it was.
+		title = cstr(title).strip()
+		if not title:
+			frappe.throw(_("Title is required."))
+		item.item_name = title
 	if collection is not None:
 		if not frappe.db.exists("Item Group", collection):
 			frappe.throw(_("Collection {0} does not exist.").format(collection))

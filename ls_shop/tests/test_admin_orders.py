@@ -5,11 +5,12 @@
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
-from frappe.utils.data import get_year_ending, get_year_start, getdate
+from frappe.utils.data import add_days, get_year_ending, get_year_start, getdate
 
 from ls_shop.api.admin.orders import (
 	MAX_PAGE_LENGTH,
 	OPEN_STATUSES,
+	OVERVIEW_WINDOW_DAYS,
 	SETTLED_STAGES,
 	STAGE_LABELS,
 	STEP_SEQUENCE,
@@ -23,6 +24,8 @@ from ls_shop.api.admin.orders import (
 	get_overview,
 	read_order_lifecycles,
 )
+from ls_shop.api.analytics_dashboard import get_period_kpis
+from ls_shop.utils import COD_CHARGE_DESCRIPTION
 
 COMPANY = "Lifestyle Demo"
 ITEM_GROUP = "Interior Accessories"
@@ -34,9 +37,36 @@ def to_fulfil_names() -> list:
 	return [row["name"] for row in get_orders(status="open", page_length=MAX_PAGE_LENGTH)["orders"]]
 
 
-def make_test_sales_order():
+def get_company_account(exclude=None):
+	"""Any real expense account of the test company: these tests care where a charge row points,
+	never at which account it is."""
+	return frappe.db.get_value(
+		"Account",
+		{"company": COMPANY, "is_group": 0, "root_type": "Expense", "name": ["!=", exclude or ""]},
+		"name",
+	)
+
+
+def make_shipping_rule(shipping_amount):
+	rule = frappe.new_doc("Shipping Rule")
+	rule.label = f"ZZ Flat Shipping {frappe.generate_hash(length=6)}"
+	rule.shipping_rule_type = "Selling"
+	rule.calculate_based_on = "Net Total"
+	rule.company = COMPANY
+	rule.account = get_company_account()
+	rule.cost_center = frappe.db.get_value("Cost Center", {"company": COMPANY, "is_group": 0}, "name")
+	rule.append("conditions", {"from_value": 0, "to_value": 1000000, "shipping_amount": shipping_amount})
+	rule.insert()
+	return rule
+
+
+def make_test_sales_order(order_type="Sales", submit=True, shipping_rule=None, cod_charge=0):
 	"""A submitted order for a non-stock item: enough to be fulfilled and returned, with nothing of
-	the stock ledger in the way of what these tests are about."""
+	the stock ledger in the way of what these tests are about.
+
+	`order_type` and `submit` are what the revenue definition turns on, and `shipping_rule` and
+	`cod_charge` are the two charge rows the order screen has to name, so the money tests raise their
+	orders through the same fixture rather than a second one that could drift from it."""
 	ensure_fiscal_year()
 	item_code = f"ZZ-LADDER-{frappe.generate_hash(length=8)}"
 	frappe.get_doc(
@@ -67,12 +97,40 @@ def make_test_sales_order():
 			"conversion_rate": 1,
 			"transaction_date": getdate(),
 			"delivery_date": getdate(),
+			"order_type": order_type,
 			"items": [{"item_code": item_code, "qty": 2, "rate": ITEM_RATE}],
 		}
 	)
+	if shipping_rule:
+		sales_order.shipping_rule = shipping_rule
+
 	sales_order.flags.ignore_permissions = True
 	sales_order.insert()
-	sales_order.submit()
+	if shipping_rule:
+		# ERPNext appends the rule's charge row only when the method is run against a costed
+		# document, which is why the storefront calls it the same way after saving the cart.
+		sales_order.run_method("apply_shipping_rule")
+		sales_order.save()
+	if cod_charge:
+		# On its own account, unlike the live store: ERPNext re-applies the shipping rule on every
+		# save and overwrites the last row that matches the rule's account and cost centre, so a COD
+		# row sharing them would come back holding the shipping amount instead of its own.
+		account = get_company_account(
+			exclude=frappe.db.get_value("Shipping Rule", shipping_rule, "account") if shipping_rule else None
+		)
+		sales_order.append(
+			"taxes",
+			{
+				"description": COD_CHARGE_DESCRIPTION,
+				"charge_type": "Actual",
+				"account_head": account,
+				"tax_amount": cod_charge,
+				"included_in_print_rate": 0,
+			},
+		)
+		sales_order.save()
+	if submit:
+		sales_order.submit()
 	return sales_order
 
 
@@ -430,3 +488,154 @@ class TestToFulfilAgreement(IntegrationTestCase):
 		for row in page["orders"]:
 			with self.subTest(order=row["name"]):
 				self.assertNotIn(row["state"]["key"], SETTLED_STAGES)
+
+
+class TestRevenueDefinition(IntegrationTestCase):
+	"""Home's Revenue tile and the Analytics screen's Total sales answer the same question, so they
+	read one definition: a storefront order that has not been cancelled.
+
+	Cash on delivery places its order as a draft, which is why drafts have to count; an order keyed
+	in by hand in Desk has no session behind it, which is why Analytics cannot attribute it and
+	neither screen counts it.
+	"""
+
+	def get_home_stat(self, key):
+		return next(stat for stat in get_overview()["stats"] if stat["key"] == key)["value"]
+
+	def get_analytics_kpis(self):
+		today = getdate()
+		return get_period_kpis(add_days(today, -(OVERVIEW_WINDOW_DAYS - 1)), today)
+
+	def test_a_draft_storefront_order_is_revenue_on_both_screens(self):
+		before_home = self.get_home_stat("revenue")
+		before_analytics = self.get_analytics_kpis()["total_sales"]
+
+		sales_order = make_test_sales_order(order_type="Shopping Cart", submit=False)
+
+		self.assertEqual(sales_order.docstatus, 0)
+		self.assertAlmostEqual(
+			self.get_home_stat("revenue"), before_home + sales_order.base_grand_total, places=2
+		)
+		self.assertAlmostEqual(
+			self.get_analytics_kpis()["total_sales"],
+			before_analytics + sales_order.base_grand_total,
+			places=2,
+		)
+
+	def test_an_order_keyed_in_by_hand_is_not_storefront_revenue(self):
+		before_home = self.get_home_stat("revenue")
+		before_analytics = self.get_analytics_kpis()["total_sales"]
+
+		make_test_sales_order(order_type="Sales")
+
+		self.assertAlmostEqual(self.get_home_stat("revenue"), before_home, places=2)
+		self.assertAlmostEqual(self.get_analytics_kpis()["total_sales"], before_analytics, places=2)
+
+	def test_a_cancelled_storefront_order_is_revenue_on_neither(self):
+		sales_order = make_test_sales_order(order_type="Shopping Cart")
+		before_home = self.get_home_stat("revenue")
+
+		sales_order.cancel()
+
+		self.assertAlmostEqual(
+			self.get_home_stat("revenue"), before_home - sales_order.base_grand_total, places=2
+		)
+
+	def test_the_two_screens_report_the_same_window(self):
+		"""The defect in one line: Home and Analytics sit two clicks apart under the same label and
+		used to disagree about the same thirty days."""
+		make_test_sales_order(order_type="Shopping Cart", submit=False)
+		make_test_sales_order(order_type="Shopping Cart")
+		make_test_sales_order(order_type="Sales")
+
+		analytics = self.get_analytics_kpis()
+		self.assertAlmostEqual(self.get_home_stat("revenue"), analytics["total_sales"], places=2)
+		self.assertEqual(self.get_home_stat("orders"), analytics["orders"])
+
+
+SHIPPING_CHARGE = 40.0
+COD_CHARGE = 15.0
+SALES_TAX = 7.5
+
+
+class TestOrderCharges(IntegrationTestCase):
+	"""The order screen has to be able to name every riyal between the item lines and the total."""
+
+	def setUp(self):
+		self.shipping_rule = make_shipping_rule(SHIPPING_CHARGE)
+		self.sales_order = make_test_sales_order(
+			order_type="Shopping Cart",
+			submit=False,
+			shipping_rule=self.shipping_rule.name,
+			cod_charge=COD_CHARGE,
+		)
+
+	def add_sales_tax(self, amount):
+		self.sales_order.append(
+			"taxes",
+			{
+				"description": "ZZ Sales Tax",
+				"charge_type": "Actual",
+				"account_head": get_company_account(exclude=self.shipping_rule.account),
+				"tax_amount": amount,
+				"included_in_print_rate": 0,
+			},
+		)
+		self.sales_order.save()
+
+	def test_shipping_and_cash_on_delivery_are_named_apart_from_tax(self):
+		order = get_order(self.sales_order.name)
+
+		self.assertEqual(order["shipping"], SHIPPING_CHARGE)
+		self.assertEqual(order["cod_charge"], COD_CHARGE)
+		self.assertEqual(order["tax"], 0)
+
+	def test_cash_on_delivery_on_the_shipping_account_is_still_not_shipping(self):
+		"""The live store points both charge rows at one account and one cost centre, so the pair
+		cannot be what tells them apart - the row's own description has to win."""
+		cod_row = frappe.db.get_value(
+			"Sales Taxes and Charges",
+			{"parent": self.sales_order.name, "description": COD_CHARGE_DESCRIPTION},
+			"name",
+		)
+		frappe.db.set_value(
+			"Sales Taxes and Charges",
+			cod_row,
+			{"account_head": self.shipping_rule.account, "cost_center": self.shipping_rule.cost_center},
+		)
+
+		order = get_order(self.sales_order.name)
+
+		self.assertEqual(order["cod_charge"], COD_CHARGE)
+		self.assertEqual(order["shipping"], SHIPPING_CHARGE)
+
+	def test_the_breakdown_reconciles_with_the_grand_total(self):
+		self.add_sales_tax(SALES_TAX)
+
+		order = get_order(self.sales_order.name)
+
+		self.assertEqual(order["tax"], SALES_TAX)
+		self.assertAlmostEqual(
+			order["net_total"] + order["shipping"] + order["cod_charge"] + order["tax"],
+			order["grand_total"],
+			places=2,
+		)
+
+	def test_the_named_lines_add_up_to_the_documents_own_charge_total(self):
+		self.add_sales_tax(SALES_TAX)
+
+		order = get_order(self.sales_order.name)
+
+		self.assertAlmostEqual(
+			order["shipping"] + order["cod_charge"] + order["tax"],
+			order["total_taxes_and_charges"],
+			places=2,
+		)
+
+	def test_an_order_with_no_charges_at_all_reads_as_zeroes(self):
+		order = get_order(make_test_sales_order(order_type="Shopping Cart", submit=False).name)
+
+		self.assertEqual(order["shipping"], 0)
+		self.assertEqual(order["cod_charge"], 0)
+		self.assertEqual(order["tax"], 0)
+		self.assertEqual(order["net_total"], order["grand_total"])

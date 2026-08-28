@@ -135,6 +135,18 @@ def write_branding_fields(values):
 	return {key: website_settings.get(fieldname) for key, fieldname in BRANDING_FIELDS.items()}
 
 
+def validate_store_details(values):
+	"""Guard the one store detail the docfield cannot guard for us.
+
+	The rest of the tab is already covered by the framework: `company` is a mandatory docfield and
+	`contact_email` carries options="Email", so a blank or malformed value fails inside save().
+	`store_name` is neither, yet ls_shop.seo falls back to the literal "Store" when it is empty -
+	so an empty save silently rebrands every storefront <title> and JSON-LD name.
+	"""
+	if "store_name" in values and not cstr(values["store_name"]).strip():
+		frappe.throw(frappe._("Store Name is required"), frappe.MandatoryError)
+
+
 @frappe.whitelist()
 def get_store_settings():
 	"""Branding and contact details - the fields a store owner touches most."""
@@ -143,6 +155,7 @@ def get_store_settings():
 
 @frappe.whitelist(methods=["POST"])
 def save_store_settings(**kwargs):
+	validate_store_details(kwargs)
 	return write_settings_fields(STORE_DETAIL_SETTINGS_FIELDS, kwargs) | write_branding_fields(kwargs)
 
 

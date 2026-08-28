@@ -16,7 +16,7 @@ from ls_shop.api.shipping import (
 	reprice_selected_option,
 )
 from ls_shop.core import _get_cart_quotation
-from ls_shop.utils import get_cod_configuration
+from ls_shop.utils import COD_CHARGE_DESCRIPTION, get_cod_configuration
 
 # ERPNext moved its transaction mappers out of the doctype module into a sibling `mapper`
 # module. Both layouts are in the wild across the versions this app runs against, so resolve
@@ -279,7 +279,7 @@ def set_cod_charges(quotation):
 
 	cod_charge = {
 		"doctype": "Sales Taxes and Charges",
-		"description": " Cash on Delivery Charges",
+		"description": COD_CHARGE_DESCRIPTION,
 		"charge_type": "Actual",
 		"account_head": account_head,
 		"tax_amount": cod_charge,

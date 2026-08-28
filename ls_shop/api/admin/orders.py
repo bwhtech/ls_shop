@@ -11,6 +11,8 @@ from frappe.utils.data import add_days, cint, cstr, flt, formatdate, getdate, st
 
 from ls_shop.api.admin.catalog import get_unpublishable_options
 from ls_shop.api.admin.inventory import get_inventory
+from ls_shop.api.shipping import DELIVERY_CHARGE_DESCRIPTION
+from ls_shop.utils import COD_CHARGE_DESCRIPTION
 
 PAGE_LENGTH = 20
 
@@ -504,6 +506,53 @@ def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 			keep_latest(lifecycle, field, request.modified)
 
 
+def get_order_charges(order):
+	"""Split the charge table into the lines the order screen can name.
+
+	The screen used to show item lines and a grand total with nothing between them to explain the
+	gap. Shipping reaches the table one of two ways - the connector's own Actual row, or ERPNext's
+	Shipping Rule row - and the rule's row is matched on account and cost centre the way ERPNext
+	matches it, because its description is the rule's translated label. Cash on delivery is a charge
+	of its own and would otherwise read as tax. `tax` is the remainder rather than a sum of its own,
+	so subtotal + shipping + cash on delivery + tax reconciles to the grand total even when a charge
+	row is one nothing here recognises.
+	"""
+	rule = (
+		frappe.get_cached_value(
+			"Shipping Rule", order.shipping_rule, ["account", "cost_center"], as_dict=True
+		)
+		if order.shipping_rule
+		else None
+	)
+
+	shipping = 0.0
+	cod_charge = 0.0
+	for row in frappe.get_all(
+		"Sales Taxes and Charges",
+		filters={"parent": order.name, "parenttype": "Sales Order"},
+		fields=["description", "charge_type", "account_head", "cost_center", "tax_amount"],
+	):
+		description = cstr(row.description).strip()
+		if description == COD_CHARGE_DESCRIPTION.strip():
+			cod_charge += flt(row.tax_amount)
+		elif description.startswith(DELIVERY_CHARGE_DESCRIPTION) or (
+			rule
+			and row.charge_type == "Actual"
+			and row.account_head == rule.account
+			and row.cost_center == rule.cost_center
+		):
+			shipping += flt(row.tax_amount)
+
+	precision = frappe.get_precision("Sales Order", "grand_total", order.currency)
+	shipping = flt(shipping, precision)
+	cod_charge = flt(cod_charge, precision)
+	return {
+		"shipping": shipping,
+		"cod_charge": cod_charge,
+		"tax": flt(flt(order.total_taxes_and_charges) - shipping - cod_charge, precision),
+	}
+
+
 @frappe.whitelist()
 def get_order(sales_order: str):
 	"""Everything one order's screen needs, in one call."""
@@ -522,7 +571,10 @@ def get_order(sales_order: str):
 			"docstatus",
 			"currency",
 			"total",
+			"net_total",
+			"total_taxes_and_charges",
 			"grand_total",
+			"shipping_rule",
 			"per_delivered",
 			"custom_ecommerce_payment_mode",
 			"shipping_address",
@@ -555,6 +607,7 @@ def get_order(sales_order: str):
 
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
 	state = describe_state(order, lifecycle)
+	charges = get_order_charges(order)
 
 	return {
 		"name": order.name,
@@ -567,6 +620,11 @@ def get_order(sales_order: str):
 		"progress": describe_progress(order, lifecycle),
 		"currency": order.currency,
 		"total": flt(order.total),
+		"net_total": flt(order.net_total),
+		"shipping": charges["shipping"],
+		"cod_charge": charges["cod_charge"],
+		"tax": charges["tax"],
+		"total_taxes_and_charges": flt(order.total_taxes_and_charges),
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
 		"shipping_address": get_address_lines(order.address_display),
@@ -713,9 +771,24 @@ def get_overview(order_status: str | None = None):
 			},
 		],
 		"recent_orders": get_orders(status=order_status, page_length=OVERVIEW_PANEL_LENGTH)["orders"],
-		"running_low": get_inventory(page_length=OVERVIEW_PANEL_LENGTH)["rows"],
+		# The same availability filter the Inventory screen's "Running low" tab runs, so the panel
+		# and the screen the owner lands on after clicking it can never disagree.
+		"running_low": get_inventory(availability="low", page_length=OVERVIEW_PANEL_LENGTH)["rows"],
 		"needs_attention": get_unpublishable_options(limit=OVERVIEW_PANEL_LENGTH),
 	}
+
+
+def is_webshop_order(sales_order):
+	"""What counts as a sale, in one place: Home's revenue figures and every Analytics order
+	aggregate read it, so two screens one click apart can never report different money for the
+	same window.
+
+	Drafts count - a cash-on-delivery order is placed as a draft and is real revenue from the
+	moment the customer places it; only a cancelled order is out. The order type is filtered
+	because this is a storefront dashboard: Analytics attributes revenue to sessions and traffic
+	sources, which an order keyed in by hand in Desk does not have.
+	"""
+	return (sales_order.docstatus < 2) & (sales_order.order_type == "Shopping Cart")
 
 
 def read_sales_window(from_date, to_date):
@@ -731,7 +804,7 @@ def read_sales_window(from_date, to_date):
 			Sum(sales_order.base_grand_total).as_("revenue"),
 			Count(sales_order.name).as_("orders"),
 		)
-		.where(sales_order.docstatus == 1)
+		.where(is_webshop_order(sales_order))
 		.where(sales_order.transaction_date >= from_date)
 		.where(sales_order.transaction_date <= to_date)
 	).run(as_dict=True)
