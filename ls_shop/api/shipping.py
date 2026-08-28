@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils.data import flt
 
 from ls_shop.core import _get_cart_quotation
+from ls_shop.utils import validate_document_access
 
 # The Actual charge row the chosen delivery option posts through. Matched on description to find and
 # replace the row on re-selection, the same way ERPNext's own shipping rule row is identified.
@@ -373,9 +374,7 @@ def copy_delivery_option_to_order(quotation_name: str, sales_order) -> None:
 @frappe.whitelist()
 def get_order_tracking(sales_order: str) -> dict:
 	"""Customer-facing tracking for one of their own orders."""
-	order = frappe.get_doc("Sales Order", sales_order)
-	if order.owner != frappe.session.user and not order.has_permission("read"):
-		raise frappe.PermissionError
+	validate_document_access("Sales Order", sales_order)
 
 	if not is_connector_installed():
 		return {"has_tracking": False}

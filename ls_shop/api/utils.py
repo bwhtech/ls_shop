@@ -8,7 +8,7 @@ from frappe.translate import get_all_translations
 from frappe.utils import cstr
 
 from ls_shop.search import query as search_query
-from ls_shop.utils import get_available_stocks, get_product_list
+from ls_shop.utils import get_available_stocks, get_product_list, validate_document_access
 
 
 def auth_required(func):
@@ -22,11 +22,33 @@ def auth_required(func):
 	return wrapper
 
 
-@frappe.whitelist(allow_guest=True)
-def get_order_detail(order_name):
-	sales_order = frappe.get_doc("Sales Order", order_name)
+# Only what an order-detail screen renders. The whole document carries contact_email, contact_phone
+# and the full address block, and Sales Order names are sequential.
+ORDER_DETAIL_FIELDS = (
+	"name",
+	"status",
+	"docstatus",
+	"transaction_date",
+	"delivery_date",
+	"currency",
+	"net_total",
+	"total_taxes_and_charges",
+	"grand_total",
+	"rounded_total",
+)
+ORDER_DETAIL_ITEM_FIELDS = ("item_code", "item_name", "qty", "rate", "amount", "image")
 
-	return {"sales_order": sales_order}
+
+@frappe.whitelist()
+def get_order_detail(order_name):
+	sales_order = validate_document_access("Sales Order", order_name)
+
+	detail = {fieldname: sales_order.get(fieldname) for fieldname in ORDER_DETAIL_FIELDS}
+	detail["items"] = [
+		{fieldname: item.get(fieldname) for fieldname in ORDER_DETAIL_ITEM_FIELDS}
+		for item in sales_order.items
+	]
+	return {"sales_order": detail}
 
 
 @frappe.whitelist()

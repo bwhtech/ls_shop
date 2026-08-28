@@ -17,6 +17,19 @@ from ls_shop.core import get_address_docs, get_party
 IN_CLAUSE_CHUNK_SIZE = 1000
 
 
+def validate_document_access(doctype: str, name: str):
+	"""Return the document only if the session owns it, or holds read permission on it.
+
+	Storefront endpoints take a document name straight from the request, and Sales Order names are
+	sequential — without this the id in the payload is the only thing standing between a shopper and
+	someone else's order.
+	"""
+	document = frappe.get_doc(doctype, name)
+	if document.owner != frappe.session.user and not document.has_permission("read"):
+		raise frappe.PermissionError
+	return document
+
+
 def get_complete_nested_links(parent_group):
 	"""Recursively fetch all nested item groups."""
 	all_links = set()

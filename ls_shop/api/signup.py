@@ -1,8 +1,24 @@
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
+from frappe.utils import cint
 
 from ls_shop.core import send_otp
+
+
+def verify_otp(email: str, otp: str):
+	"""Check the OTP and burn it.
+
+	Replay is the whole risk here: the key used to survive the full cache TTL, so one intercepted code
+	stayed valid for every later attempt. cint keeps a non-numeric code a clean "Invalid OTP" rather
+	than an uncaught ValueError.
+	"""
+	cache_key = f"otp:{email}"
+	stored_otp = frappe.cache.get_value(cache_key)
+	if not stored_otp or cint(otp) != cint(stored_otp):
+		frappe.throw(_("Invalid OTP"))
+
+	frappe.cache.delete_value(cache_key)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -25,12 +41,11 @@ def send_login_otp(email: str):
 
 
 @frappe.whitelist(allow_guest=True)
-@rate_limit(limit=30, seconds=60 * 60)
+# Keyed on email, not the default caller IP: an IP-bound limit leaves a 6-digit code brute-forceable
+# from a pool of addresses inside its own validity window.
+@rate_limit(key="email", limit=5, seconds=60 * 5)
 def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
-	stored_otp = frappe.cache.get_value(f"otp:{email}")
-	otp = int(otp) if otp else 0
-	if stored_otp != otp:
-		frappe.throw(_("Invalid OTP"))
+	verify_otp(email, otp)
 
 	user = frappe.get_doc(
 		{
@@ -47,13 +62,9 @@ def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 
 
 @frappe.whitelist(allow_guest=True)
-@rate_limit(limit=30, seconds=60 * 60)
+@rate_limit(key="email", limit=5, seconds=60 * 5)
 def verify_login_otp(email: str, otp: str):
 	"""Check OTP from Redis instead of DB"""
 
-	stored_otp = frappe.cache.get_value(f"otp:{email}")
-	otp = int(otp) if otp else 0
-	if stored_otp != otp:
-		frappe.throw(_("Invalid OTP"))
-
+	verify_otp(email, otp)
 	frappe.local.login_manager.login_as(email)
