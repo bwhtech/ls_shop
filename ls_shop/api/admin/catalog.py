@@ -20,6 +20,11 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 	"""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
+	# Imported here because orders imports this module at import time; a module-level import would cycle.
+	from ls_shop.api.admin.orders import get_reporting_currency
+
+	currency = get_reporting_currency()
+
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
 
@@ -28,7 +33,7 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 		fields=["name", "item_template", "item_attribute"],
 	)
 	if not configurators:
-		return {"products": [], "total": 0}
+		return {"products": [], "total": 0, "currency": currency}
 
 	templates_by_configurator = {row.name: row.item_template for row in configurators}
 
@@ -46,7 +51,7 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 		page_length=page_length,
 	)
 	if not templates:
-		return {"products": [], "total": total}
+		return {"products": [], "total": total, "currency": currency}
 
 	template_names = {row.name for row in templates}
 	page_configurators = [
@@ -137,7 +142,7 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 			}
 		)
 
-	return {"products": products, "total": total}
+	return {"products": products, "total": total, "currency": currency}
 
 
 def get_default_rates(item_codes):

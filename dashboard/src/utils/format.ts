@@ -7,7 +7,10 @@ import type {
 } from "@/types"
 
 /** One place that decides how a price range reads, so the list and the detail agree. */
-export function formatPriceRange(rates: (number | null)[]) {
+export function formatPriceRange(
+	rates: (number | null)[],
+	printRate: (rate: number) => string = String,
+) {
 	const values = rates.filter(
 		(rate): rate is number => rate !== null && rate !== undefined,
 	)
@@ -15,11 +18,15 @@ export function formatPriceRange(rates: (number | null)[]) {
 
 	const low = Math.min(...values)
 	const high = Math.max(...values)
-	return low === high ? String(low) : `${low} – ${high}`
+	return low === high
+		? printRate(low)
+		: `${printRate(low)} – ${printRate(high)}`
 }
 
-export function formatRowPrice(product: ProductRow) {
-	return formatPriceRange([product.price_from, product.price_to])
+export function formatRowPrice(product: ProductRow, currency: string) {
+	return formatPriceRange([product.price_from, product.price_to], (rate) =>
+		formatMoney(rate, currency),
+	)
 }
 
 export function sumStock(sizes: ProductSize[]) {

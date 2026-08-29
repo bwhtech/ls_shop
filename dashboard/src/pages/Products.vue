@@ -26,16 +26,21 @@ const {
 	loadMore,
 	reload,
 	getEmptyState,
-} = usePagedList<{ products: ProductRow[]; total: number }, ProductRow>(
+} = usePagedList<
+	{ products: ProductRow[]; total: number; currency: string },
+	ProductRow
+>(
 	"/api/v2/method/ls_shop.api.admin.catalog.get_products",
 	PAGE_LENGTH,
 	(data) => data.products,
 )
 
+const currency = computed(() => products.data?.currency ?? "")
+
 const rows = computed(() =>
 	loadedProducts.value.map((product) => ({
 		...product,
-		price: formatRowPrice(product),
+		price: formatRowPrice(product, currency.value),
 		status: product.published_count
 			? `${product.published_count} of ${product.variant_count} live`
 			: "Not live",
