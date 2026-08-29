@@ -53,6 +53,7 @@ onAnalyticsRefresh(() => {
 })
 
 const currency = computed(() => overview.data?.currency ?? "")
+const currencySymbol = computed(() => overview.data?.currency_symbol ?? "")
 
 const drilldownItemCode = ref<string | null>(null)
 const showDrilldown = ref(false)
@@ -95,7 +96,11 @@ function openProductDrilldown(itemCode: string) {
 				<ConversionFunnel />
 
 				<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-					<TopProducts :currency="currency" @select="openProductDrilldown" />
+					<TopProducts
+						:currency="currency"
+						:currency-symbol="currencySymbol"
+						@select="openProductDrilldown"
+					/>
 					<ProductEngagement @select="openProductDrilldown" />
 				</div>
 

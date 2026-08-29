@@ -10,7 +10,7 @@ import { BarChart, ChartCard } from "frappe-ui/charts"
 import type { ChartDatapointEvent } from "frappe-ui/charts"
 import { computed, ref } from "vue"
 
-const props = defineProps<{ currency: string }>()
+const props = defineProps<{ currency: string; currencySymbol?: string }>()
 const emit = defineEmits<{ select: [itemCode: string] }>()
 
 const { rangeParams, rangeCaption } = useAnalyticsRange()
@@ -27,12 +27,12 @@ const { data, loading, error } = useAnalyticsReport<TopProduct[]>(
 	() => ({ ...rangeParams.value, sort_by: sortBy.value, limit: 10 }),
 )
 
-// Horizontal bars run bottom-up, so the best seller has to go last to sit at the top.
-const rows = computed(() => [...(data.value ?? [])].reverse())
+const rows = computed(() => data.value ?? [])
 
 const formatValue = computed(() =>
 	sortBy.value === "revenue"
-		? (value: number) => formatMoney(value, props.currency, true)
+		? (value: number) =>
+				formatMoney(value, props.currency, true, props.currencySymbol)
 		: formatCount,
 )
 

@@ -702,3 +702,9 @@ def get_reporting_currency():
 	company = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "company")
 	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
 	return currency or frappe.defaults.get_global_default("currency")
+
+
+def get_reporting_currency_symbol(currency):
+	# Intl carries no narrow symbol for AED or SAR in a Latin locale and falls back to the code, so the
+	# symbol has to come from the site's own Currency record.
+	return frappe.get_cached_value("Currency", currency, "symbol") if currency else None

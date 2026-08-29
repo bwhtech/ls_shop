@@ -15,7 +15,11 @@ from frappe.utils.data import (
 )
 
 from ls_shop.analytics import facebook, ga4
-from ls_shop.api.admin.orders import get_reporting_currency, is_webshop_order
+from ls_shop.api.admin.orders import (
+	get_reporting_currency,
+	get_reporting_currency_symbol,
+	is_webshop_order,
+)
 
 KNOWN_PROVIDER_ERRORS = {
 	"meta": "Meta denied pixel stats — the token needs ads_read AND the pixel's connected ad account assigned to the system user",
@@ -170,9 +174,11 @@ def get_overview(from_date: str, to_date: str):
 	current = get_period_kpis(from_date, to_date)
 	previous_from, previous_to = get_previous_window(from_date, to_date)
 	previous = get_period_kpis(previous_from, previous_to)
+	currency = get_reporting_currency()
 	return {
 		# base_grand_total is company currency; Global Defaults is a separate setting and mislabels the tiles.
-		"currency": get_reporting_currency(),
+		"currency": currency,
+		"currency_symbol": get_reporting_currency_symbol(currency),
 		"kpis": {key: {"value": current[key], "previous": previous[key]} for key in current},
 	}
 

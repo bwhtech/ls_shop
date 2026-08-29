@@ -235,6 +235,7 @@ export type AnalyticsKpiKey =
 
 export type AnalyticsOverview = {
 	currency: string
+	currency_symbol: string | null
 	kpis: Record<AnalyticsKpiKey, AnalyticsKpi>
 }
 
