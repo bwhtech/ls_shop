@@ -200,6 +200,16 @@ useKeyboardShortcut([
 			showShortcuts.value = true
 		},
 	},
+	// Same description as Mod+Slash, so the dialog merges both into one row.
+	// Unmodified, so the default input guard keeps a bare "?" typeable.
+	{
+		combo: "Shift+Slash",
+		description: "Show keyboard shortcuts",
+		group: "General",
+		handler: () => {
+			showShortcuts.value = true
+		},
+	},
 	{
 		combo: "Mod+Comma",
 		description: "Open settings",
