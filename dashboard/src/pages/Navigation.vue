@@ -249,13 +249,6 @@ const menuActions = computed(() => [
 				<Dropdown :options="menuActions">
 					<Button icon-left="lucide-ellipsis" aria-label="Menu actions" />
 				</Dropdown>
-				<Button
-					variant="solid"
-					theme="gray"
-					icon-left="lucide-plus"
-					label="Add section"
-					@click="addEntry('')"
-				/>
 			</div>
 		</PageHeader>
 
@@ -270,68 +263,79 @@ const menuActions = computed(() => [
 					@retry="load"
 				/>
 
-				<div v-else-if="!menu.length" class="px-3 py-16 text-center">
-					<p class="text-base text-ink-gray-6">No menu yet</p>
-					<p class="mt-1 text-p-sm text-ink-gray-5">
-						Add a section, or build one from your item groups.
-					</p>
+				<template v-else>
+					<div v-if="!menu.length" class="px-3 py-16 text-center">
+						<p class="text-base text-ink-gray-6">No menu yet</p>
+						<p class="mt-1 text-p-sm text-ink-gray-5">
+							Add a section, or build one from your item groups.
+						</p>
+						<Button
+							class="mt-4"
+							variant="subtle"
+							theme="gray"
+							label="Import from item groups"
+							@click="importGroups"
+						/>
+					</div>
+
+					<Tree
+						v-else
+						:nodes="menu"
+						node-key="name"
+						draggable
+						:move="canDrop"
+						@drag-end="onDragEnd"
+					>
+						<template #item-label="{ node }">
+							<button
+								v-if="isMenuNode(node)"
+								type="button"
+								class="min-w-0 flex-1 truncate text-left text-base"
+								:class="[
+									node.visible ? 'text-ink-gray-8' : 'text-ink-gray-4',
+									selectedName === node.name ? 'font-medium' : '',
+								]"
+								@click.stop="selectedName = node.name"
+							>
+								{{ node.label }}
+							</button>
+						</template>
+
+						<template #item-suffix="{ node }">
+							<div v-if="isMenuNode(node)" class="flex items-center gap-2">
+								<Badge v-if="!node.visible" variant="subtle" theme="amber" label="Hidden" />
+								<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
+									{{ groupCount(node) }}
+								</span>
+								<span @click.stop>
+									<Dropdown :options="rowActions(node)">
+										<Button
+											variant="ghost"
+											class="!size-5 shrink-0"
+											aria-label="Entry actions"
+										>
+											<template #icon>
+												<span
+													class="lucide-ellipsis size-4 text-ink-gray-5"
+													aria-hidden="true"
+												/>
+											</template>
+										</Button>
+									</Dropdown>
+								</span>
+							</div>
+						</template>
+					</Tree>
+
 					<Button
-						class="mt-4"
-						variant="subtle"
+						class="mt-3"
+						variant="solid"
 						theme="gray"
-						label="Import from item groups"
-						@click="importGroups"
+						icon-left="lucide-plus"
+						label="Add section"
+						@click="addEntry('')"
 					/>
-				</div>
-
-				<Tree
-					v-else
-					:nodes="menu"
-					node-key="name"
-					draggable
-					:move="canDrop"
-					@drag-end="onDragEnd"
-				>
-					<template #item-label="{ node }">
-						<button
-							v-if="isMenuNode(node)"
-							type="button"
-							class="min-w-0 flex-1 truncate text-left text-base"
-							:class="[
-								node.visible ? 'text-ink-gray-8' : 'text-ink-gray-4',
-								selectedName === node.name ? 'font-medium' : '',
-							]"
-							@click.stop="selectedName = node.name"
-						>
-							{{ node.label }}
-						</button>
-					</template>
-
-					<template #item-suffix="{ node }">
-						<div v-if="isMenuNode(node)" class="flex items-center gap-2">
-							<Badge v-if="!node.visible" variant="subtle" theme="amber" label="Hidden" />
-							<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
-								{{ groupCount(node) }}
-							</span>
-							<span @click.stop>
-								<Dropdown :options="rowActions(node)">
-									<Button
-										variant="ghost"
-										class="!size-5 shrink-0"
-										aria-label="Entry actions"
-									>
-										<template #icon>
-											<span
-												class="lucide-ellipsis size-4 text-ink-gray-5"
-												aria-hidden="true"
-											/>
-										</template>
-									</Button>
-								</Dropdown>
-							</span>
-						</div>
-					</template>
-				</Tree>
+				</template>
 			</div>
 
 			<div class="flex w-96 shrink-0 flex-col border-l border-outline-gray-1">
