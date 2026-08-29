@@ -5,7 +5,7 @@ import OrderProgress from "@/components/orders/OrderProgress.vue"
 import type { OrderProgressStep } from "@/components/orders/types"
 import type { OrderDetail } from "@/types"
 import { errorMessage } from "@/utils/errors"
-import { formatMoney } from "@/utils/format"
+import { formatDate, formatMoney } from "@/utils/format"
 import {
 	Breadcrumbs,
 	Button,
@@ -113,7 +113,7 @@ function confirmFulfil() {
 					<OrderStateBadge :state="order.data.state" />
 				</div>
 				<p class="mt-1 text-p-sm text-ink-gray-5">
-					Placed {{ order.data.placed_on }} · {{ order.data.payment_mode ?? "No payment mode" }}
+					Placed {{ formatDate(order.data.placed_on) }} · {{ order.data.payment_mode ?? "No payment mode" }}
 				</p>
 
 				<OrderProgress

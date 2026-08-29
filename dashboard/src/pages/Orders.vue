@@ -6,7 +6,7 @@ import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import { usePagedList } from "@/composables/usePagedList"
 import type { OrderRow } from "@/types"
 import { errorMessage } from "@/utils/errors"
-import { cellAlignClass, formatMoney } from "@/utils/format"
+import { cellAlignClass, formatDate, formatMoney } from "@/utils/format"
 import { Breadcrumbs, FormControl, TabButtons } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref } from "vue"
@@ -42,6 +42,7 @@ const rows = computed(() =>
 	loadedOrders.value.map((order) => ({
 		...order,
 		items: `${order.item_count}`,
+		placed_on: formatDate(order.placed_on),
 		amount: formatMoney(order.total, order.currency),
 	})),
 )

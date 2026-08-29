@@ -1,3 +1,5 @@
+import { dayjs } from "frappe-ui"
+
 import type {
 	BadgeTheme,
 	BadgeVariant,
@@ -137,16 +139,52 @@ export function formatPercent(value: number) {
 	return `${value.toFixed(1)}%`
 }
 
+/**
+ * Frappe writes its formats in lowercase tokens (dd-mm-yyyy, HH:mm:ss); dayjs wants the date parts
+ * uppercased. Month stays `MM` in both, so only the day and year tokens need lifting.
+ */
+function toDayjsPattern(frappeFormat: string) {
+	return frappeFormat
+		.replace(/yyyy/g, "YYYY")
+		.replace(/yy(?!YY)/g, "YY")
+		.replace(/dd/g, "DD")
+		.replace(/mm/g, "MM")
+}
+
+/**
+ * The dashboard shell (ls_shop/www/dashboard.py) drops the site's formats on `window`, so every screen
+ * reads the same site setting instead of each falling back to whatever locale the browser happens to be in.
+ */
+function bootFormat(key: "date_format" | "time_format", fallback: string) {
+	const booted = (window as unknown as Record<string, unknown>)[key]
+	return toDayjsPattern(
+		typeof booted === "string" && booted ? booted : fallback,
+	)
+}
+
+/** Safari refuses the space-separated datetime the database returns, so it is made ISO first. */
+function parseMoment(value: string | null | undefined) {
+	if (!value) return null
+	const parsed = dayjs(String(value).replace(" ", "T"))
+	return parsed.isValid() ? parsed : null
+}
+
+export const emptyValue = "—"
+
+/** Every date in the dashboard goes through here, so the site's date format is the only one on screen. */
+export function formatDate(value: string | null | undefined) {
+	const parsed = parseMoment(value)
+	if (!parsed) return emptyValue
+	return parsed.format(bootFormat("date_format", "yyyy-mm-dd"))
+}
+
 /** A timestamp that has to carry the time of day, e.g. when a cart was last touched. */
-export function formatDateTime(value: string) {
-	const parsed = new Date(value)
-	if (Number.isNaN(parsed.getTime())) return value
-	return new Intl.DateTimeFormat(undefined, {
-		day: "numeric",
-		month: "short",
-		hour: "numeric",
-		minute: "2-digit",
-	}).format(parsed)
+export function formatDateTime(value: string | null | undefined) {
+	const parsed = parseMoment(value)
+	if (!parsed) return emptyValue
+	return parsed.format(
+		`${bootFormat("date_format", "yyyy-mm-dd")} ${bootFormat("time_format", "HH:mm:ss")}`,
+	)
 }
 
 /** Short, readable dates for the overview's compact rows - the full date is on the detail screen. */

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OrderProgressStep } from "@/components/orders/types"
-import { orderStateBadge } from "@/utils/format"
+import { formatDate, formatDateTime, orderStateBadge } from "@/utils/format"
 import { computed } from "vue"
 
 const props = defineProps<{ steps: OrderProgressStep[] }>()
@@ -79,16 +79,10 @@ const stateWording: Record<OrderProgressStep["state"], string> = {
 	upcoming: "Not reached yet",
 }
 
-/** Safari refuses the space-separated datetime the database returns, so it is made ISO first. */
+/** A step stamped with only a date must not grow a misleading 00:00 time of day. */
 function formatStepMoment(value: string) {
 	const hasTime = value.includes(" ") || value.includes("T")
-	const parsed = new Date(value.replace(" ", "T"))
-	if (Number.isNaN(parsed.getTime())) return value
-	return new Intl.DateTimeFormat(undefined, {
-		day: "numeric",
-		month: "short",
-		...(hasTime ? { hour: "numeric", minute: "2-digit" } : {}),
-	}).format(parsed)
+	return hasTime ? formatDateTime(value) : formatDate(value)
 }
 
 const currentStep = computed(() =>
