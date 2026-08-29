@@ -102,7 +102,8 @@ const currentStep = computed(() =>
 		class="overflow-x-auto"
 		:aria-label="`Fulfilment progress — ${currentStep?.label ?? 'not started'}`"
 	>
-		<ol class="flex min-w-max items-start py-1">
+		<!-- min-w-max keeps the strip scrollable when it overflows, which also makes justify-center a no-op there. -->
+		<ol class="flex min-w-max items-start justify-center py-1">
 			<!-- `relative` is load-bearing: the sr-only state is position:absolute and without it escapes this strip's clipping. -->
 			<li
 				v-for="(step, index) in steps"
