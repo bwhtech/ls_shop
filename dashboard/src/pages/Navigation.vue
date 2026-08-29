@@ -247,7 +247,7 @@ const menuActions = computed(() => [
 			<Breadcrumbs :items="[{ label: 'Navigation', route: { name: 'Navigation' } }]" />
 			<div class="flex items-center gap-2">
 				<Dropdown :options="menuActions">
-					<Button icon-left="lucide-ellipsis" label="Actions" />
+					<Button icon-left="lucide-ellipsis" aria-label="Menu actions" />
 				</Dropdown>
 				<Button
 					variant="solid"
