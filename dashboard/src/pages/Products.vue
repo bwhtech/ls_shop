@@ -50,7 +50,7 @@ const rows = computed(() =>
 const columns = [
 	{ label: "Product", key: "title", width: 3 },
 	{ label: "Collection", key: "collection", width: 1.5 },
-	{ label: "Options", key: "variant_count", width: 0.7, align: "right" },
+	{ label: "Variants", key: "variant_count", width: 0.7, align: "right" },
 	{ label: "Price", key: "price", width: 1.2, align: "right" },
 	{ label: "Stock", key: "stock", width: 0.8, align: "right" },
 	{ label: "Status", key: "status", width: 1.3 },

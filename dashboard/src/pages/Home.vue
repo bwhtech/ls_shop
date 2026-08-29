@@ -210,7 +210,7 @@ function formatStat(stat: Overview["stats"][number]) {
 							</router-link>
 						</div>
 						<p v-else class="py-6 text-sm text-ink-gray-5">
-							Every option is ready to go live.
+							Every variant is ready to go live.
 						</p>
 					</section>
 				</div>

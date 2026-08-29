@@ -182,17 +182,17 @@ function saveDetails() {
 					class="mb-5"
 					theme="amber"
 					:dismissible="false"
-					:title="`${blockedOptions.length} option${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
+					:title="`${blockedOptions.length} variant${blockedOptions.length > 1 ? 's are' : ' is'} not ready to sell`"
 					:description="`${blockedOptions.join(', ')} still ${blockedOptions.length > 1 ? 'need' : 'needs'} a photo before ${blockedOptions.length > 1 ? 'they' : 'it'} can go live.`"
 				/>
 
 				<div class="flex items-baseline justify-between">
-					<h2 class="text-md text-ink-gray-9">Options</h2>
+					<h2 class="text-md text-ink-gray-9">Variants</h2>
 					<span class="text-sm text-ink-gray-5">{{ liveCount }} of {{ variants.length }} live</span>
 				</div>
 
 				<div class="mt-1 flex items-center gap-4 border-b border-outline-gray-1 pb-1.5">
-					<span class="flex-1 text-sm text-ink-gray-5">Option</span>
+					<span class="flex-1 text-sm text-ink-gray-5">Variant</span>
 					<span class="w-24 shrink-0 text-right text-sm text-ink-gray-5">Price</span>
 					<span class="w-20 shrink-0 text-right text-sm text-ink-gray-5">Stock</span>
 					<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">Live</span>
@@ -237,7 +237,7 @@ function saveDetails() {
 
 				<dl class="space-y-2.5 border-b border-outline-gray-1 px-4 py-4">
 					<div class="flex items-center justify-between">
-						<dt class="text-sm text-ink-gray-5">Options</dt>
+						<dt class="text-sm text-ink-gray-5">Variants</dt>
 						<dd class="text-base text-ink-gray-9">{{ variants.length }}</dd>
 					</div>
 					<div class="flex items-center justify-between">

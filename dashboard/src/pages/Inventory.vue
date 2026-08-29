@@ -85,7 +85,7 @@ const listOptions = computed(() => ({
 
 const columns = [
 	{ label: "Product", key: "product", width: 2.2 },
-	{ label: "Option", key: "option", width: 1.2 },
+	{ label: "Variant", key: "option", width: 1.2 },
 	{ label: "Size", key: "size", width: 0.7 },
 	{ label: "In stock", key: "stock", width: 0.8, align: "right" },
 	{ label: "Availability", key: "availability", width: 1.2 },
