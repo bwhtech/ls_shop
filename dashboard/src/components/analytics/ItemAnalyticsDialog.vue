@@ -7,9 +7,9 @@ import type { AnalyticsRangeParams, ItemAnalytics } from "@/types"
 import { errorMessage } from "@/utils/errors"
 import {
 	formatCount,
+	formatDate,
 	formatMoney,
 	formatPercent,
-	formatShortDate,
 } from "@/utils/format"
 import { Dialog, useCall } from "frappe-ui"
 import { ChartCard, LineChart, NumberCard } from "frappe-ui/charts"
@@ -43,7 +43,7 @@ const orderColumns: AnalyticsTableColumn<RecentOrderRow>[] = [
 	{
 		key: "date",
 		label: "Date",
-		format: (value) => formatShortDate(String(value)),
+		format: (value) => formatDate(value),
 	},
 	countColumn("qty", "Qty"),
 	moneyColumn("amount", "Amount", () => props.currency),
@@ -157,7 +157,7 @@ const sourceRows = computed<SourceRow[]>(() =>
 							:data="dailyRows"
 							x="day"
 							:y="['views', 'adds', 'units']"
-							:x-axis="{ format: formatShortDate }"
+							:x-axis="{ format: formatDate }"
 							:y-axis="{ format: formatCount }"
 							:series-config="{
 								views: { label: 'Views' },

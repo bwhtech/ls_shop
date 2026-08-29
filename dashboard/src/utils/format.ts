@@ -1,3 +1,4 @@
+import type { Dayjs } from "dayjs"
 import { dayjs } from "frappe-ui"
 
 import type {
@@ -162,40 +163,41 @@ function bootFormat(key: "date_format" | "time_format", fallback: string) {
 	)
 }
 
-/** Safari refuses the space-separated datetime the database returns, so it is made ISO first. */
-function parseMoment(value: string | null | undefined) {
-	if (!value) return null
-	const parsed = dayjs(String(value).replace(" ", "T"))
+/**
+ * Chart axis formatters are handed an epoch number, which must not be stringified — dayjs would read
+ * the digits as a calendar date. Strings get the space swapped for a T, which Safari insists on.
+ */
+function validMoment(parsed: Dayjs) {
 	return parsed.isValid() ? parsed : null
 }
+
+function parseMoment(value: DateInput) {
+	if (typeof value === "string")
+		return value ? validMoment(dayjs(value.replace(" ", "T"))) : null
+	if (typeof value === "number" || value instanceof Date)
+		return validMoment(dayjs(value))
+	return null
+}
+
+/** Column and axis formatters hand their value over as `unknown`, so the narrowing happens here. */
+type DateInput = unknown
 
 export const emptyValue = "—"
 
 /** Every date in the dashboard goes through here, so the site's date format is the only one on screen. */
-export function formatDate(value: string | null | undefined) {
+export function formatDate(value: DateInput) {
 	const parsed = parseMoment(value)
 	if (!parsed) return emptyValue
 	return parsed.format(bootFormat("date_format", "yyyy-mm-dd"))
 }
 
 /** A timestamp that has to carry the time of day, e.g. when a cart was last touched. */
-export function formatDateTime(value: string | null | undefined) {
+export function formatDateTime(value: DateInput) {
 	const parsed = parseMoment(value)
 	if (!parsed) return emptyValue
 	return parsed.format(
 		`${bootFormat("date_format", "yyyy-mm-dd")} ${bootFormat("time_format", "HH:mm:ss")}`,
 	)
-}
-
-/** Short, readable dates for the overview's compact rows - the full date is on the detail screen. */
-export function formatShortDate(value: string) {
-	const parsed = new Date(value)
-	if (Number.isNaN(parsed.getTime())) return value
-	return new Intl.DateTimeFormat(undefined, {
-		day: "numeric",
-		month: "short",
-		year: "numeric",
-	}).format(parsed)
 }
 
 /**

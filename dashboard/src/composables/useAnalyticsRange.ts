@@ -1,5 +1,5 @@
 import type { AnalyticsRangeParams } from "@/types"
-import { formatShortDate } from "@/utils/format"
+import { formatDate } from "@/utils/format"
 import { useCall } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 import { errorMessage } from "../utils/errors"
@@ -53,7 +53,7 @@ const rangeParams = computed<AnalyticsRangeParams>(() => ({
 const rangeCaption = computed(() =>
 	preset.value === "today"
 		? "Today"
-		: `${formatShortDate(fromDate.value)} – ${formatShortDate(toDate.value)}`,
+		: `${formatDate(fromDate.value)} – ${formatDate(toDate.value)}`,
 )
 
 export function useAnalyticsRange() {

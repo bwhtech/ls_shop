@@ -37,7 +37,7 @@ const columns: AnalyticsTableColumn<AbandonedCartRow>[] = [
 	{
 		key: "last_activity",
 		label: "Last activity",
-		format: (value) => formatDateTime(String(value)),
+		format: (value) => formatDateTime(value),
 	},
 	{ key: "status", label: "Status" },
 	{ key: "quotation", label: "" },

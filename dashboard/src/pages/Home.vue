@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
 import type { Overview } from "@/types"
-import { formatMoney, formatShortDate } from "@/utils/format"
+import { formatDate, formatMoney } from "@/utils/format"
 import {
 	Button,
 	PageHeader,
@@ -109,7 +109,7 @@ function formatStat(stat: Overview["stats"][number]) {
 							<ListRow :to="{ name: 'Order', params: { name: item.name } }">
 								<ListCell>
 									<span class="text-sm text-ink-gray-6">
-										{{ formatShortDate(item.placed_on) }}
+										{{ formatDate(item.placed_on) }}
 									</span>
 								</ListCell>
 								<ListCell>

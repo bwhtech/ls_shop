@@ -4,7 +4,7 @@ import {
 	useAnalyticsReport,
 } from "@/composables/useAnalyticsRange"
 import type { SalesTimeseries } from "@/types"
-import { formatCount, formatMoney, formatShortDate } from "@/utils/format"
+import { formatCount, formatDate, formatMoney } from "@/utils/format"
 import { ChartCard, LineChart } from "frappe-ui/charts"
 import { computed } from "vue"
 
@@ -40,7 +40,7 @@ const formatSales = (value: number) => formatMoney(value, props.currency, true)
 			:data="rows"
 			x="day"
 			:y="['sales', 'orders']"
-			:x-axis="{ format: formatShortDate }"
+			:x-axis="{ format: formatDate }"
 			:y-axis="{ title: 'Sales', format: formatSales }"
 			:y2-axis="{ title: 'Orders', format: formatCount }"
 			:series-config="{
