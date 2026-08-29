@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import ErrorState from "@/components/ErrorState.vue"
 import NameDialog from "@/components/NameDialog.vue"
 import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import NavInspector from "@/components/navigation/NavInspector.vue"
 import { useNavMenu } from "@/composables/useNavMenu"
 import type { MenuNode } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import { useStorage } from "@vueuse/core"
 import {
 	Badge,
@@ -22,6 +24,7 @@ import { computed, onMounted, ref } from "vue"
 
 const {
 	menu,
+	loadError,
 	selected,
 	selectedName,
 	findNode,
@@ -54,19 +57,12 @@ const itemGroupOptions = computed(() =>
 
 onMounted(load)
 
-/**
- * Tree takes no generic: the nodes it hands back through slots, `move` and `drag-end` are our own
- * objects typed as its opaque shape. The key is what it tracks them by, so the menu is asked for
- * that key rather than the node being asserted into ours.
- */
+/** Tree takes no generic, so its slot, move and drag-end nodes arrive as its opaque shape and are tracked by key. */
 function isMenuNode(node: TreeNode): node is MenuNode {
 	return findNode(String(node.name)) !== null
 }
 
-/**
- * Domain rule for a drop. Tree already rejects dropping onto itself or into its own descendant,
- * so this only has to answer the depth question the server would otherwise throw on.
- */
+/** Tree already rejects dropping onto itself or into its own descendant; only the depth question is left. */
 function canDrop({ node, target, position }: MoveContext) {
 	if (!isMenuNode(node)) return false
 	const targetDepth = depthOf(String(target.name))
@@ -75,12 +71,9 @@ function canDrop({ node, target, position }: MoveContext) {
 }
 
 async function onDragEnd(info: DropInfo | null) {
-	// Null means the drag was cancelled or never landed anywhere valid.
 	if (!info) return
 
 	const toParent = info.to === null ? "" : String(info.to)
-	// `move_node` reparents and positions in one call, so a reorder within one parent and a
-	// move across parents are the same request - `to` is simply unchanged in the first case.
 	const moved = await mutate(
 		"move_node",
 		{
@@ -90,7 +83,6 @@ async function onDragEnd(info: DropInfo | null) {
 		},
 		toParent,
 	)
-	// Tree has already drawn the drop, so a refusal is undone by reading the menu back.
 	if (!moved) await load()
 }
 
@@ -102,7 +94,6 @@ function addEntry(parent = "") {
 	entryDialogOpen.value = true
 }
 
-/** Resolves to whether the entry landed, so the dialog knows whether it may close. */
 async function saveEntry(displayName: string) {
 	const parent = entryDialogParent.value
 	const added = await mutate(
@@ -127,8 +118,6 @@ function countEntries(nodes: MenuNode[]): number {
 }
 
 function importGroups() {
-	// Import lands under whatever is selected, so an owner can pull a supplier's category
-	// tree into one section rather than always at the top level.
 	const parent = selectedName.value ?? ""
 	dialog.prompt({
 		title: "Build the menu from item groups",
@@ -273,6 +262,13 @@ const menuActions = computed(() => [
 		<div class="flex min-h-0 flex-1">
 			<div class="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
 				<LoadingText v-if="loading && !menu.length" />
+
+				<ErrorState
+					v-else-if="loadError"
+					title="Could not load your menu"
+					:message="errorMessage(loadError)"
+					@retry="load"
+				/>
 
 				<div v-else-if="!menu.length" class="px-3 py-16 text-center">
 					<p class="text-base text-ink-gray-6">No menu yet</p>

@@ -1,14 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""Renders the storefront header so the navigation editor can show the menu it is editing.
-
-The mirror of footer_editor_preview: same machinery from shop_themes.chrome_preview, pointed at the
-other end of the page. The menu itself is read live rather than passed in - unlike the footer's
-copy fields, a menu is edited through its own endpoints and is already saved by the time the pane
-reloads, so there is nothing unsaved to carry.
-"""
-
 import frappe
 from frappe.utils import escape_html
 

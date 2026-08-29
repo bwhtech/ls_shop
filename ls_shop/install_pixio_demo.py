@@ -1,18 +1,5 @@
-"""One-shot seeder for a Pixio storefront demo site.
-
-Wraps the three existing seeders — the prerequisite helpers in install_demo_data, the catalogue in
-install_fashion_demo_data and the homepage content in install_pixio_theme_data — and adds the bits a
-scripted site needs that none of them own: an INR-consistent money setup, the Pixio theme switched
-on, the reference site's footer columns, and the company account rows a COD checkout needs.
-
-install_demo_data's own car-part steps (create_demo_products, create_ecommerce_categories,
-create_ecommerce_group, create_brands) are deliberately NOT called — the fashion seeder replaces
-them. create_price_lists is skipped too because it hardcodes USD, which is the currency mismatch
-that blocks every Sales Invoice on a site whose company is not USD.
-
-Usage:
-    bench --site your-site-name execute ls_shop.install_pixio_demo.install_pixio_demo
-"""
+"""One-shot seeder for a Pixio storefront demo site. install_demo_data.create_price_lists is skipped:
+it hardcodes USD, which blocks every Sales Invoice on a site whose company is not USD."""
 
 import frappe
 
@@ -35,22 +22,15 @@ DEMO_SIZES = DEFAULT_SIZES
 SALE_PRICE_LIST = "Sale Price List"
 SHIPPING_RULE = "Standard Shipping"
 
-# Rupee-scale money. install_demo_data's own numbers (₹10 shipping below ₹50, ₹5 COD below ₹100)
-# read as dollars and make every demo cart free-shipped.
+# Rupee-scale money; install_demo_data's own numbers read as dollars and free-ship every demo cart.
 FREE_SHIPPING_ABOVE = 999
 FLAT_SHIPPING_CHARGE = 99
 COD_CHARGE = 49
 COD_CHARGE_APPLICABLE_BELOW = 999
 
-# The fashion catalogue is authored at dollar scale, so a ₹129 cardigan reads as placeholder
-# pricing on an India demo. Rates are recomputed from FASHION_PRODUCTS rather than scaled off
-# whatever is in the table, so a second run lands on the same number instead of compounding.
+# Rates are recomputed from FASHION_PRODUCTS, never scaled in place — a re-run would compound.
 RUPEE_MULTIPLIER = 50
 
-# Banners for the ORIGINAL (un-themed / Shop Default Theme) homepage, which reads Landing Page
-# Settings rather than Pixio Theme Settings. Seeding both means flipping Shop Theme Settings
-# .active_theme swaps the whole storefront look with the same catalogue underneath - which is the
-# point of having them side by side in a demo.
 DEFAULT_HOMEPAGE_IMAGES = "/assets/ls_shop/images/homepage/demo"
 DEFAULT_HERO_BANNERS = ("hero-1.webp", "hero-2.webp", "hero-3.webp", "hero-4.webp")
 DEFAULT_PROMO_TILES = ("tile-1.webp", "tile-2.webp", "tile-3.webp", "tile-4.webp")
@@ -58,7 +38,6 @@ DEFAULT_WIDE_BANNER = "wide-1.webp"
 
 STORE_COPY = {
 	"store_name": "Pixio",
-	# The reference site's own mark, so the header reads Pixio rather than the app's default LSShop.
 	"brand_logo": f"{IMAGE_ROOT}/logo.svg",
 	"footer_logo": f"{IMAGE_ROOT}/logo-white.svg",
 	"contact_phone": "+91 98765 43210",
@@ -70,8 +49,7 @@ STORE_COPY = {
 	"copyright_text": "Pixio. All Rights Reserved.",
 }
 
-# The reference footer's own column titles and links, in its own order. Every URL points at a route
-# this storefront actually serves — a demo footer that 404s is worse than one that is shorter.
+# Every URL must point at a route this storefront actually serves.
 FOOTER_SECTIONS = (
 	{
 		"section_title": "Our Stores",
@@ -138,22 +116,15 @@ def install_pixio_demo():
 
 
 def seed_storefront_analytics():
-	"""Give the analytics screen a store worth looking at.
-
-	Runs last on purpose: the events reference real item codes and the orders it writes are what the
-	KPI tiles count, so seeding before the catalogue exists would attribute traffic to items that are
-	not there yet. Idempotent like the rest of this file - a re-run replaces its own rows rather than
-	doubling them - and reversible via remove_analytics_demo_data.
-	"""
+	"""Give the analytics screen a store worth looking at."""
+	# Must run after the catalogue: the events and orders it writes reference real item codes.
 	install_analytics_demo_data()
 
 
 def configure_site_defaults():
-	"""The three site-level settings that silently break a paid checkout later.
-
-	A blank System Settings.language makes money_in_words call num2words(lang=None) and crash on
-	every Sales Invoice, and a Contact whose email_id is not an address is rejected by the gateways.
-	"""
+	"""The three site-level settings that silently break a paid checkout later."""
+	# A blank System Settings.language crashes money_in_words (num2words(lang=None)) on every invoice;
+	# a Contact whose email_id is not an address is rejected by the gateways.
 	frappe.db.set_single_value("System Settings", "language", "en")
 	frappe.db.set_single_value("System Settings", "country", "India")
 	frappe.db.set_default("currency", "INR")
@@ -184,13 +155,8 @@ def save_sale_price_list():
 
 
 def normalise_size_attribute():
-	"""ERPNext ships Size as Small/Medium/Large with the abbreviations S/M/L, so the demo's literal
-	S/M/L/XL values can neither be added (the abbreviations are taken) nor used (the values are not
-	there) — every variant insert dies on "Attribute Value S is not valid".
-
-	Rewriting the rows is only safe while nothing references them, which on a freshly seeded site is
-	always true; once variants exist the wanted values are already in place and this is a no-op.
-	"""
+	"""Replace ERPNext's Small/Medium/Large Size values with the demo's literal S/M/L/XL."""
+	# ERPNext ships Size as Small/Medium/Large abbreviated S/M/L, so a literal "S" fails as invalid.
 	attribute = frappe.get_doc("Item Attribute", "Size")
 	existing = {row.attribute_value for row in attribute.item_attribute_values}
 	if set(DEMO_SIZES).issubset(existing):
@@ -240,8 +206,7 @@ def apply_store_copy():
 	settings.cod_charge = COD_CHARGE
 	settings.cod_charge_applicable_below = COD_CHARGE_APPLICABLE_BELOW
 	settings.ecommerce_warehouse = ensure_warehouse_exists()
-	# Without this set_cod_charges throws "Please select a valid account for cod charges" and no COD
-	# cart under the threshold can be confirmed. It rides on the same account the shipping rule posts to.
+	# Without this, set_cod_charges throws "Please select a valid account for cod charges".
 	settings.charge_account_head = get_freight_account()
 
 	for fieldname, value in STORE_COPY.items():
@@ -272,8 +237,7 @@ def to_rupees(amount):
 
 
 def apply_rupee_hero_prices():
-	"""The hero slides carry the reference site's own dollar copy ("$80.00"), which sits beside a
-	rupee catalogue. Restated at the same scale the prices use."""
+	"""Restate the hero slides' dollar copy at the catalogue's rupee scale."""
 	settings = frappe.get_doc("Pixio Theme Settings")
 	for slide in settings.hero_slides:
 		amount = "".join(
@@ -287,11 +251,7 @@ def apply_rupee_hero_prices():
 
 
 def save_default_homepage():
-	"""Fill Landing Page Settings so the un-themed storefront is a real page, not an empty one.
-
-	The picks deliberately reuse whatever the catalogue already published rather than seeding a
-	second product set: the two themes are meant to differ in look, not in what is for sale.
-	"""
+	"""Fill Landing Page Settings so the un-themed storefront is a real page, not an empty one."""
 	settings = frappe.get_doc("Landing Page Settings")
 
 	settings.hero_banner = []
@@ -362,12 +322,8 @@ def save_footer_sections():
 
 
 def save_mode_of_payment_accounts():
-	"""A Mode of Payment with no company account row makes create_payment_entry throw
-	"Please set default Cash or Bank account in Mode of Payment" the moment an order is paid.
-
-	Every mode is covered, not just COD's: enabling a gateway creates its own Mode of Payment
-	(add_gateway_payment_mode), so the row a gateway needs would otherwise be missing again.
-	"""
+	"""Give every Mode of Payment a company account row."""
+	# Without one, create_payment_entry throws "Please set default Cash or Bank account in Mode of Payment".
 	company = get_company()
 	abbr = frappe.db.get_value("Company", company, "abbr")
 	accounts = {

@@ -1,6 +1,4 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Real-DB tests for the dashboard's integration screen (api/admin/integrations.py + api/admin/payments.py).
-# Razorpay is the gateway under test because the payment-hook suite already owns Stripe.
 
 import frappe
 from bwh_payments.bwh_payments.utils import get_available_payment_modes
@@ -29,9 +27,7 @@ def get_stored_password(fieldname):
 
 class TestAdminPaymentIntegrations(IntegrationTestCase):
 	def setUp(self):
-		# IntegrationTestCase only rolls back once per class, so without this a gateway one test
-		# enabled is still enabled in the next one. The Single's cached copy survives the rollback
-		# too, and would hand the next test credentials that no longer exist in the database.
+		# IntegrationTestCase rolls back once per class, and the Single's cached copy survives rollback.
 		self.addCleanup(frappe.clear_document_cache, SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
 		self.addCleanup(frappe.db.rollback)
 		frappe.clear_document_cache(SETTINGS_DOCTYPE, SETTINGS_DOCTYPE)
@@ -70,8 +66,7 @@ class TestAdminPaymentIntegrations(IntegrationTestCase):
 		save_payment_integration(SLUG, 0, {"key_secret": ""})
 		self.assertEqual(get_stored_password("key_secret"), KEY_SECRET)
 
-		# An explicit null is the only "clear this" the engine honours - and on a required field the
-		# doctype's own mandatory check then refuses it, so a live gateway cannot be left half-credentialled.
+		# An explicit null is the only "clear this" the engine honours; a required field then fails mandatory.
 		with self.assertRaises(frappe.MandatoryError):
 			save_payment_integration(SLUG, 0, {"key_secret": None})
 

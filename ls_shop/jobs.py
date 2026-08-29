@@ -173,7 +173,6 @@ def delete_notified_oos():
 
 
 def delete_old_draft_quotations():
-	# Delete draft quotations older than 6 hours
 	cutoff_time = add_to_date(now_datetime(), hours=-6)
 
 	old_drafts = frappe.get_all(
@@ -193,13 +192,7 @@ def delete_old_draft_quotations():
 
 
 def sync_pending_gateway_payments():
-	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order.
-
-	The confirmation page is what normally re-reads the gateway, and it never runs when the shopper
-	closes the tab, pays on a second device or comes back without a session. sync_status() writes the
-	authoritative status and the Gateway Payment Request on_update hook places the Sales Order from
-	there, so this sweep needs no order logic of its own.
-	"""
+	"""Settle checkouts the shopper's browser never confirmed, so captured money always reaches an order."""
 	# ponytail: a request older than the lookback is left to manual reconciliation - delete_old_draft_
 	# quotations already removes the draft cart it points at after 6 hours, so the order can no longer
 	# be placed from it. Widen both windows together, never this one alone.
@@ -208,8 +201,7 @@ def sync_pending_gateway_payments():
 		"Gateway Payment Request",
 		filters={
 			"status": "Pending",
-			# The upper bound skips requests too new to have settled: the shopper is most likely still
-			# on the gateway's own page, where the status reads Pending anyway.
+			# Upper bound skips requests too new to have settled - the shopper is likely still on the gateway.
 			"creation": ("between", [add_to_date(now, hours=-6), add_to_date(now, minutes=-10)]),
 		},
 		# Oldest money first: those are the requests closest to losing the draft cart they point at.
@@ -218,16 +210,13 @@ def sync_pending_gateway_payments():
 	)
 
 	for payment_request in pending_requests:
-		# Scoped to a savepoint rather than a bare rollback: sync_status() places the Sales Order
-		# through the on_update hook, so a failure half way through has accounting documents to undo,
-		# and a full rollback would also discard every order the sweep has already placed.
+		# Savepoint, not a bare rollback: a full rollback would discard every order the sweep already placed.
 		savepoint = f"sweep_{payment_request}"
 		try:
 			frappe.db.savepoint(savepoint)
 			frappe.get_doc("Gateway Payment Request", payment_request).sync_status()
 			frappe.db.commit()
 		except Exception:
-			# One unreachable gateway session must not cost the rest of the sweep their orders.
 			frappe.db.rollback(save_point=savepoint)
 			frappe.log_error(
 				title="Pending gateway payment sweep failed",

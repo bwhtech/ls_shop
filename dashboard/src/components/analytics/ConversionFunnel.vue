@@ -25,7 +25,6 @@ const { data, loading, error } = useAnalyticsReport<FunnelReport>(
 	() => ({ ...rangeParams.value, device: device.value }),
 )
 
-// Every stage is a share of the first one, so a funnel with no sessions has nothing to divide by.
 const stages = computed(() => {
 	const rows = data.value?.stages ?? []
 	return rows[0]?.count ? rows : []

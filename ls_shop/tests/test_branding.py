@@ -1,6 +1,4 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
-# Resolution order for the storefront's brand assets, the legacy-to-Website Settings patch,
-# and the admin API that now spans both doctypes. Real-DB, auto-rolled-back.
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -76,9 +74,7 @@ class TestBrandAssetResolution(IntegrationTestCase):
 		self.assertEqual(branding.get_brand_assets().footer_logo, "/files/website-logo.png")
 
 	def test_configured_assets_stay_empty_when_unset(self):
-		# get_configured_brand_assets() is what lets the OG image prefer a real share image over a
-		# 32px favicon - if it started answering with the bundled default, DEFAULT_OG_IMAGE would
-		# become unreachable and every page would ship a favicon-sized share image.
+		# If this answered with the bundled default, DEFAULT_OG_IMAGE would become unreachable.
 		set_brand_settings()
 
 		self.assertEqual(branding.get_configured_brand_assets()["favicon"], "")
@@ -103,7 +99,6 @@ class TestSyncBrandAssetsPatch(IntegrationTestCase):
 		website_settings = frappe.get_doc(branding.WEBSITE_SETTINGS)
 		self.assertEqual(website_settings.banner_image, "/files/legacy-logo.png")
 		self.assertEqual(website_settings.favicon, "/files/legacy-favicon.png")
-		# Nothing to copy from, so nothing invented.
 		self.assertFalse(website_settings.footer_logo)
 
 	def test_second_run_changes_nothing(self):
@@ -153,8 +148,7 @@ class TestStoreSettingsApi(IntegrationTestCase):
 		)
 
 	def test_a_blank_store_name_is_refused(self):
-		"""The storefront renders the literal "Store" in every title when this is empty, so an
-		accepted blank silently rebrands the live site."""
+		"""A blank store name silently rebrands the live site: the storefront then renders "Store"."""
 		frappe.db.set_single_value(branding.LEGACY_SETTINGS, "store_name", "Pixio")
 
 		for blank in ("", "   "):

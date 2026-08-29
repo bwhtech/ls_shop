@@ -1,14 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # See license.txt
 
-"""The storefront nav reads one data source, and the templates must not grow a second one.
-
-A theme engine lands next and its loader can override any path under `templates/`. If a template is
-allowed to query for nav data, a theme that replaces it silently disconnects the menu manager from
-the page it is supposed to drive — the storefront keeps rendering, just not what the shop owner
-built. `test_no_nav_template_queries_for_its_own_data` is the guard; it is a grep, deliberately, so
-it fails on the diff that introduces the query rather than on some later rendering symptom.
-"""
+"""The storefront nav reads one data source, and the templates must not grow a second one."""
 
 import re
 from pathlib import Path
@@ -83,8 +76,7 @@ class TestStorefrontNav(IntegrationTestCase):
 		)
 
 	def test_the_grep_would_actually_catch_a_query(self):
-		"""Guard against a regex that matches nothing — the check above is only worth its runtime if
-		it fires on the line it is meant to catch."""
+		"""Guard against a regex that matches nothing — the check above must fire on the line it targets."""
 		self.assertTrue(QUERY_CALL.search("{% set rows = frappe.get_all('Brand') %}"))
 		self.assertTrue(QUERY_CALL.search("{% set rows = frappe.db.get_all('Ecommerce Category') %}"))
 		self.assertIsNone(QUERY_CALL.search("{{ nav_menu(header_data.navigation_menu) }}"))
@@ -96,8 +88,7 @@ class TestStorefrontNav(IntegrationTestCase):
 
 		self.assertIn(tab, [node["name"] for node in header_data.navigation_menu])
 		self.assertEqual(len(header_data.navigation_categories), len(header_data.navigation_menu))
-		# The header, the drawer and the sidebar each read the menu once per render, so the second
-		# read must be the same object rather than two more queries.
+		# Header, drawer and sidebar each read the menu, so the second read must be cached, not requeried.
 		self.assertIs(get_storefront_menu(), header_data.navigation_menu)
 
 	def test_a_hidden_tab_never_reaches_the_storefront_menu(self):
@@ -149,8 +140,7 @@ class TestStorefrontNav(IntegrationTestCase):
 		self.assertEqual(one_tab[tab], all_tabs[f"{PREFIX} Men {self.tag}"])
 
 	def test_a_heading_with_no_item_group_never_becomes_a_facet(self):
-		"""A Brand or URL entry links no item group, so a facet for it would filter on the empty
-		string — a checkbox that can be ticked and matches nothing."""
+		"""A Brand or URL entry links no item group, so its facet would filter on the empty string."""
 		tab = navbar_manager.create_node("", f"{PREFIX} Mixed {self.tag}").name
 		navbar_manager.create_node(tab, f"{PREFIX} Just A Heading")
 		navbar_manager.create_node(tab, f"{PREFIX} Off Site", "URL", "https://example.com")

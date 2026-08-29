@@ -50,10 +50,6 @@ export function integrationErrorMessage(error: Error | null | undefined) {
 	return errorMessage(error, "Could not save this integration")
 }
 
-/**
- * Load/save cycle for one family of integrations (payment gateways, shipping providers, …).
- * Everything provider-specific lives behind the two urls, so a second screen is a second pair.
- */
 export function useIntegrations(urls: { listUrl: string; saveUrl: string }) {
 	const list = useCall<Integration[]>({ url: urls.listUrl })
 

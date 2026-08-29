@@ -1,7 +1,5 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Tests for the fulfilment ladder behind every order badge in the store-admin dashboard
-# (api/admin/orders.py). The ladder is pure, so it is exercised without touching the database;
-# the batched reader that feeds it is covered against real documents.
+# Tests for the fulfilment ladder behind every order badge (api/admin/orders.py).
 
 import frappe
 from frappe.tests import IntegrationTestCase, UnitTestCase
@@ -38,8 +36,7 @@ def to_fulfil_names() -> list:
 
 
 def get_company_account(exclude=None):
-	"""Any real expense account of the test company: these tests care where a charge row points,
-	never at which account it is."""
+	"""Any real expense account of the test company - these tests care where a charge points, not which."""
 	return frappe.db.get_value(
 		"Account",
 		{"company": COMPANY, "is_group": 0, "root_type": "Expense", "name": ["!=", exclude or ""]},
@@ -61,12 +58,7 @@ def make_shipping_rule(shipping_amount):
 
 
 def make_test_sales_order(order_type="Sales", submit=True, shipping_rule=None, cod_charge=0):
-	"""A submitted order for a non-stock item: enough to be fulfilled and returned, with nothing of
-	the stock ledger in the way of what these tests are about.
-
-	`order_type` and `submit` are what the revenue definition turns on, and `shipping_rule` and
-	`cod_charge` are the two charge rows the order screen has to name, so the money tests raise their
-	orders through the same fixture rather than a second one that could drift from it."""
+	"""A submitted order for a non-stock item: enough to fulfil and return, no stock ledger in the way."""
 	ensure_fiscal_year()
 	item_code = f"ZZ-LADDER-{frappe.generate_hash(length=8)}"
 	frappe.get_doc(
@@ -107,14 +99,12 @@ def make_test_sales_order(order_type="Sales", submit=True, shipping_rule=None, c
 	sales_order.flags.ignore_permissions = True
 	sales_order.insert()
 	if shipping_rule:
-		# ERPNext appends the rule's charge row only when the method is run against a costed
-		# document, which is why the storefront calls it the same way after saving the cart.
+		# ERPNext appends the rule's charge row only when run against a costed document.
 		sales_order.run_method("apply_shipping_rule")
 		sales_order.save()
 	if cod_charge:
-		# On its own account, unlike the live store: ERPNext re-applies the shipping rule on every
-		# save and overwrites the last row that matches the rule's account and cost centre, so a COD
-		# row sharing them would come back holding the shipping amount instead of its own.
+		# ERPNext re-applies the shipping rule on every save and overwrites the last row matching its
+		# account and cost centre, so a COD row sharing them comes back holding the shipping amount.
 		account = get_company_account(
 			exclude=frappe.db.get_value("Shipping Rule", shipping_rule, "account") if shipping_rule else None
 		)
@@ -150,10 +140,8 @@ def ensure_fiscal_year():
 
 
 def return_against_order(sales_order):
-	"""Ship the order and take it straight back, which is what resets per_delivered while ERPNext's
-	own status on the order stays open."""
-	# ERPNext moved its transaction mappers into a sibling `mapper` module; both layouts are in the
-	# wild across the versions this app runs against, exactly as api/admin/orders.py resolves them.
+	"""Ship the order and take it straight back - resets per_delivered while ERPNext's status stays open."""
+	# ERPNext moved its transaction mappers to a sibling `mapper` module; both layouts are in the wild.
 	try:
 		from erpnext.stock.doctype.delivery_note.mapper import make_sales_return
 	except ImportError:
@@ -220,8 +208,7 @@ class TestFulfilmentLadder(UnitTestCase):
 
 
 class TestFulfilmentSteps(UnitTestCase):
-	"""The stepper draws a *sequence*, which the ladder is not - it is a priority ordering. These pin
-	the translation between the two, and above all that a path which ended reads as ended."""
+	"""The stepper draws a sequence; the ladder is a priority ordering. These pin the translation."""
 
 	def keys(self, order, lifecycle=None):
 		return [step["key"] for step in describe_progress(order, lifecycle)]
@@ -321,8 +308,7 @@ class TestFulfilmentSteps(UnitTestCase):
 
 
 class TestAddressLines(UnitTestCase):
-	"""ERPNext hands over address_display as HTML; the dashboard renders text, so the <br> tags
-	used to appear literally on the order screen."""
+	"""ERPNext hands over address_display as HTML, so <br> tags used to appear literally on the screen."""
 
 	def test_break_tags_become_newlines(self):
 		self.assertEqual(
@@ -367,8 +353,7 @@ class TestOrderLifecycleReader(IntegrationTestCase):
 		if len(orders) < 2:
 			self.skipTest("needs at least two Sales Orders on this site")
 
-		# Warm the doctype meta first: the very first read of a doctype in a process pays for its
-		# schema, which would otherwise be counted against whichever page happened to run first.
+		# Warm the doctype meta first: the first read of a doctype in a process pays for its schema.
 		read_order_lifecycles(orders)
 
 		one_order_queries = count_queries(orders[:1])
@@ -413,11 +398,7 @@ class TestFulfilButton(UnitTestCase):
 
 
 class TestToFulfilAgreement(IntegrationTestCase):
-	"""The badge, the tab, the Home figure and the fulfil button all have to tell the same story.
-
-	Driven against real documents: a return is what pulls an order onto a settled rung while ERPNext's
-	own status stays open, which is exactly the contradiction the tab used to show.
-	"""
+	"""The badge, the tab, the Home figure and the fulfil button all have to tell the same story."""
 
 	def setUp(self):
 		self.sales_order = make_test_sales_order()
@@ -491,13 +472,8 @@ class TestToFulfilAgreement(IntegrationTestCase):
 
 
 class TestRevenueDefinition(IntegrationTestCase):
-	"""Home's Revenue tile and the Analytics screen's Total sales answer the same question, so they
-	read one definition: a storefront order that has not been cancelled.
-
-	Cash on delivery places its order as a draft, which is why drafts have to count; an order keyed
-	in by hand in Desk has no session behind it, which is why Analytics cannot attribute it and
-	neither screen counts it.
-	"""
+	"""Home's Revenue tile and Analytics' Total sales read one definition: a storefront order not
+	cancelled. Drafts count because cash on delivery places its order as a draft."""
 
 	def get_home_stat(self, key):
 		return next(stat for stat in get_overview()["stats"] if stat["key"] == key)["value"]

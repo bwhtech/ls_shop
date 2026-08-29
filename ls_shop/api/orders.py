@@ -8,14 +8,10 @@ from ls_shop.utils import validate_document_access
 
 @frappe.whitelist()
 def cancel_order(order_id: str):
-	# check if can cancel
 	order_doc = frappe.get_doc("Sales Order", order_id)
 	validate_can_cancel(order_doc)
 	if order_doc.custom_ecommerce_payment_mode != "COD":
-		# validate_can_cancel has already established the caller owns this order, so the refund goes
-		# through the internal helper rather than the staff-facing endpoint. The helper still clamps:
-		# a staff partial refund followed by this cancellation would otherwise pay the original amount
-		# out a second time.
+		# The helper still clamps: a staff partial refund then this cancellation would pay out twice.
 		make_refund_payment_entry(order_id)
 
 	order_doc.flags.ignore_permissions = True
@@ -23,17 +19,13 @@ def cancel_order(order_id: str):
 		order_doc.cancel()
 	elif order_doc.docstatus == 0:
 		order_doc.submit()
-		order_doc.reload()  # Ensure the document state is updated
+		order_doc.reload()
 		order_doc.cancel()
 
 
 def resolve_refund_amount(refundable_amount: float, amount: float | None) -> float:
-	"""Clamp a requested refund to what the order still owes back.
-
-	`amount` arrives from a form post, so a non-numeric value coerces to 0 rather than raising. `or`
-	would read that 0 as "unspecified" and pay out the maximum, which is why None is the only thing
-	that means "refund the balance".
-	"""
+	"""Clamp a requested refund to what the order still owes back. Only `None` means "the balance":
+	a non-numeric post coerces to 0, and `or` would read that as unspecified and pay out the max."""
 	precision = frappe.get_precision("Payment Entry", "paid_amount")
 	refundable_amount = flt(refundable_amount, precision)
 	refund_amount = refundable_amount if amount is None else flt(amount, precision)
@@ -45,13 +37,8 @@ def resolve_refund_amount(refundable_amount: float, amount: float | None) -> flo
 
 
 def make_refund_payment_entry(order_id: str, amount: float | None = None) -> str:
-	"""Submit the Payment Entry that reverses a paid order. Callers must authorize access first.
-
-	The clamp lives here, not in the whitelisted wrapper, because cancel_order refunds on the
-	customer's behalf — a limit enforced at one of two entry points is not a limit.
-	"""
-	# get_refund_status reads what has already been paid back, so without the row lock two concurrent
-	# refunds both see the pre-refund balance and both pay out in full.
+	"""Submit the Payment Entry that reverses a paid order. Callers must authorize access first."""
+	# Without this lock two concurrent refunds both see the pre-refund balance and both pay out.
 	frappe.get_doc("Sales Order", order_id).lock()
 
 	refund_status = get_refund_status(order_id)
@@ -64,8 +51,7 @@ def make_refund_payment_entry(order_id: str, amount: float | None = None) -> str
 		"Payment Entry Reference",
 		filters={"reference_doctype": "Sales Order", "reference_name": order_id},
 		fields=["parent"],
-		# Ordered so a second gateway attempt or a partial payment cannot change which entry the
-		# refund is modelled on.
+		# Ordered so a second gateway attempt cannot change which entry the refund is modelled on.
 		order_by="creation asc",
 		limit=1,
 	)
@@ -85,11 +71,9 @@ def make_refund_payment_entry(order_id: str, amount: float | None = None) -> str
 				"party": payment_entry_doc.party,
 				"company": payment_entry_doc.company,
 				"paid_from": payment_entry_doc.paid_to,
-				"paid_to": payment_entry_doc.paid_from,  # Make sure refund flows back
+				"paid_to": payment_entry_doc.paid_from,
 				"paid_amount": refund_amount,
-				# received_amount is deliberately not set: PaymentEntry.set_received_amount derives it,
-				# and hardcoding it asserts a 1:1 rate that is wrong the moment the party account is in
-				# another currency.
+				# received_amount unset: set_received_amount derives it; hardcoding asserts a wrong 1:1 rate.
 				"reference_no": payment_entry_doc.reference_no,
 				"reference_date": frappe.utils.nowdate(),
 				"remarks": f"Refund for Sales Order {order_id}",
@@ -104,8 +88,7 @@ def make_refund_payment_entry(order_id: str, amount: float | None = None) -> str
 @frappe.whitelist()
 def create_refund_payment_entry(order_id: str, amount: float | None = None) -> str:
 	"""Refund an order from the Sales Order form. Staff only."""
-	# The Desk dialog bounds the amount before it calls, but that check lives in the browser — a direct
-	# POST would otherwise name any figure. make_refund_payment_entry clamps it for real.
+	# The Desk dialog's bound is browser-side only; make_refund_payment_entry clamps for real.
 	frappe.has_permission("Sales Order", ptype="write", doc=order_id, throw=True)
 
 	return make_refund_payment_entry(order_id, amount)
@@ -115,11 +98,9 @@ def validate_can_cancel(order_doc):
 	if order_doc.docstatus > 1:
 		frappe.throw(_("Order already cancelled!"))
 
-	# If already shipped, can't
 	if order_doc.status == "To Bill":
 		frappe.throw(_("Order already shipped!"))
 
-	# If already completed, can't
 	if order_doc.status == "Completed":
 		frappe.throw(_("Order already delivered!"))
 
@@ -148,8 +129,7 @@ def get_refund_status(order_id: str) -> dict:
 		filters={
 			"payment_type": "Pay",
 			"reference_no": payment_entry_doc.reference_no,
-			# Gateways reuse reference numbers across parties, so an unscoped match pulls in someone
-			# else's refund and silently blocks a legitimate one.
+			# Gateways reuse reference numbers across parties; an unscoped match pulls in another's refund.
 			"party_type": payment_entry_doc.party_type,
 			"party": payment_entry_doc.party,
 			"company": payment_entry_doc.company,
@@ -165,7 +145,6 @@ def get_refund_status(order_id: str) -> dict:
 			"can_refund": False,
 		}
 
-	# Determine refundable balance
 	only_charges = total_refunded >= order.net_total
 	refundable_amount = order.rounded_total - total_refunded
 

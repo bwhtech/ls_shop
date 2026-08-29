@@ -1,13 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # See license.txt
 
-"""A menu entry links any number of item groups.
-
-The entry is the shop owner's own grouping — "Sale" holds Shirts and Denim — so the link is a list
-everywhere it is read: the editor counts it, the storefront filters the listing on all of it, and
-the sidebar facet ticks only when every group is selected. It is always a list, never null, because
-the editor reads its length before anything else.
-"""
+"""A menu entry links any number of item groups, always as a list and never null."""
 
 from urllib.parse import unquote
 

@@ -22,13 +22,11 @@ const columns: AnalyticsTableColumn<ProviderRow>[] = [
 	{ key: "status", label: "Status" },
 ]
 
-// No params: the endpoint reports a fixed 30-day health window of its own.
 const { data, loading, error } = useAnalyticsReport<TrackingHealth>(
 	"get_tracking_health",
 	() => ({}),
 )
 
-/** Off is a choice and Error is a fault - a store owner has to be able to tell them apart. */
 function providerRow(
 	label: string,
 	provider: ProviderHealth | undefined,
@@ -62,7 +60,6 @@ const rows = computed<ProviderRow[]>(() => {
 	]
 })
 
-// Off and Error both end at the same place - the credentials screen.
 const needsAttention = computed(() => {
 	const health = data.value
 	if (!health) return false

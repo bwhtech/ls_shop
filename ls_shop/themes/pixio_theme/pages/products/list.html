@@ -1,7 +1,6 @@
 {% extends "components/theme_layout.html" %}
 {% from "components/macros/product_card.html" import variant_card %}
 
-{# Reference: reference_themes/pixio/shop-sidebar.html 1017-2124. #}
 
 {% block head %}
 	{{ super() }}
@@ -9,8 +8,6 @@
 {% endblock %}
 
 {% block uncontained_body %}
-{# .dz-bnr-inr's 250px box and 90px inner padding are what clears the transparent header on
-   every inner page of the reference, so the banner is this page's top offset. #}
 <div class="dz-bnr-inr bg-secondary">
 	<div class="container">
 		<div class="dz-bnr-inr-entry">
@@ -32,8 +29,6 @@
 		<div class="row">
 			<div class="col-xl-3 col-lg-12">
 				<div class="sticky-xl-top">
-					{# Below 1199px .shop-filter is an off-canvas panel and this is its backdrop;
-					   the vendor JS that used to stamp .active on both is not loaded. #}
 					<a href="javascript:void(0);" class="panel-close-btn" :class="{ 'active': panel_open }"
 						@click="panel_open = false" aria-label="{{ _('Close filters') }}">
 						<svg width="35" height="35" viewBox="0 0 51 50" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -50,8 +45,7 @@
 				{% if products %}
 				<ul class="row gx-xl-4 g-3 mb-xl-0 mb-md-0 mb-3">
 					{% for product in products %}
-					{# .card-container is what pixio.css sizes the card media off, so the row cannot
-					   staircase on merchant photography of mixed aspect ratios. #}
+					{# .card-container is what pixio.css sizes the card media off, so the row cannot staircase on mixed aspect ratios. #}
 					<li class="card-container col-6 col-sm-6 col-md-4"
 						:class="view === 'grid' ? 'col-xl-4 col-lg-4' : 'col-xl-6 col-lg-6'">
 						{{ variant_card(product, wow_delay="%.1fs" | format(0.1 * (loop.index0 % 6))) }}
@@ -100,9 +94,6 @@
 	{{ super() }}
 	<script>
 		document.addEventListener('alpine:init', () => {
-			// Every control writes to the QuerySync state the base bootstraps and then reloads:
-			// the listing is rendered server-side, so the URL is the single source of truth for
-			// what is on screen and a filtered view stays shareable.
 			Alpine.data('shop_listing', () => ({
 				query_state: window.query_state,
 				panel_open: false,
@@ -116,8 +107,6 @@
 					return Math.max(1, Math.ceil(this.total_count / this.page_length));
 				},
 
-				// A five-page window, not every page: a 3000-product catalogue would otherwise
-				// wrap a hundred page links across the toolbar.
 				get pages_to_show() {
 					const start = Math.max(1, Math.min(this.current_page - 2, this.total_pages - 4));
 					const length = Math.min(5, this.total_pages);
@@ -128,9 +117,7 @@
 					return this.query_state[key] ? this.query_state[key].split(',') : [];
 				},
 
-				// A category facet may link several item groups, so `value` is either one option
-				// or the list a facet filters on: it counts as selected only when every one of
-				// its groups is, and toggling it moves them together.
+// `value` is either one option or the list of item groups a facet filters on, so it ticks only when every one is selected.
 				is_selected(key, value) {
 					const values = [].concat(value).map(String);
 					const selected = this.get_selected(key);
@@ -148,7 +135,7 @@
 
 				set_filter(key, value) {
 					this.query_state[key] = value;
-					// A narrower result set has fewer pages, so page 7 of the old one is a blank grid.
+// A narrower result set has fewer pages, so page 7 of the old one is a blank grid.
 					this.query_state.page = 1;
 					window.location.reload();
 				},

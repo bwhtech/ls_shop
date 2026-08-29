@@ -1,15 +1,4 @@
-{# Reference: reference_themes/pixio/index.html 2390-2484.
 
-   Four cards, not a rail: .shop-card.style-3 floats its copy over the photo and the reference
-   band is a fixed 2x2 beside the promo panel, so the set is capped at four rather than scrolled.
-
-   The starburst keeps the reference's slot - the second card - but only appears when that card
-   is genuinely discounted, and it prints its own percentage instead of the reference's hardcoded
-   50%. #}
-
-{# .shop-card.style-3 needs the sale-title / struck-through-price content block that
-   macros/product_card.html only emits for style-2 and style-4, so the card is built here.
-   It belongs in that macro as a shared branch - see the handoff note. #}
 {% macro shortlist_card(variant, wow_delay, show_sale_badge=False) %}
 {% set product_url = "/" ~ (frappe.lang or "en") ~ "/products/" ~ variant.route %}
 {% set product_name = variant.item_name if frappe.lang == "en" else (variant.custom_item_name_ar or variant.item_name) %}

@@ -22,7 +22,6 @@ const { data, loading, error } =
 
 const cells = computed(() => {
 	const heatmap = data.value
-	// A grid of 168 zeroes colours as one flat block; it is an empty chart, not a cold week.
 	if (!heatmap?.max) return []
 	return heatmap.matrix.flatMap((row, weekday) =>
 		row.map((orders, hour) => ({

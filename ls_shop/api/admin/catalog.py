@@ -16,10 +16,7 @@ PAGE_LENGTH = 20
 def get_products(search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH):
 	"""One call, one complete Products screen.
 
-	A store owner asking "what is the state of this product?" would otherwise open Item,
-	Style Attribute Configurator, Item Price and each variant's publish flag in turn. Every
-	lookup below is batched across the whole page so adding a column never costs a query
-	per row.
+	Every lookup is batched across the page, so adding a column never costs a query per row.
 	"""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
@@ -77,8 +74,7 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 	rates_by_item_code = get_default_rates(item_codes)
 	stock_by_item_code = get_ecommerce_stock(item_codes)
 
-	# A product created from the dashboard never sets Item.image - the picture lives on the
-	# option - so fall back to the first option image rather than showing a blank row.
+	# A dashboard-created product never sets Item.image, so fall back to the first option image.
 	first_image_by_variant = {}
 	if variant_names:
 		for row in frappe.get_all(
@@ -258,8 +254,6 @@ def get_product(item_template: str):
 				"storefront_url": get_url(f"/products/{row.route}") if row.route else None,
 				"sizes": sizes_by_variant.get(row.name, []),
 				"images": images_by_variant.get(row.name, []),
-				# The storefront refuses to publish without both, so say so before the owner
-				# clicks Publish rather than as an error afterwards.
 				"blockers": get_publish_blockers(
 					images_by_variant.get(row.name, []), sizes_by_variant.get(row.name, [])
 				),
@@ -292,40 +286,43 @@ def get_collections(search_text: str | None = None):
 	return frappe.get_all("Item Group", filters=filters, order_by="name", pluck="name", limit=100)
 
 
+@frappe.whitelist()
+def get_attribute_values(attribute: str):
+	"""The colours and sizes this store already uses, so the create form suggests instead of retypes."""
+	frappe.has_permission("Item Attribute", doc=attribute, ptype="read", throw=True)
+
+	return frappe.get_all(
+		"Item Attribute Value",
+		filters={"parent": attribute, "parenttype": "Item Attribute"},
+		order_by="idx asc",
+		pluck="attribute_value",
+	)
+
+
 @frappe.whitelist(methods=["POST"])
 def create_product(
 	title: str,
 	collection: str,
 	option_attribute: str,
-	options: list | str,
 	size_attribute: str,
-	sizes: list | str,
+	option_sizes: list | str,
 	price=None,
 	sale_price=None,
 ):
-	"""Create a sellable product from what a store owner actually knows.
-
-	Company, warehouse, price list, UOM and naming series come from Lifestyle Settings and are
-	never asked for - a shop owner coming from Shopify has no reason to know them.
-	"""
+	"""Create a sellable product. Company, warehouse, price list, UOM and naming series
+	come from Lifestyle Settings."""
 	frappe.has_permission("Item", ptype="create", throw=True)
 
 	title = cstr(title).strip()
 	if not title:
 		frappe.throw(_("Enter a product title"))
 
-	options = [cstr(value).strip() for value in frappe.parse_json(options) if cstr(value).strip()]
-	sizes = [cstr(value).strip() for value in frappe.parse_json(sizes) if cstr(value).strip()]
-	if not options:
-		frappe.throw(_("Add at least one option, for example a colour"))
-	if not sizes:
-		frappe.throw(_("Add at least one size"))
+	option_sizes = parse_option_sizes(option_sizes)
 
 	if not frappe.db.exists("Item Group", collection):
 		frappe.throw(_("Collection {0} does not exist. Create it first.").format(collection))
 
-	options = add_missing_attribute_values(option_attribute, options)
-	sizes = add_missing_attribute_values(size_attribute, sizes)
+	option_sizes = resolve_option_sizes(option_attribute, size_attribute, option_sizes)
 
 	item_template = frappe.new_doc("Item")
 	item_template.item_code = title
@@ -339,7 +336,7 @@ def create_product(
 	item_template.append("attributes", {"attribute": size_attribute})
 	item_template.insert()
 
-	for option in options:
+	for option, sizes in option_sizes:
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
 			size_item.insert()
@@ -348,8 +345,7 @@ def create_product(
 	configurator.item_template = item_template.name
 	configurator.item_attribute = option_attribute
 	configurator.insert()
-	# after_insert only generates variants when the setting says so; a product created here is
-	# useless without them, so make sure they exist either way.
+	# after_insert only generates variants when the setting says so, and a product here needs them.
 	if not frappe.db.exists("Style Attribute Variant", {"configurator": configurator.name}):
 		configurator.generate_variants()
 
@@ -359,12 +355,62 @@ def create_product(
 	return {"name": item_template.name}
 
 
+def parse_option_sizes(option_sizes: list | str):
+	"""ERPNext compares attribute values case-insensitively, so two spellings of one colour
+	are merged here or the second create_variant collides."""
+	rows = frappe.parse_json(option_sizes) or []
+	if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+		frappe.throw(_("Colours and sizes could not be read"))
+
+	merged = {}
+	for row in rows:
+		option = cstr(row.get("option")).strip()
+		if not option:
+			continue
+
+		sizes = merged.setdefault(option.casefold(), (option, []))[1]
+		taken = {size.casefold() for size in sizes}
+		for value in row.get("sizes") or []:
+			size = cstr(value).strip()
+			if size and size.casefold() not in taken:
+				sizes.append(size)
+				taken.add(size.casefold())
+
+	if not merged:
+		frappe.throw(_("Add at least one option, for example a colour"))
+
+	for option, sizes in merged.values():
+		if not sizes:
+			frappe.throw(_("Pick at least one size for {0}").format(option))
+
+	return list(merged.values())
+
+
+def resolve_option_sizes(option_attribute: str, size_attribute: str, option_sizes: list):
+	"""Swap what the owner typed for the spelling the Item Attribute already holds."""
+	typed_options = [option for option, _sizes in option_sizes]
+	typed_sizes = []
+	taken = set()
+	for _option, sizes in option_sizes:
+		for size in sizes:
+			if size.casefold() not in taken:
+				typed_sizes.append(size)
+				taken.add(size.casefold())
+
+	canonical_options = add_missing_attribute_values(option_attribute, typed_options)
+	canonical_sizes = add_missing_attribute_values(size_attribute, typed_sizes)
+	size_by_typed = dict(zip(typed_sizes, canonical_sizes, strict=True))
+
+	return [
+		(canonical_options[index], [size_by_typed[size] for size in sizes])
+		for index, (_option, sizes) in enumerate(option_sizes)
+	]
+
+
 def add_missing_attribute_values(attribute: str, values: list):
 	"""Let the owner type a new colour without visiting the Item Attribute form.
 
-	Returns the values in the attribute's own spelling. ERPNext compares attribute values
-	case-insensitively, so treating "red" as new when "Red" exists appends a duplicate and the
-	save is rejected - the owner typed a colour that already exists and got a validation error.
+	ERPNext compares attribute values case-insensitively, so "red" beside "Red" appends a duplicate.
 	"""
 	attribute_doc = frappe.get_doc("Item Attribute", attribute)
 	canonical_by_key = {
@@ -415,8 +461,7 @@ def update_product(item_template: str, title=None, collection=None, description=
 
 	item = frappe.get_doc("Item", item_template)
 	if title is not None:
-		# Item.validate quietly backfills a blank item_name from the item_code, so without this the
-		# save reports success while the title the owner cleared stays exactly as it was.
+		# Item.validate backfills a blank item_name from item_code, so a cleared title silently survives.
 		title = cstr(title).strip()
 		if not title:
 			frappe.throw(_("Title is required."))
@@ -438,8 +483,7 @@ def update_product(item_template: str, title=None, collection=None, description=
 def set_variant_published(style_attribute_variant: str, publish):
 	"""Publish or unpublish one option.
 
-	The variant controller refuses to publish without images and sizes; surface that as a
-	message the owner can act on instead of a bare validation failure.
+	The variant controller refuses to publish without images and sizes.
 	"""
 	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
 	variant.check_permission("write")
@@ -458,11 +502,7 @@ def set_variant_published(style_attribute_variant: str, publish):
 
 @frappe.whitelist(methods=["POST"])
 def add_product_images(style_attribute_variant: str, file_urls: list | str):
-	"""Attach already-uploaded files to an option, then report what still blocks publishing.
-
-	The dashboard's whole point is that the owner never has to guess why a product is not live,
-	so every write that can change publishability hands the blockers straight back.
-	"""
+	"""Attach already-uploaded files to an option, then report what still blocks publishing."""
 	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
 	variant.add_images(file_urls)
 	variant.reload()
@@ -507,8 +547,7 @@ def receive_product_stock(
 def set_product_published(item_template: str, publish):
 	"""Publish or unpublish every option of a product in one go.
 
-	Options that are not ready are skipped rather than failing the whole request, and come back
-	named so the owner can see which ones still need work.
+	Options that are not ready are skipped rather than failing the whole request, and come back named.
 	"""
 	frappe.has_permission("Item", doc=item_template, ptype="write", throw=True)
 
@@ -526,8 +565,7 @@ def set_product_published(item_template: str, publish):
 	)
 	variant_names = [row.name for row in variants]
 
-	# Work out readiness for the whole set in two queries; loading each variant just to count
-	# its images and sizes would be a read per row.
+	# Two queries for the whole set; loading each variant to count images and sizes is a read per row.
 	ready = get_ready_variant_names(variant_names) if publish else set(variant_names)
 
 	updated = []
@@ -573,12 +611,7 @@ def get_ready_variant_names(variant_names):
 
 
 def get_unpublishable_options(limit: int = 5):
-	"""Options that cannot go live yet, with the reason, across the whole catalogue.
-
-	The per-product screen already answers this one product at a time; the overview needs it
-	across every product, so the same blocker rule is applied here over batched reads rather
-	than opening each product in turn.
-	"""
+	"""Options that cannot go live yet, with the reason, across the whole catalogue."""
 	variants = frappe.get_all(
 		"Style Attribute Variant",
 		filters={"is_published": 0},
@@ -625,8 +658,7 @@ def get_unpublishable_options(limit: int = 5):
 
 	blocked = []
 	for row in variants:
-		# The blocker rule reads presence, not content, so membership sets stand in for the
-		# image/size lists get_publish_blockers() would otherwise be handed.
+		# The blocker rule reads presence, not content, so membership sets stand in for the lists.
 		blockers = get_publish_blockers(
 			[1] if row.name in imaged_variants else [], [1] if row.name in sized_variants else []
 		)
@@ -635,8 +667,7 @@ def get_unpublishable_options(limit: int = 5):
 
 		template = templates_by_configurator.get(row.configurator)
 		if not template:
-			# An option whose configurator or template is gone has no product screen to send
-			# the owner to, so listing it would be a dead end.
+			# An option whose configurator or template is gone has no product screen to link to.
 			continue
 
 		blocked.append(

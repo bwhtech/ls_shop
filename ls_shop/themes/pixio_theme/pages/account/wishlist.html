@@ -1,11 +1,3 @@
-{# Reference: reference_themes/pixio/shop-wishlist.html 1009-1081, moved inside the account shell so
-   the page matches its five siblings instead of the reference's standalone centred column.
-
-   The reference's Stock column is dropped: the wishlist is a client-side store of the card fields
-   captured when the shopper hearted the product, and stock is never one of them.
-
-   Add To Cart is a link to the product page rather than a cart write - the cart store keys a line
-   on a chosen size variant and a wishlist row carries none. #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -43,9 +35,7 @@
 							<a :href="`/{{ language }}/products/${wishlist_item.route}`" x-text="{% if language == 'en' %}wishlist_item.item_name{% else %}wishlist_item.custom_item_name_ar || wishlist_item.item_name{% endif %}"></a>
 						</td>
 						<td class="product-item-price text-nowrap">
-							{# The amounts sit in bdi, not span: .product-item-price strikes through every span it
-							   holds, which would strike the sale price too. bdi also isolates the digits from the
-							   surrounding RTL text on the Arabic route. #}
+							{# .product-item-price strikes through every span it holds, so the amounts sit in bdi. #}
 							<span x-show="wishlist_item.default_price > wishlist_item.sale_price">{{ get_currency_symbol() }}<bdi x-text="Number(wishlist_item.default_price || 0).toFixed(2)"></bdi></span>
 							<strong>{{ get_currency_symbol() }}<bdi x-text="Number(wishlist_item.sale_price || 0).toFixed(2)"></bdi></strong>
 						</td>

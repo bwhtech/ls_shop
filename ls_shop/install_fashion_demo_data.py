@@ -1,12 +1,3 @@
-"""Fashion demo catalogue for the storefront themes.
-
-Sibling of install_demo_data.py (car parts) — it reuses that module's prerequisite helpers and only
-replaces the product set, so a site can be flipped to a clothing catalogue without a second seeding path.
-
-Usage:
-    bench --site your-site-name execute ls_shop.install_fashion_demo_data.install_fashion_demo_data
-"""
-
 import frappe
 
 from ls_shop.install_demo_data import (
@@ -34,12 +25,9 @@ FASHION_COLORS = (
 
 FASHION_ITEM_GROUPS = ("Knitwear", "Suits", "Denim", "Activewear", "Shirts")
 
-# The first fashion seed made one flat top-level category per item group; FASHION_MENU replaces them.
 LEGACY_FLAT_CATEGORIES = FASHION_ITEM_GROUPS
 
-# Tab -> mega-menu column -> leaf listing, the three levels Ecommerce Category allows. Every leaf
-# names one of FASHION_ITEM_GROUPS, so no menu entry can land a shopper on an empty listing — which
-# is why the leaf under "Denim & Active" reads Denim rather than Jeans: Jeans has no products.
+# Tab -> mega-menu column -> leaf listing, the three levels Ecommerce Category allows.
 FASHION_MENU = (
 	{
 		"display_name": "Women",
@@ -273,8 +261,7 @@ def save_ecommerce_categories():
 def remove_legacy_flat_categories():
 	"""Drop the flat demo categories the tree replaces — their names are the ones a leaf would want.
 
-	Deepest-first because NestedSet refuses to trash a node that still has children, and through
-	delete_doc so the lft/rgt band is reclaimed instead of left as a hole.
+	Deepest-first: NestedSet refuses to trash a node with children, and delete_doc reclaims the band.
 	"""
 	legacy_names = frappe.get_all(
 		"Ecommerce Category",
@@ -298,8 +285,7 @@ def save_menu_branch(node, parent, root_display_name, display_order):
 
 
 def save_category(node, parent, root_display_name, display_order, is_group):
-	"""category_name is the primary key, so a column named "Clothing" can only exist once site-wide —
-	every entry below a tab carries that tab's name, and display_name stays the human label."""
+	"""category_name is the primary key, so "Clothing" can exist only once site-wide; display_name is the label."""
 	display_name = node["display_name"]
 	category_name = display_name if not parent else f"{root_display_name} {display_name}"
 
@@ -310,8 +296,7 @@ def save_category(node, parent, root_display_name, display_order, is_group):
 		category.category_name = category_name
 
 	category.display_name = display_name
-	# Assigning the parent field and saving is the NestedSet move path — it reseats lft/rgt for the
-	# whole subtree, which a db_set on the column would not.
+	# Assigning parent and saving is the NestedSet move path; a db_set would not reseat lft/rgt.
 	category.parent_ecommerce_category = parent
 	category.is_group = 1 if is_group else 0
 	category.display_order = display_order
@@ -399,8 +384,7 @@ def save_style_variant(configurator, template_name, product, variant):
 def save_item_variants(template_name, product, variant):
 	"""Create one sellable Item per size, price it, and map it onto the style variant's size table.
 
-	Publishing happens here rather than at insert because unpublish_if_incomplete_data rejects a
-	variant that has no sizes yet, and the sizes only exist once these items do.
+	Published here, not at insert: unpublish_if_incomplete_data rejects a variant with no sizes yet.
 	"""
 	color = variant["color"]
 	style_variant = frappe.get_doc(

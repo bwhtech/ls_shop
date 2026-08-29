@@ -55,7 +55,6 @@ function saveProfileCall<TParams extends Record<string, unknown>>(
 
 const save = saveProfileCall<{ first_name: string; last_name: string }>()
 
-// Its own resource, so the confirmation toast cannot fire on a name save.
 const savePicture = saveProfileCall<{ user_image: string }>(() =>
 	toast.success("Profile picture updated"),
 )
@@ -67,8 +66,6 @@ const nameChanged = computed(
 			form.last_name !== (profile.data.last_name ?? "")),
 )
 
-// Gameplan saves the name on blur rather than behind a button, so the field feels like the
-// record itself rather than a form you have to remember to submit.
 function saveName() {
 	if (!nameChanged.value) return
 	save.submit({ ...form })

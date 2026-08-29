@@ -20,7 +20,6 @@ const statusTabs = [
 	{ label: "All", value: "" },
 ]
 
-// Matches the endpoint's own default, so the first screenful is the page it already returns.
 const PAGE_LENGTH = 20
 
 const {
@@ -61,7 +60,6 @@ const listOptions = computed(() => ({
 		name: "Order",
 		params: { name: row.name },
 	}),
-	// No bulk action exists for orders yet, and a checkbox that does nothing is just noise.
 	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,

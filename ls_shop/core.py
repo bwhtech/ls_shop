@@ -33,14 +33,8 @@ def _get_default_territory() -> str:
 
 
 def get_default_customer_group() -> str:
-	"""Resolve a leaf Customer Group for storefront party creation.
-
-	Was reading a customer_group field off Lifestyle Settings that has never existed, so party
-	creation threw and every checkout failed at the quotation step. The obvious fix - falling back
-	to get_root_of() the way _get_default_territory does - is wrong here: the Customer Group root is
-	is_group=1 and Customer rejects a group, so an unset Selling Setting still broke checkout. Fall
-	through to frappe's own default, then to any leaf group.
-	"""
+	"""Resolve a leaf Customer Group for storefront party creation."""
+	# get_root_of() is wrong here: the Customer Group root is is_group=1 and Customer rejects a group.
 	configured = frappe.db.get_single_value("Selling Settings", "customer_group") or frappe.db.get_default(
 		"customer_group"
 	)

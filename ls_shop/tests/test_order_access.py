@@ -1,7 +1,5 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Permission tests for the storefront order endpoints. Sales Order names are sequential, so every one
-# of these took a document name straight from the request and returned or acted on it; the assertions
-# below are the boundary, not the behaviour.
+# Permission tests for the storefront order endpoints; Sales Order names are sequential and enumerable.
 
 import importlib
 
@@ -20,8 +18,7 @@ from ls_shop.tests.test_admin_orders import make_test_sales_order
 
 LEAKED_FIELDS = ("contact_email", "contact_phone", "address_display", "customer")
 
-# `return` is a keyword, so ls_shop.api.return cannot be imported with an import statement. Frappe
-# reaches it by string path from the whitelist; tests have to go the same way round.
+# `return` is a keyword, so ls_shop.api.return can only be reached by string path.
 return_api = importlib.import_module("ls_shop.api.return")
 
 

@@ -36,8 +36,6 @@ function setDetails(data: ProductDetail) {
 	details.description = data.description ?? ""
 }
 
-// Seeded once per product, not on every response: publishing an option reloads the product, and
-// re-seeding there would replace a description the owner is halfway through typing.
 watch(
 	() => product.data,
 	(data) => {
@@ -72,8 +70,6 @@ const updateProduct = useCall<
 		toast.success("Product saved")
 		product.reload()
 	},
-	// A rejected save stored nothing, so the form goes back to what the server still holds. Left
-	// alone it keeps showing the refused value - a blanked title reads as a title we just wiped.
 	onError: (error: Error) => {
 		toast.error(errorMessage(error))
 		if (product.data) setDetails(product.data)
@@ -108,8 +104,6 @@ const stockTotal = computed(() =>
 	variants.value.reduce((total, variant) => total + sumStock(variant.sizes), 0),
 )
 
-// The one thing an owner most needs to know is why the product is not selling yet, so lead with
-// it rather than leaving them to notice a greyed-out switch.
 const blockedOptions = computed(() =>
 	variants.value
 		.filter((variant) => variant.blockers.length > 0)
@@ -181,10 +175,8 @@ function saveDetails() {
 		/>
 
 		<div v-else-if="product.data" class="flex min-h-0 flex-1 overflow-hidden">
-			<!-- Main pane: the options are the work surface, so they get the width. -->
 			<div class="min-w-0 flex-1 overflow-y-auto px-3 pb-40 pt-5 sm:px-5">
-				<!-- Alert has no default slot: body text passed as children is dropped, so the
-				     sentence goes through `description`. -->
+				<!-- Alert has no default slot - body text passed as children is dropped, so it goes through `description`. -->
 				<Alert
 					v-if="blockedOptions.length"
 					class="mb-5"
@@ -216,7 +208,6 @@ function saveDetails() {
 				</div>
 			</div>
 
-			<!-- Side panel: what the product *is*, kept out of the way of what you came to change. -->
 			<aside
 				class="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-outline-gray-1 lg:flex"
 			>
@@ -259,8 +250,6 @@ function saveDetails() {
 					</div>
 				</dl>
 
-				<!-- A real form, so the browser enforces `required` before the request is made and
-				     points at the offending field itself. -->
 				<form class="space-y-4 px-4 py-4" @submit.prevent="saveDetails">
 					<FormControl v-model="details.title" label="Title" required />
 					<CollectionCombobox v-model="details.collection" />

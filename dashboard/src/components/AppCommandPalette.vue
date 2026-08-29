@@ -39,14 +39,10 @@ const { setColorScheme, toggleColorScheme } = useColorScheme()
 const searchQuery = ref("")
 
 function go(route: string) {
-	// A navigation shortcut is reachable from inside the palette, so the palette has to get out
-	// of the way once it has been used to leave the current screen.
 	showPalette.value = false
 	router.push({ name: route })
 }
 
-// The shortcut chip rides on the row, so the keyboard route to a destination is learnt from
-// the mouse route to it.
 const destinations: PaletteItem[] = navDestinations.map((destination) => ({
 	name: destination.route,
 	title: destination.label,
@@ -112,8 +108,6 @@ const orderSearch = useCall<
 	immediate: false,
 })
 
-// `filterable="false"`: the record rows are already what the server decided matches, so a
-// second client pass would drop them. The static entries are matched here instead.
 let searchTimer: ReturnType<typeof setTimeout>
 watch(searchQuery, (query) => {
 	clearTimeout(searchTimer)
@@ -171,9 +165,6 @@ function runCommand(command: CommandPaletteValue) {
 	item.action()
 }
 
-// Every combo here is drawn as a chip on its own palette row, and the palette holds focus in
-// its own input inside a dialog - so both gates stay open, or the chip would advertise a
-// shortcut that cannot fire from where it is being read.
 const navigationShortcuts = navDestinations.flatMap((destination) =>
 	destination.shortcut
 		? [
@@ -189,15 +180,11 @@ const navigationShortcuts = navDestinations.flatMap((destination) =>
 		: [],
 )
 
-// One registry: every shortcut declares its own description and group, which is what
-// KeyboardShortcutsDialog lists - so the help stays in step with the bindings by construction.
 useKeyboardShortcut([
 	{
 		combo: "Mod+K",
 		description: "Open command palette",
 		group: "General",
-		// The palette answers from a focused field too, or it dies the moment any page's search
-		// box has focus.
 		allowInInput: true,
 		handler: () => {
 			showPalette.value = true
@@ -207,8 +194,6 @@ useKeyboardShortcut([
 		combo: "Mod+Slash",
 		description: "Show keyboard shortcuts",
 		group: "General",
-		// The palette and the settings dialog are both `[role=dialog]`, and the palette holds
-		// focus in its own input, so help needs both gates open to answer from inside them.
 		allowInInput: true,
 		allowInDialog: true,
 		handler: () => {

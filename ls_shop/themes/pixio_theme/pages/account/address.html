@@ -1,9 +1,3 @@
-{# Reference: reference_themes/pixio/account-address.html 1009-1122.
-
-   The reference's two cards link out to account-billing-address.html and
-   account-shipping-address.html, two more demo pages carrying a static form. This route keeps
-   the form on the page instead: one Address doctype sits behind both cards here, so a second
-   route would only repeat the same ten fields. #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -18,8 +12,7 @@
 {% block uncontained_body %}
 {% call account_shell(_("Address Book")) %}
 
-{# Synchronous on purpose: Alpine's core is deferred in the base head, so a deferred script
-   here would register after alpine:init has already fired. #}
+{# Synchronous on purpose: Alpine's core is deferred in the base head, so a deferred script here would register after alpine:init. #}
 <script>
 	document.addEventListener("alpine:init", () => {
 		Alpine.data("pixio_account_addresses", (party) => ({

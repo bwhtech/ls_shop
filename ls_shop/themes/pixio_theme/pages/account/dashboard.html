@@ -1,10 +1,3 @@
-{# Reference: reference_themes/pixio/account-dashboard.html 1064-1163, with the recent-order table
-   from account-orders.html 1068-1090 and the info cards from account-address.html 1071-1087.
-
-   The reference's apexchart sales graph and "Your Top Countries" card are dropped: both are
-   hand-authored demo data with nothing behind them, and the chart needs the banned jQuery
-   apexchart bundle. The recent-order table takes their place - it is the only panel on this
-   page a shopper can act on. #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -61,8 +54,6 @@
 		</div>
 		<div class="col-md-4">
 			<a class="total-contain" href="/{{ language }}/account/wishlist">
-				{# The wishlist lives in the Alpine store, not the page context, so this one
-				   counter is bound client-side while the two order counters are rendered. #}
 				<div class="total-icon"><i class="icon feather icon-heart"></i></div>
 				<div class="total-detail">
 					<span class="text">{{ _("Wishlist Items") }}</span>

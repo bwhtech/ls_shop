@@ -28,8 +28,6 @@ import { useRoute } from "vue-router"
 const route = useRoute()
 const orderName = computed(() => String(route.params.name))
 
-// The stepper's own shape lives with the component that draws it, so the shared OrderDetail type
-// stays as it is and this screen still gets a checked `progress`.
 const order = useCall<
 	OrderDetail & { progress: OrderProgressStep[] },
 	{ sales_order: string }
@@ -50,14 +48,6 @@ const fulfil = useCall<{ delivery_note: string }, { sales_order: string }>({
 	onError: (error: Error) => toast.error(errorMessage(error)),
 })
 
-/**
- * The lines under the items, so the total is arrived at rather than announced.
- *
- * A charge of zero is not something the owner needs told - a prepaid order printing "Cash on
- * delivery -" invites the question of what it is - so only a charge that was actually made gets a
- * line. What is left always reconciles: the API hands back the unrecognised remainder of the
- * charges table as `tax`, so subtotal plus these lines is the grand total.
- */
 const totalsBreakdown = computed(() => {
 	const data = order.data
 	if (!data) return []
@@ -72,7 +62,6 @@ const totalsBreakdown = computed(() => {
 	]
 })
 
-// Fulfilling submits a stock movement that cannot be undone from here, so it asks first.
 function confirmFulfil() {
 	dialog.confirm({
 		title: "Fulfil this order?",
@@ -134,8 +123,6 @@ function confirmFulfil() {
 
 				<section class="mt-6">
 					<h2 class="text-md text-ink-gray-9">Items</h2>
-					<!-- The trailing rule closes the block: the header draws the one on top,
-					     and row dividers only sit between rows. -->
 					<List
 						class="mt-2 border-b border-outline-gray-1"
 						:columns="['minmax(0,1fr)', '4rem', '5rem', '6rem', '6rem']"

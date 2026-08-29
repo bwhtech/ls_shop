@@ -1,12 +1,4 @@
-{# Reference: reference_themes/pixio/index.html 703-869.
-
-   Opened by $dispatch('open-cart') on window. The tab pair is Pixio's markup driven by Alpine
-   rather than bootstrap's tab plugin. The reference's free-shipping progress bar is dropped:
-   nothing in Lifestyle Settings carries a free-shipping threshold, so the bar could only ever
-   be a hardcoded 75%.
-
-   The quantity stepper is written out by hand because upstream generates it with
-   bootstrap-touchspin; the class names are touchspin's own so style.css still shapes it. #}
+{# The quantity stepper is hand-written with bootstrap-touchspin's own class names, so style.css still shapes it. #}
 
 {% set language = frappe.lang or "en" %}
 <div class="offcanvas dz-offcanvas offcanvas-end" tabindex="-1" role="dialog"

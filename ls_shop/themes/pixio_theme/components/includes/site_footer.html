@@ -1,17 +1,5 @@
-{# Reference: reference_themes/pixio/index.html 2809-2946 (footer top widgets + footer bottom).
 
-   The reference's second column is a "Recent Posts" blog widget. This app ships no blog, so that
-   column is dropped rather than faked, and the remaining four share the row evenly. Everything
-   else is the reference skeleton with Lifestyle Settings behind it: the reference's five demo
-   link columns become the merchant's own `footer_sections`, which is what the footer editor in
-   Desk manages.
-
-   The reference footer carries no social row, so the header's `.dz-social-icon` block is not
-   repeated here and nothing was extracted into a shared macro. #}
-
-{# preview_settings carries the footer editor's unsaved values, so binding straight to the saved
-   doc would make the preview ignore whatever the shop owner is currently typing. Same idiom as
-   templates/includes/footer.html. #}
+{# preview_settings carries the footer editor's unsaved values; binding to the saved doc makes the preview ignore what is being typed. #}
 {% set settings = preview_settings if preview_settings is defined and preview_settings else frappe.get_cached_doc("Lifestyle Settings", "Lifestyle Settings") %}
 {% set store_name = settings.store_name or "Lifestyle" %}
 {% set footer_logo = preview_settings.footer_logo if preview_settings is defined and preview_settings and preview_settings.footer_logo else get_brand_assets().footer_logo %}
@@ -43,8 +31,7 @@
 							{% if settings.newsletter_description %}
 							<p>{{ settings.newsletter_description }}</p>
 							{% endif %}
-							{# The app ships no subscribe endpoint, so the form is deliberately inert rather than
-							   posting at a URL that would 404. Wire the submit here once one exists. #}
+							{# The app ships no subscribe endpoint, so the form is deliberately inert rather than posting at a URL that would 404. #}
 							<form class="dzSubscribe style-1" x-data @submit.prevent>
 								<div class="form-group">
 									<div class="input-group mb-0">
@@ -85,9 +72,7 @@
 
 	<div class="footer-bottom">
 		<div class="container">
-			{# Upstream marks this row `wow` too, but pixio.js reveals on an observer whose root is
-			   inset 10% at the bottom, and this row is the document's last ~80px - at a 900px
-			   viewport it can never intersect, so the copyright would stay invisible for good. #}
+			{# No `wow` here: pixio.js observes with a 10% bottom inset, and this last row can never intersect at a 900px viewport. #}
 			<div class="row fb-inner">
 				<div class="col-lg-6 col-md-12 text-start">
 					<p class="copyright-text">&copy; {{ frappe.utils.getdate().year }} {{ _(copyright_text) }}</p>

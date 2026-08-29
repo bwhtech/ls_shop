@@ -29,10 +29,6 @@ const { data, loading, error } =
 const rows = computed(() => data.value ?? [])
 </script>
 
-<!--
-	The ring answers "how do they arrive", the table under it "and do they buy" - a conversion
-	rate is not a share of a total, so it cannot go in the ring.
--->
 <template>
 	<AnalyticsPanel
 		title="Devices"

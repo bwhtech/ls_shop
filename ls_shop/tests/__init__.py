@@ -14,8 +14,7 @@ from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 def delete_menu_entries(filters=None):
 	"""Delete menu entries along with the item-group links hanging off them.
 
-	`frappe.db.delete` is the fast way to clear fixtures, but it never touches child rows — and a
-	link left behind attaches itself to the next entry created under the same name.
+	`frappe.db.delete` never touches child rows, and an orphan link re-attaches to the next same-named entry.
 	"""
 	names = frappe.get_all("Ecommerce Category", filters=filters, pluck="name")
 	for offset in range(0, len(names), IN_CLAUSE_CHUNK_SIZE):

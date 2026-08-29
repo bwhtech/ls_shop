@@ -1,10 +1,4 @@
-{# Pixio ships three card skins over one skeleton - the masonry grid (no modifier), the deals
-   rail (style-2) and the featured rail (style-4). They are one macro because the media, the
-   title link and the price block are identical in all three; only the content order differs.
-
-   Quick View and Add To Cart are links to the product page rather than the reference's
-   bootstrap modal and blind cart write: the modal needs bootstrap JS (banned here) and the
-   cart store refuses an item without a chosen size variant. #}
+{# Quick View and Add To Cart link to the product page: the cart store refuses an item without a chosen size variant. #}
 
 {% macro product_card(
     image,
@@ -81,8 +75,6 @@
 {% endmacro %}
 
 
-{# The homepage picks tables all hand back the one storefront card shape from
-   utils.get_product_list, so the field mapping is done once here rather than in four sections. #}
 {% macro variant_card(variant, style="", wow_delay="") %}
 {{ product_card(
     image=variant.image,

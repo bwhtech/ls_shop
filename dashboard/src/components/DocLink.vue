@@ -24,14 +24,10 @@ const linked_document = defineModel<string>({ default: "" })
 const open = ref(false)
 const query = ref("")
 
-// A Link docfield with no `options` has nothing to search, and Frappe's own guard treats "" as
-// falsy - it would run an unscoped search_widget rather than reject the request. Holding the
-// search term still keeps the request URL constant, so `refetch` never fires either.
+// Frappe's link search treats an empty `options` as falsy and runs an unscoped search_widget, so the request is held back.
 const searchable = computed(() => Boolean(props.doctype))
 
-// In the combobox's input mode the query IS the value display, so it still reads the committed
-// link while the popover is open and nothing has been typed yet. Searching for that text would
-// filter the list down to the value already chosen, so only a genuinely different query counts.
+// In the combobox's input mode the query is the value display, so only a genuinely different query counts as a search.
 const searchText = refDebounced(
 	computed(() =>
 		searchable.value && open.value && query.value !== linked_document.value

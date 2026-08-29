@@ -7,7 +7,6 @@ type LinkOption = { label: string; value: string }
 
 const props = defineProps<{
 	modelValue: string | null
-	/** Doctype the link points at; must be linked from Lifestyle Settings. */
 	doctype: string
 	disabled?: boolean
 }>()
@@ -22,7 +21,6 @@ const { open, query, results } = useLinkSearch<LinkOption>(
 
 const options = computed(() => results.data ?? [])
 
-// Emptying the input clears the selection, so an optional link no longer needs a blank option.
 const selected = computed({
 	get: () => props.modelValue,
 	set: (value: string | null) => emit("update:modelValue", value || null),

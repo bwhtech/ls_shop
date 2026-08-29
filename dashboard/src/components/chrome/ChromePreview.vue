@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { useElementSize } from "@vueuse/core"
+import {
+	useElementSize,
+	useEventListener,
+	useStorage,
+	useWindowSize,
+} from "@vueuse/core"
 import { Button, TabButtons } from "frappe-ui"
 import { computed, ref } from "vue"
 
 const props = defineProps<{
-	/** Bumped by the page after every save, to pull the rendered chrome again. */
 	token: number
-	/** The www page rendering this piece of chrome, e.g. `/footer_editor_preview`. */
 	path: string
-	/** Shown on the toggle, e.g. "Footer preview". */
 	title: string
-	/** The chrome being previewed, e.g. `footer`. The pane is sized to it. */
 	selector: string
 }>()
 
 const collapsed = defineModel<boolean>("collapsed", { required: true })
 
-// Framed at a real storefront width and scaled down, not reflowed to the pane: a footer given
-// only the pane's width collapses to its mobile stack and shows a layout no shopper sees.
 const FRAME_WIDTH = 1440
 
 const LANGUAGES = [
@@ -30,12 +29,14 @@ const reloadToken = ref(0)
 
 const stage = ref<HTMLElement | null>(null)
 const { width: stageWidth } = useElementSize(stage)
+const { height: windowHeight } = useWindowSize()
 
-// Until the frame reports its own height. A themed footer runs past 500px, so a smaller guess
-// would crop the first paint of every load.
 const FALLBACK_FRAME_HEIGHT = 560
-// Past this the pane would own the screen, so it scrolls instead.
 const MAX_STAGE_HEIGHT = 420
+const MIN_STAGE_HEIGHT = 160
+const RESIZE_STEP = 40
+// A hovered mega-menu opens under the navbar, so a frame ending at the chrome bottom clips it out of existence.
+const DROPDOWN_HEADROOM = 460
 
 const contentHeight = ref(0)
 
@@ -43,20 +44,63 @@ const scale = computed(() =>
 	stageWidth.value ? Math.min(1, stageWidth.value / FRAME_WIDTH) : 1,
 )
 
-// Driven by the rendered footer, not by the pane. Sizing the frame to the pane instead cropped
-// whatever did not fit - which was the whole footer-bottom strip, including the copyright line
-// and payment images this very editor edits.
-const frameHeight = computed(() => contentHeight.value || FALLBACK_FRAME_HEIGHT)
+const headroom = computed(() =>
+	props.selector === "header" ? DROPDOWN_HEADROOM : 0,
+)
+
+// Sizing the frame to the pane crops the footer-bottom strip, so it is driven by the rendered footer.
+const frameHeight = computed(
+	() => (contentHeight.value || FALLBACK_FRAME_HEIGHT) + headroom.value,
+)
+
+// The editor board above must survive the drag, so the pane can never own the whole viewport.
+const maxStageHeight = computed(() =>
+	Math.max(MIN_STAGE_HEIGHT, Math.round(windowHeight.value * 0.7)),
+)
+
+// Zero means untouched: the pane keeps fitting itself to the chrome until the user drags it.
+const storedStageHeight = useStorage(`ls-shop-preview-height:${props.path}`, 0)
 
 const stageHeight = computed(() =>
-	Math.min(frameHeight.value * scale.value, MAX_STAGE_HEIGHT),
+	storedStageHeight.value
+		? Math.min(
+				Math.max(storedStageHeight.value, MIN_STAGE_HEIGHT),
+				maxStageHeight.value,
+			)
+		: Math.min(frameHeight.value * scale.value, MAX_STAGE_HEIGHT),
 )
+
+const resizing = ref(false)
+let resizeOrigin = 0
+let resizeBaseHeight = 0
+
+function resizeTo(height: number) {
+	storedStageHeight.value = Math.min(
+		Math.max(Math.round(height), MIN_STAGE_HEIGHT),
+		maxStageHeight.value,
+	)
+}
+
+function startResize(event: PointerEvent) {
+	resizing.value = true
+	resizeOrigin = event.clientY
+	resizeBaseHeight = stageHeight.value
+}
+
+useEventListener(window, "pointermove", (event: PointerEvent) => {
+	if (!resizing.value) return
+	event.preventDefault()
+	resizeTo(resizeBaseHeight + (resizeOrigin - event.clientY))
+})
+
+useEventListener(window, "pointerup", () => {
+	resizing.value = false
+})
 
 function measureFrame(event: Event) {
 	const frame = event.target as HTMLIFrameElement
 	const previewDocument = frame.contentDocument
-	// Measured off the chrome itself, not the document: a header sits at the top of a full-height
-	// themed page, so sizing to scrollHeight would hang an empty storefront under the navbar.
+	// Measured off the chrome itself: a full-height themed page's scrollHeight would hang an empty storefront under the navbar.
 	const chrome = previewDocument?.querySelector(props.selector)
 	contentHeight.value = chrome
 		? Math.ceil(chrome.getBoundingClientRect().bottom)
@@ -70,9 +114,22 @@ const source = computed(
 </script>
 
 <template>
-	<div class="shrink-0 border-t border-outline-gray-1 bg-surface-gray-1">
+	<div
+		class="shrink-0 border-t border-outline-gray-1 bg-surface-gray-1"
+		:class="resizing && 'select-none'"
+	>
 		<div class="flex min-h-11 items-center justify-between gap-2 px-3 sm:px-5">
 			<div class="flex items-center gap-2">
+				<Button
+					v-if="!collapsed"
+					variant="ghost"
+					icon="lucide-grip-horizontal"
+					class="cursor-ns-resize"
+					:aria-label="`Resize ${title.toLowerCase()}`"
+					@pointerdown="startResize"
+					@keydown.up.prevent="resizeTo(stageHeight + RESIZE_STEP)"
+					@keydown.down.prevent="resizeTo(stageHeight - RESIZE_STEP)"
+				/>
 				<Button
 					variant="ghost"
 					:icon-left="collapsed ? 'lucide-chevron-up' : 'lucide-chevron-down'"

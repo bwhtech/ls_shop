@@ -1,8 +1,5 @@
 # Copyright (c) 2026, ivend and Contributors
-# The order confirmation is the gateway return URL, so it is the one account page a shopper can reach
-# with no session - and by then the money has already been taken. Both copies of the page (the www
-# controller and the themed one the renderer actually serves) must offer a login back to this exact
-# URL instead of letting confirm_payment refuse with a bare "not whitelisted".
+# The gateway return URL: the one account page reachable with no session, after the money is taken.
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -35,8 +32,7 @@ class TestOrderConfirmationForSignedOutShopper(IntegrationTestCase):
 		frappe.local.request = self.saved_request
 
 	def run_context(self, get_context, query_string=QUERY_STRING):
-		# A real werkzeug request, because the login URL is built from request.full_path and that
-		# carries the trailing separator the helper has to strip.
+		# A real werkzeug request: the login URL is built from request.full_path, whose trailing separator is stripped.
 		frappe.local.request = Request(
 			EnvironBuilder(path=CONFIRMATION_PATH, query_string=query_string).get_environ()
 		)

@@ -1,9 +1,4 @@
-{# Pixio's w3menu drives every level below a tab off the same <li><a>+<ul> skeleton
-   (reference: reference_themes/pixio/index.html 118-160), so one recursive macro covers the
-   mega-menu columns and everything hanging under them. #}
 
-{# The bar and the mobile drawer each carry their own .logo-header - style.css shows exactly one
-   of them per breakpoint - so the brand mark is written once here. #}
 {% macro brand_logo(header_data, extra_classes="") %}
 <div class="logo-header logo-dark {{ extra_classes }}">
 	<a href="/{{ frappe.lang or 'en' }}"><img src="{{ header_data.brand_logo }}" alt="{{ header_data.store_name }}"></a>
@@ -23,9 +18,6 @@
 {% endmacro %}
 
 
-{# A tab. Its <i> is the toggle: below 992px style.css sizes it into the black chevron box on
-   the row's right edge, which is what the reference's jQuery listens on, so the anchor keeps
-   its real href and taps on the box open the branch instead of navigating. #}
 {% macro menu_tab(node, branch_key) %}
 {% if node.children %}
 <li class="has-mega-menu sub-menu-down auto-width" :class="is_branch_open({{ branch_key }}) ? 'open' : ''">

@@ -11,9 +11,12 @@ const menu = ref<MenuNode[]>([])
 const maxDepth = ref(0)
 const selectedName = ref<string | null>(null)
 
-const { call, loading } = createMethodCaller(
+const { attempt, call, loading } = createMethodCaller(
 	"/api/v2/method/ls_shop.api.admin.navigation.",
 )
+
+// A refused read leaves `menu` empty, which reads as "this store has no menu" unless the failure is kept.
+const loadError = ref<Error | null>(null)
 
 function walk(
 	nodes: MenuNode[],
@@ -56,22 +59,14 @@ function depthOf(name: string): number {
 	return depth
 }
 
-/**
- * Whether a node can be dropped under a parent at the given depth.
- *
- * The server throws past `max_depth`, so the tree checks first and refuses the drop rather than
- * animating a move that is about to be rejected and snapped back.
- */
+/** The server throws past `max_depth`, so the tree refuses the drop rather than animating a move about to be snapped back. */
 function canNest(node: MenuNode, parentDepth: number): boolean {
 	return parentDepth + 1 + subtreeHeight(node) <= maxDepth.value
 }
 
 /**
- * Carry expansion across a refresh.
- *
- * `Tree` keeps each node's open state on the node itself, and every mutation replaces the whole
- * tree with the server's answer - so without this, moving one entry would collapse the branch
- * the owner is working in.
+ * `Tree` keeps each node's open state on the node itself and every mutation replaces the whole tree,
+ * so without this, moving one entry collapses the branch the owner is working in.
  */
 function rememberExpansion() {
 	const state = new Map<string, boolean>()
@@ -85,8 +80,6 @@ function applyExpansion(
 	depth = 1,
 ) {
 	for (const node of nodes) {
-		// Unseen branches start closed below the top level, so a deep menu opens as an
-		// overview rather than as every row at once.
 		node.expanded = state.get(node.name) ?? depth === 1
 		applyExpansion(node.children, state, depth + 1)
 	}
@@ -101,8 +94,7 @@ function apply(data: EditorData | null) {
 	menu.value = nodes
 	if (data.max_depth) maxDepth.value = data.max_depth
 
-	// A deleted node must not stay selected - the inspector would render a stale copy of a
-	// row that is no longer in the tree.
+	// A deleted node must not stay selected - the inspector would render a stale copy of a row no longer in the tree.
 	if (selectedName.value && !findNode(selectedName.value))
 		selectedName.value = null
 }
@@ -118,11 +110,8 @@ function pathTo(name: string, nodes: MenuNode[] = menu.value): MenuNode[] {
 }
 
 /**
- * Run a mutation and adopt the tree it returns.
- *
- * `revealUnder` opens the branch a row was added to or moved into. The refresh otherwise restores
- * that branch's remembered collapsed state, so the change lands on the server yet looks like
- * nothing happened until the page is re-entered.
+ * `revealUnder` opens the branch a row was added to or moved into: the refresh otherwise restores that branch's
+ * remembered collapsed state, so the change lands on the server yet looks like nothing happened.
  */
 async function mutate(
 	method: string,
@@ -133,8 +122,7 @@ async function mutate(
 	if (!data) return null
 	apply(data)
 	for (const node of pathTo(revealUnder)) node.expanded = true
-	// Every menu change funnels through here, so this is the one place the storefront preview has
-	// to be told the menu it rendered is now stale.
+	// Every menu change funnels through here, so this is the one place the storefront preview is told it is stale.
 	revision.value += 1
 	return data
 }
@@ -142,13 +130,16 @@ async function mutate(
 const revision = ref(0)
 
 async function load() {
-	apply(await call<EditorData>("get_editor_data"))
+	const { data, error } = await attempt<EditorData>("get_editor_data")
+	loadError.value = error
+	apply(data)
 }
 
 export function useNavMenu() {
 	return {
 		menu,
 		maxDepth,
+		loadError,
 		revision,
 		selectedName,
 		selected,

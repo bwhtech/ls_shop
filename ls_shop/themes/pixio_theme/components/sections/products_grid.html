@@ -1,8 +1,3 @@
-{# Reference: reference_themes/pixio/index.html 1415-1683.
-
-   The reference filter bar is isotope-driven over hand-authored category classes; isotope is
-   banned, so the pills are built from the item groups the pinned products actually carry and
-   Alpine hides the cards that do not match. #}
 {% from "components/macros/product_card.html" import variant_card %}
 {% set settings = shop_theme_config() %}
 {% set product_groups = picked_products.best_picks | map(attribute="item_group") | select | unique | list %}

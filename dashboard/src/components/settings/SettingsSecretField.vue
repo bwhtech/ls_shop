@@ -18,7 +18,6 @@ const emit = defineEmits<{
 
 const editing = ref(false)
 
-// A reload reports what is now stored, so an edit that has been saved folds itself away.
 watch(
 	() => props.isSet,
 	() => {

@@ -1,15 +1,3 @@
-{# Reference: reference_themes/pixio/index.html 2486-2578. The reference rail is six Reebok/Puma/
-   adidas demo tiles; the brands here are the real Brand records that actually have catalogue
-   items behind them, so every card links to a listing with products in it.
-
-   The two lookups sit in the template because the homepage controller is pages/index.py and a
-   sponsored rail has no settings table to hang off yet - see GAPS.
-
-   The badge and the discount line are only drawn when the page's own picked products can back
-   them: Brand carries no discount and no stock flag, so a brand with no picks shows its name
-   alone rather than an invented offer. The tile photo is the theme's own decorative stock
-   photography cycled across the rail - it is not brand imagery, so a brand only ever shows a
-   logo it actually owns, and its name otherwise. #}
 {% set stocked_brands = frappe.get_all("Item", filters={"disabled": 0}, pluck="brand", distinct=True) | select | list %}
 {% set sponsored_brands = frappe.get_all("Brand", filters={"name": ["in", stocked_brands]}, fields=["name", "image"], order_by="brand asc") if stocked_brands else [] %}
 {% set picks = picked_products.best_picks + picked_products.deal_picks + picked_products.featured_picks %}

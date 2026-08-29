@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import ErrorState from "@/components/ErrorState.vue"
 import NameDialog from "@/components/NameDialog.vue"
 import ChromePreview from "@/components/chrome/ChromePreview.vue"
 import FooterLinkDialog from "@/components/footer/FooterLinkDialog.vue"
 import { useFooter } from "@/composables/useFooter"
 import type { FooterLink, FooterSection } from "@/types"
+import { errorMessage } from "@/utils/errors"
 import { useStorage } from "@vueuse/core"
 import {
 	Badge,
@@ -20,8 +22,16 @@ import {
 import { onMounted, ref } from "vue"
 import Draggable from "vuedraggable"
 
-const { sections, pages, previewToken, loading, load, mutate, reordered } =
-	useFooter()
+const {
+	sections,
+	pages,
+	loadError,
+	previewToken,
+	loading,
+	load,
+	mutate,
+	reordered,
+} = useFooter()
 
 onMounted(load)
 
@@ -31,11 +41,6 @@ const linkDialogOpen = ref(false)
 const linkDialogSection = ref<FooterSection | null>(null)
 const linkDialogLink = ref<FooterLink | null>(null)
 
-/**
- * A drag on the board is already applied to the local lists, so the server is told the result -
- * and a refusal has to be undone by reading the board back, or it keeps showing a move that never
- * happened.
- */
 async function onColumnDrop() {
 	const moved = await mutate("reorder_sections", {
 		ordered_names: sections.value.map((section) => section.name),
@@ -61,8 +66,6 @@ async function onLinkDrop(event: DragEndEvent) {
 		return
 	}
 
-	// `move_link` unlinks and re-inserts in one call, so the two columns never disagree about
-	// which one owns the row mid-move.
 	const moved = await mutate("move_link", {
 		from_section: fromSection,
 		to_section: toSection,
@@ -86,10 +89,6 @@ async function reorderLinks(sectionName: string) {
 	if (!moved) await load()
 }
 
-/**
- * Menu-driven equivalents of the drags. Dragging is a pointer-only gesture, so every move the
- * board offers also has to be reachable from a card's or column's menu.
- */
 async function moveLinkWithinColumn(
 	section: FooterSection,
 	linkIndex: number,
@@ -117,8 +116,6 @@ async function moveLinkToColumn(
 		from_section: section.name,
 		to_section: target.name,
 		link_row_name: link.name,
-		// Appended rather than kept at the same row: the target column is a different length,
-		// so the "same position" the owner sees would not survive the move.
 		target_index: target.links.length,
 	})
 	if (moved) toast.success(`Moved to ${target.title}`)
@@ -134,7 +131,6 @@ async function moveSection(columnIndex: number, offset: number) {
 	})
 }
 
-/** Resolves to whether the column landed, so the dialog knows whether it may close. */
 async function saveSection(title: string) {
 	const added = await mutate("add_section", { title })
 	if (added) toast.success("Column added")
@@ -202,7 +198,6 @@ function openLinkDialog(
 	linkDialogOpen.value = true
 }
 
-/** Resolves to whether the save landed, so the dialog knows whether it may close. */
 async function saveLink({ label, url }: { label: string; url: string }) {
 	const section = linkDialogSection.value
 	const link = linkDialogLink.value
@@ -348,6 +343,13 @@ function linkActions(
 
 		<ScrollArea class="min-h-0 flex-1" viewport-class="px-3 py-3 sm:px-5">
 			<LoadingText v-if="loading && !sections.length" />
+
+			<ErrorState
+				v-else-if="loadError"
+				title="Could not load your footer"
+				:message="errorMessage(loadError)"
+				@retry="load"
+			/>
 
 			<div v-else-if="!sections.length" class="px-3 py-16 text-center">
 				<p class="text-base text-ink-gray-6">No footer columns yet</p>

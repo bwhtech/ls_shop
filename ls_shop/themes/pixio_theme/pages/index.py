@@ -1,12 +1,9 @@
-# The data layer is not duplicated: reusing www.index.get_context keeps SEO, search shapes
-# and product data identical between the themed and un-themed home page.
 import frappe
 
 from ls_shop.utils import get_product_list
 from ls_shop.www import index
 
-# The picks tables Pixio's homepage sections render, keyed by the settings fieldname they
-# come from so the sections and the settings form use one vocabulary.
+# The picks tables Pixio's homepage sections render, keyed by their settings fieldname.
 PICKS_FIELDS = ("best_picks", "deal_picks", "featured_picks")
 
 
@@ -18,11 +15,7 @@ def get_context(context):
 
 
 def get_picked_products(rows):
-	"""Hydrate one pinned-variant table into storefront product cards.
-
-	Kept to a single get_product_list call per table so the homepage costs three product
-	queries however many rows a merchant pins.
-	"""
+	"""Hydrate one pinned-variant table into storefront product cards."""
 	variants = [row.item_variant for row in rows]
 	if not variants:
 		return []

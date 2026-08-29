@@ -1,12 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""The payment half of the dashboard's integration screen: a registry plus two wrappers.
-
-Everything that does the work lives in `integrations.py`; this module only says which gateways exist
-and how a payment gateway differs from any other integration.
-"""
-
 import frappe
 
 from ls_shop.api.admin.integrations import describe_integration, save_integration

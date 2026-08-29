@@ -6,7 +6,6 @@ defineProps<{ loading?: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ save: [] }>()
 </script>
 
-<!-- The one footer every settings tab ends on, so they cannot drift apart on spacing again. -->
 <template>
 	<div class="flex justify-end pt-4">
 		<Button

@@ -9,8 +9,8 @@ def get_translations():
 
 	for entry in translations:
 		lang = entry["language"]
-		source_texts = entry["source_text"].split("\n")  # Split source text
-		translated_texts = entry["translated_text"].split("\n")  # Split translated text
+		source_texts = entry["source_text"].split("\n")
+		translated_texts = entry["translated_text"].split("\n")
 
 		if lang not in translation_dict:
 			translation_dict[lang] = {}

@@ -1,11 +1,4 @@
-"""Pixio Theme Settings demo content for the storefront homepage.
-
-Sibling of install_fashion_demo_data.py — that module seeds the catalogue, this one seeds the
-homepage copy, banners and picks that read off it, so either can be re-run on its own.
-
-Usage:
-    bench --site your-site-name execute ls_shop.install_pixio_theme_data.install_pixio_theme_data
-"""
+"""Pixio Theme Settings demo content for the storefront homepage."""
 
 import frappe
 
@@ -63,8 +56,6 @@ SHOP_BY_CATEGORY = (
 )
 
 COLLECTION_BANNERS = (
-	# The first card centres a short heading in .sale-box, the second left-aligns a longer one
-	# in .product-content, so the copy is sized to its slot rather than shared between them.
 	{"badge_label": "Sale Up to 50% Off", "heading": "Summer Edit", "image": "collection/1.png"},
 	{"badge_label": "Sale Up to 50% Off", "heading": "New Summer Collection", "image": "collection/2.png"},
 )
@@ -132,8 +123,7 @@ def install_pixio_theme_data():
 
 
 def save_child_rows(settings, fieldname, rows):
-	"""Fill a table only while it is still empty, so a re-run never duplicates and never
-	overwrites content the merchant has since curated in Desk."""
+	"""Fill a table only while it is empty, so a re-run never duplicates or overwrites curated rows."""
 	if settings.get(fieldname) or not rows:
 		return
 
@@ -153,8 +143,7 @@ def banner_rows(banners, cta_label=None):
 
 
 def pick_rows(variant_names):
-	"""A pick whose variant is missing is dropped — the catalogue seeder is optional and a
-	dangling link would fail the save instead of just rendering one card less."""
+	"""Rows for a picks table, skipping variants the (optional) catalogue seeder never created."""
 	existing = set(
 		frappe.get_all("Style Attribute Variant", filters={"name": ["in", list(variant_names)]}, pluck="name")
 	)
@@ -163,12 +152,8 @@ def pick_rows(variant_names):
 
 
 def save_social_urls():
-	"""Demo placeholder handles, not the merchant's real accounts — replace them in Lifestyle
-	Settings before going live.
-
-	Written field-wise rather than through the doc because Lifestyle Settings.validate rejects a
-	site that has no payment method configured yet, which a freshly seeded site usually has not.
-	"""
+	"""Seed demo placeholder social handles, not the merchant's real accounts."""
+	# Written field-wise: Lifestyle Settings.validate rejects a site with no payment method configured.
 	settings = frappe.get_cached_doc("Lifestyle Settings")
 	for fieldname, url in SOCIAL_URLS.items():
 		if not settings.get(fieldname):

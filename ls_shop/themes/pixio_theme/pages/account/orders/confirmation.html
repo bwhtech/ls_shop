@@ -1,12 +1,4 @@
-{# Reference: reference_themes/pixio/account-order-confirmation.html 1008-1086.
-
-   Two things the reference could not know about this route. First, it is the checkout return
-   URL (api/payments.py builds `?reference_id=...`), so the order number only exists after
-   confirm_payment has resolved the gateway - the card starts in a checking state and fills in.
-   Second, the reference's images/confirmation.png is not vendored with the theme, so the green
-   .cancel-btn badge style.css already ships stands in for it; that badge is scoped to
-   .confirmed-request, which carries the same 50px/30px card padding as .confirmation-card, so
-   the card takes that class instead of adding CSS. #}
+{# This is the gateway return URL (api/payments.py builds `?reference_id=...`), so the order number only exists once confirm_payment resolves. #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -23,8 +15,6 @@
 {% block uncontained_body %}
 {% call account_shell(_("Order Confirmed"), [{"label": _("Orders"), "href": orders_url}]) %}
 {% if login_url %}
-{# The gateway has already taken the money by the time this page loads, so the shopper is told
-   that first - a bare login form here reads as a payment that vanished. #}
 <div class="account-card confirmed-request text-center">
 	<h4 class="mb-3">{{ _("Your payment has been received") }}</h4>
 	<p class="mb-0">{{ _("Please sign in to confirm this order. You will come straight back to this page.") }}</p>
@@ -83,15 +73,14 @@
 	{% if not login_url %}
 	<script>
 		function track_purchase(data, order_name) {
-			// The first-party `purchase` event is logged server-side at order creation; the
-			// capture endpoint rejects it from the client, so only the pixels fire here.
+// The first-party `purchase` event is logged server-side at order creation; the capture endpoint rejects it from the client.
 			const dedup_key = "fb_purchase_" + order_name;
 			if (sessionStorage.getItem(dedup_key)) return;
 			sessionStorage.setItem(dedup_key, "1");
 
 			const order_value = parseFloat(data.grand_total || data.amount || 0) || 0;
 
-			// eventID lets Meta dedupe this browser hit against a future server-side Purchase.
+// eventID lets Meta dedupe this browser hit against a future server-side Purchase.
 			if (window.fbq) fbq("track", "Purchase",
 				{ value: order_value, currency: data.currency || window.fb_currency },
 				{ eventID: order_name });
@@ -120,9 +109,7 @@
 
 				async confirm_payment() {
 					const url_params = new URLSearchParams(window.location.search);
-					// Legacy gateway redirects still come back with `payment_id` instead of `reference_id`, and
-					// Stripe substitutes its own session id into the success URL as `session_id`. All three
-					// resolve through Gateway Payment Request.order_ref, where the gateway session id is stored.
+// Legacy gateway redirects return `payment_id` and Stripe substitutes `session_id`; all three resolve through Gateway Payment Request.order_ref.
 					const reference_id = url_params.get("reference_id") || url_params.get("payment_id") || url_params.get("session_id");
 					if (!reference_id) {
 						this.state = "unconfirmed";
@@ -147,8 +134,6 @@
 						Alpine.store("cart").remove_selected();
 						this.state = "confirmed";
 					} catch (error) {
-						// A forged, expired or already-consumed reference throws; the shopper is
-						// standing on the page either way and still needs somewhere to go.
 						this.state = "unconfirmed";
 					}
 				},

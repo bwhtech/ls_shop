@@ -47,7 +47,6 @@ def get_analytics_settings():
 	for fieldname in SECRET_FIELDS:
 		data[f"{fieldname}_is_set"] = bool(settings.get_password(fieldname, raise_exception=False))
 
-	# Borrowed from the analytics dashboard so "connected" means the same thing on both screens.
 	data["ga4_configured"] = is_provider_configured("ga4", settings)
 	data["meta_configured"] = is_provider_configured("meta", settings)
 	data["custom_tracking_scripts"] = format_custom_tracking_scripts(settings)
@@ -55,11 +54,7 @@ def get_analytics_settings():
 
 
 def apply_secret_values(settings, values, cleared_fieldnames):
-	"""A blank incoming secret means "leave the stored one alone" - only an explicit clear wipes it.
-
-	The loaded doc already carries Frappe's masked placeholder for each password, so skipping a
-	field here is what preserves it: save_passwords() recognises the mask and leaves the vault row.
-	"""
+	# A blank secret keeps the stored one: save_passwords() recognises Frappe's mask.
 	for fieldname in SECRET_FIELDS:
 		if fieldname in cleared_fieldnames:
 			settings.set(fieldname, "")

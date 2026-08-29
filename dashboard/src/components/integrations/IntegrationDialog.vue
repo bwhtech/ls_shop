@@ -120,8 +120,6 @@ async function copyWebhookUrl() {
 					<h4 class="text-sm text-ink-gray-5">{{ group.label }}</h4>
 
 					<template v-for="field in group.fields" :key="field.fieldname">
-						<!-- Integration links search any doctype through Frappe's own link search;
-						     the settings tabs search a scoped endpoint, so each keeps its Link branch. -->
 						<DocLink
 							v-if="field.fieldtype === 'Link'"
 							v-model="values[field.fieldname] as string"

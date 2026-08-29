@@ -1,9 +1,4 @@
-{# Reference: product-default.html 1077-1287. Dropped from the reference and not invented:
-   the star rating and review count, the bank-offer strip and the two marketing icon boxes -
-   the storefront has no data behind any of them.
-
-   The size radios reload the page rather than swap client-side, because price, stock and the
-   cart variant are all resolved per size by the controller. #}
+{# The size radios reload the page: price, stock and the cart variant are all resolved per size by the controller. #}
 <div class="col-xl-8 col-md-8" x-data='{
 		product: JSON.parse({{ product_variant.as_json() | tojson }}),
 		selected_variant: {{ (json.dumps(selected_item) if size_selected else "") | tojson }},

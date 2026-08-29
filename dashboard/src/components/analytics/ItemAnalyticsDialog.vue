@@ -58,8 +58,6 @@ const itemAnalytics = useCall<
 	immediate: false,
 })
 
-// Fetching is driven by the item rather than by the params: an open dialog must not refetch
-// itself out from under the reader, and a closed one must not fetch at all.
 watch(
 	() => props.itemCode,
 	(itemCode) => {
@@ -69,7 +67,6 @@ watch(
 
 const report = computed(() => itemAnalytics.data)
 
-/** The one comparison that makes a single product's rate mean anything. */
 function storeAverageCaption(totals: ItemAnalytics["totals"]) {
 	const direction =
 		totals.purchase_to_view_rate >= totals.store_avg_purchase_to_view_rate

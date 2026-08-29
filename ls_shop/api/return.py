@@ -7,9 +7,7 @@ from ls_shop.utils import validate_document_access
 @frappe.whitelist()
 def return_items(sales_order_id, items):
 	order = validate_document_access("Sales Order", sales_order_id)
-	# Read on the order is not enough to raise one of these: the return inserts a stock-reversing
-	# Delivery Note under ignore_permissions, and roles like Accounts User hold read on every Sales
-	# Order while holding no create on Delivery Note at all.
+	# Accounts User holds read on every Sales Order but no create on Delivery Note, which this inserts.
 	if order.owner != frappe.session.user:
 		frappe.has_permission("Delivery Note", ptype="create", throw=True)
 
@@ -17,7 +15,6 @@ def return_items(sales_order_id, items):
 	if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
 		frappe.throw(_("Items to return must be a list of objects."))
 
-	# Find the delivery note linked to this sales order
 	delivery_note_item = frappe.get_all(
 		"Delivery Note Item",
 		filters={"against_sales_order": sales_order_id},
@@ -28,11 +25,9 @@ def return_items(sales_order_id, items):
 	if not delivery_note_item:
 		frappe.throw(_("No Delivery Note found for this Sales Order."))
 
-	# Get the Delivery Note doc (assuming first match)
 	dn_name = delivery_note_item[0]["parent"]
 	original_dn = frappe.get_doc("Delivery Note", dn_name)
 
-	# Build the return delivery note
 	return_dn = frappe.copy_doc(original_dn)
 	return_dn.set("is_return", 1)
 	return_dn.set("return_against", dn_name)
@@ -68,7 +63,6 @@ def return_items(sales_order_id, items):
 
 @frappe.whitelist()
 def get_returned_items(sales_order_id):
-	# Fetch all returned Delivery Note Items for this Sales Order
 	sales_order = validate_document_access("Sales Order", sales_order_id)
 
 	free_items_map = {}

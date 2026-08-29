@@ -28,7 +28,6 @@ const active = computed(
 		) ?? null,
 )
 
-/** The refusal from the last save attempt made from inside the dialog. */
 const dialogError = ref<string | null>(null)
 
 function configure(integration: Integration) {

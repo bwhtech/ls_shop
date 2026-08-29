@@ -28,7 +28,6 @@ const tabs = [
 	{ label: "All", value: "" },
 ]
 
-// Matches the endpoint's own default, so the first screenful is the page it already returns.
 const PAGE_LENGTH = 50
 
 const {
@@ -65,8 +64,6 @@ const receiveStock = useCall<
 	onError: (error: Error) => toast.error(errorMessage(error)),
 })
 
-// Only the sizes the owner actually typed a quantity into: the map keeps a key for every field
-// that was ever focused, and the blanks and zeroes among them are not part of the receipt.
 const pendingReceipt = computed(() =>
 	Object.fromEntries(
 		Object.entries(receiveQuantities.value).filter(
@@ -172,8 +169,6 @@ const columns = [
 			@load-more="loadMore"
 		/>
 
-		<!-- One receipt covers whatever the owner typed across the whole screen, so a stock take
-		     is a single action rather than one submission per size. -->
 		<div
 			v-if="pendingCount"
 			class="flex items-center gap-2 border-t border-outline-gray-1 px-3 py-3 sm:px-5"

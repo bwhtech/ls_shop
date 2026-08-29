@@ -1,9 +1,3 @@
-{# Reference: reference_themes/pixio/account-profile.html 1008-1137.
-
-   Three panels of the reference are dropped because nothing backs them: the avatar upload
-   (no file endpoint on this route - the avatar is shown read-only), the two password fields
-   (the User REST document has no password-change contract a shopper may call), and the
-   "Subscribe me to Newsletter" checkbox (no subscription field exists on User here). #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -16,8 +10,7 @@
 {% block uncontained_body %}
 {% call account_shell(_("Profile")) %}
 
-{# Synchronous on purpose: Alpine's core is deferred in the base head, so a deferred script
-   here would register after alpine:init has already fired. #}
+{# Synchronous on purpose: Alpine's core is deferred in the base head, so a deferred script here would register after alpine:init. #}
 <script>
 	document.addEventListener("alpine:init", () => {
 		Alpine.data("pixio_account_profile", (profile) => ({
@@ -34,16 +27,14 @@
 
 				this.saving = true;
 				try {
-					// Keyed on the User document name, not the email field - they differ for
-					// accounts created before the login id was set (Administrator).
+// Keyed on the User document name, not the email field - they differ for accounts created before the login id was set.
 					await frappe_call(`/api/v2/document/User/${encodeURIComponent(this.profile.name)}`, {
 						first_name: this.profile.first_name,
 						last_name: this.profile.last_name,
 						mobile_no: this.profile.mobile_no,
 					}, "PUT");
 					toast(this.$store.i18n.t("Profile updated successfully"), { type: "success" });
-					// The header and the sidebar render the name server-side, so they only
-					// pick the new one up on a reload.
+// The header and the sidebar render the name server-side, so they only pick it up on a reload.
 					window.location.reload();
 				} catch (error) {
 					toast(this.$store.i18n.t("Something went wrong"), { type: "danger" });
@@ -62,13 +53,10 @@
 	"mobile_no": user_details.mobile_no or "",
 } %}
 
-{# Single-quoted on purpose: tojson leaves double quotes unescaped, so they would close a
-   double-quoted attribute. #}
+{# Single-quoted on purpose: tojson leaves double quotes unescaped and they would close a double-quoted attribute. #}
 <div class="account-card" x-data='pixio_account_profile({{ profile_data | tojson }})'>
 	<div class="profile-edit">
 		<div class="thumb">
-			{# Same fallback as the sidebar: the app's own user icon, never frappe's gravatar
-			   URL - a third-party fetch renders broken the moment it is blocked. #}
 			<img src="{{ user_details.user_image or '/assets/ls_shop/icons/user.svg' }}"
 				width="100" height="100" alt="{{ user_details.full_name }}">
 		</div>

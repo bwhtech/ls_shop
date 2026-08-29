@@ -12,9 +12,7 @@ export function useLinkSearch<TOption>(
 	const open = ref(false)
 	const query = ref("")
 
-	// In the combobox's input mode the query IS the value display, so it still reads the committed
-	// option while the popover is open and nothing has been typed yet. Searching for that text
-	// would filter the list down to the value already chosen, so only a different query counts.
+	// In the combobox's input mode the query IS the value display, so only a genuinely different query counts.
 	const searchText = refDebounced(
 		computed(() =>
 			open.value && query.value !== committedValue() ? query.value : "",

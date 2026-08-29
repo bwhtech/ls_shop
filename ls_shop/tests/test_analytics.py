@@ -1,6 +1,5 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Tests for the first-party analytics beacon (api/analytics.py), its payload
-# clamps (analytics/events.py) and the event log retention job. Real-DB, auto-rolled-back.
+# Tests for the first-party analytics beacon, its payload clamps and the event log retention job.
 
 import json
 
@@ -99,8 +98,7 @@ class AnalyticsCaptureTestBase(IntegrationTestCase):
 	def setUp(self):
 		self.session_id = frappe.generate_hash(length=32)
 		self.set_first_party(1)
-		# get_capture_payload prefers a JSON request body; drop any inherited request so the
-		# form_dict branch is the one under test, and so get_user_agent sees no headers.
+		# Drop any inherited request so the form_dict branch is under test and get_user_agent sees none.
 		self.saved_request = getattr(frappe.local, "request", None)
 		if hasattr(frappe.local, "request"):
 			delattr(frappe.local, "request")
@@ -144,8 +142,7 @@ class TestCaptureEventWhitelist(AnalyticsCaptureTestBase):
 				self.assertEqual(self.only_captured_row(["event"])["event"], event)
 
 	def test_purchase_is_rejected_and_writes_no_row(self):
-		# purchase is server-authoritative (logged at order submit); accepting it from the
-		# browser would let anyone forge revenue into the analytics reports.
+		# purchase is server-authoritative; accepting it from the browser would let anyone forge revenue.
 		with self.assertRaises(frappe.ValidationError):
 			self.post(event="purchase", value=99999)
 		self.assertEqual(self.captured_rows(), [])
@@ -223,8 +220,7 @@ class TestCaptureDisabled(AnalyticsCaptureTestBase):
 		self.assertEqual(self.captured_rows(), [])
 
 	def test_disabled_capture_does_not_even_validate_the_event(self):
-		# The kill switch must short-circuit before the throw, so a beacon still in flight
-		# after an admin disables tracking does not 417 the shopper's browser.
+		# The kill switch must short-circuit before the throw, so an in-flight beacon does not 417.
 		self.set_first_party(0)
 		self.post(event="purchase")
 		self.assertEqual(self.captured_rows(), [])
@@ -293,8 +289,7 @@ class TestGetTrafficSources(IntegrationTestCase):
 		self.event_names = []
 
 	def tearDown(self):
-		# get_traffic_sources aggregates every row in the window, so one test's rows would land in
-		# the next test's totals if they outlived it
+		# get_traffic_sources aggregates the whole window, so leftover rows land in the next test's totals.
 		frappe.db.delete("Storefront Analytics Event", {"name": ("in", self.event_names)})
 
 	def make_session(self, session_id, source, medium, campaign, revenue=0):

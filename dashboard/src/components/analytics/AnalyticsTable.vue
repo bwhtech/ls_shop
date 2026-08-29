@@ -18,10 +18,6 @@ function selectRow(row: TRow) {
 }
 </script>
 
-<!--
-	The dense numeric table half the analytics widgets are. A column prints itself through its
-	own `format`, and is a named slot for the cells that need more than text - a badge, a link.
--->
 <template>
 	<div class="-mx-1 overflow-x-auto">
 		<table class="w-full min-w-max border-collapse text-base">

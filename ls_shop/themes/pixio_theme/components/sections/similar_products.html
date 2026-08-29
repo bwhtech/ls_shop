@@ -1,17 +1,5 @@
-{# Reference: reference_themes/pixio/index.html 1716-1809.
+{# .text__char reads its angle from --char-rotate, which the vendor's unloaded word-rotate script used to write, so the angles are computed here. #}
 
-   The reference lays the three cards out as a static .row. They are a rail here because the
-   set is merchant-pinned and unbounded, and .swiper-visible + pixio_carousels.js is the
-   theme's existing way to hold an unbounded product row.
-
-   The circular badge is Pixio's word-rotate widget: style.css already styles .text-row,
-   .text__char and .badge__emoji, and .text__char reads its angle from a --char-rotate custom
-   property that the vendor's word-rotate script used to write. That script is not loaded, so
-   the angles are computed here - the inline property is the widget's own contract, not styling. #}
-
-{# .shop-card.style-5 needs the sale-title / struck-through-price content block that
-   macros/product_card.html only emits for style-2 and style-4, so the card is built here.
-   It belongs in that macro as a shared branch - see the handoff note. #}
 {% macro similar_card(variant, wow_delay) %}
 {% set product_url = "/" ~ (frappe.lang or "en") ~ "/products/" ~ variant.route %}
 {% set product_name = variant.item_name if frappe.lang == "en" else (variant.custom_item_name_ar or variant.item_name) %}

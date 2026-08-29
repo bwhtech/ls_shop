@@ -28,8 +28,7 @@ FUNNEL_STAGES = (
 	("purchased", "Purchased", "purchase"),
 )
 ABANDONED_CARTS_LIMIT = 20
-# source x medium x campaign multiplies the distinct groups, so the cap is wider than the
-# source x medium one was, while still bounding a guest-controlled grouping
+# source x medium x campaign is a guest-controlled grouping, so the cap bounds the distinct groups
 TRAFFIC_SOURCES_LIMIT = 50
 # engagement sorts by conversion rate, so rank a wider by-views pool first, then slice
 ENGAGEMENT_CANDIDATE_LIMIT = 100
@@ -172,9 +171,7 @@ def get_overview(from_date: str, to_date: str):
 	previous_from, previous_to = get_previous_window(from_date, to_date)
 	previous = get_period_kpis(previous_from, previous_to)
 	return {
-		# Every figure on this screen is a base_grand_total sum, which is denominated in the
-		# company's currency - Global Defaults is a different setting and disagreed with it, so the
-		# tiles were labelling company-currency money with the global symbol.
+		# base_grand_total is company currency; Global Defaults is a separate setting and mislabels the tiles.
 		"currency": get_reporting_currency(),
 		"kpis": {key: {"value": current[key], "previous": previous[key]} for key in current},
 	}
@@ -374,8 +371,7 @@ def get_traffic_sources(from_date: str, to_date: str):
 	analytics_event = frappe.qb.DocType("Storefront Analytics Event")
 	source = Coalesce(NullIf(analytics_event.utm_source, ""), "Direct")
 	medium = Coalesce(analytics_event.utm_medium, "")
-	# direct and organic traffic legitimately has no campaign, so it stays empty rather than
-	# being labelled with a placeholder the shop owner would read as a real campaign
+	# direct and organic traffic has no campaign; left empty rather than given a placeholder
 	campaign = Coalesce(analytics_event.utm_campaign, "")
 	sessions = distinct_sessions(analytics_event)
 	rows = (

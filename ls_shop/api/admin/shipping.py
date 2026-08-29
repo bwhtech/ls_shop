@@ -1,15 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""The shipping half of the dashboard's integration screen: a registry plus two wrappers.
-
-The mirror of `payments.py`, and the reason `integrations.py` knows nothing about either one. A
-carrier differs from a payment gateway in only three ways, all of them data: which profile doctype
-records it, what that profile calls its Link back to the settings Single, and where its webhook
-lands. There is no `on_enable` - a gateway needs a Mode of Payment before ERPNext will post its
-Payment Entry, while a carrier needs nothing beyond the profile row.
-"""
-
 import frappe
 
 from ls_shop.api.admin.integrations import describe_integration, save_integration

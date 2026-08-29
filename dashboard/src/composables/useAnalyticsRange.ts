@@ -26,8 +26,6 @@ const presetDays: Record<AnalyticsRangePreset, number> = {
 	"90": 90,
 }
 
-// Module state, not per-caller state: every widget on the page reads the one range control,
-// so switching a preset refetches the whole page rather than the widget that owns the tabs.
 const preset = ref<AnalyticsRangePreset>("30")
 const refreshToken = ref(0)
 
@@ -67,10 +65,7 @@ export function refreshAnalytics() {
 	refreshToken.value += 1
 }
 
-/**
- * Widgets whose params did not change still have to reload on a manual refresh - `useCall`
- * only refetches when its params do, and the range has not moved.
- */
+/** `useCall` only refetches when its params change, so a manual refresh has to reload widgets whose params did not. */
 export function onAnalyticsRefresh(reload: () => void) {
 	watch(refreshToken, () => reload())
 }
@@ -78,12 +73,8 @@ export function onAnalyticsRefresh(reload: () => void) {
 export type AnalyticsReportParams = Record<string, string | number>
 
 /**
- * One report endpoint behind one analytics widget: the call, its place in the page's refresh,
- * and the three shapes every widget hands its panel.
- *
- * `params` is the whole param set, not an addition to the range - `get_live_view` and
- * `get_tracking_health` take no window at all, and sending them one would refetch them every
- * time the reader moved the range.
+ * `params` is the whole param set, not an addition to the range: `get_live_view` and `get_tracking_health`
+ * take no window, and sending them one would refetch them every time the reader moved the range.
  */
 export function useAnalyticsReport<TData>(
 	method: string,

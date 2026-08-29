@@ -33,7 +33,6 @@ const { data, loading, error } = useAnalyticsReport<ProductEngagementRow[]>(
 
 const rows = computed(() => data.value ?? [])
 
-/** The store's own flag from the formula sheet: plenty of interest, almost nothing bought. */
 function isLowConverting(row: ProductEngagementRow) {
 	return row.views > 50 && row.purchase_to_view_rate < 1
 }

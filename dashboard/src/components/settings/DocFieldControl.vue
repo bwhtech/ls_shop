@@ -16,10 +16,6 @@ import { normalizeValue } from "./useSettingsForm"
 const props = defineProps<{
 	field: DocField
 	modelValue: DocFieldValue
-	/**
-	 * The integration forms label each control themselves; the settings tabs put the label in
-	 * their SettingsRow, and FormControl renders identically with it left undefined.
-	 */
 	label?: string
 	description?: string
 	placeholder?: string
@@ -32,8 +28,6 @@ const value = computed({
 	set: (next: DocFieldValue) => emit("update:modelValue", next),
 })
 
-// Attach, Password and Checkbox each take one shape, while a metadata-driven field holds any of
-// them - so each control reads the value as what it accepts and writes the plain value back.
 const text = computed<string | null>({
 	get: () =>
 		props.modelValue === null ? null : normalizeValue(props.modelValue),
@@ -52,12 +46,6 @@ const secret = computed({
 })
 </script>
 
-<!--
-	One ladder from fieldtype to control, so a fieldtype cannot render as a textarea on one
-	screen and a one-line input on another. Link is deliberately not here: the settings tabs
-	search a permission-scoped endpoint and the integration forms search Frappe's own, so each
-	caller keeps its own Link branch above this one.
--->
 <template>
 	<SettingsAttach
 		v-if="props.field.fieldtype === 'Attach Image'"

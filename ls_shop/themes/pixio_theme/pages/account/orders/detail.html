@@ -1,12 +1,4 @@
-{# Reference: reference_themes/pixio/account-order-details.html 1011-1211.
-
-   The reference's Order History timeline and Courier tab are dropped: a Sales Order carries a
-   single ecommerce status, not a dated shipment event log, and there is no courier record
-   behind the tab at all - both would be hand-authored demo data. The two tabs that survive are
-   the two the order really answers: what was bought, and who it is going to.
-
-   Bootstrap's tab JS is banned, so Alpine toggles the .active/.show classes bootstrap's own
-   CSS keys the panes off - the same pattern as components/sections/product_tabs.html. #}
+{# Bootstrap's tab JS is banned, so Alpine toggles the .active/.show classes bootstrap's own CSS keys the panes off. #}
 
 {% extends "components/theme_layout.html" %}
 {% from "components/core/account_shell.html" import account_shell %}
@@ -26,8 +18,7 @@
 {% set is_returnable = return_period and order.name | can_return(return_period) %}
 {% set returnable_items = order_items | rejectattr("is_free_item") | list %}
 {% set discount_amount = (order.total or 0) - (order.net_total or 0) %}
-{# The stored shipping address is an ERPNext display string with <br> separators and trailing
-   empty lines; both destinations below need it as one flat, autoescaped sentence. #}
+{# The stored shipping address is an ERPNext display string with <br> separators and trailing empty lines. #}
 {% set address_lines = [
 	order.pickup_address_line_1,
 	order.pickup_address_line_2,

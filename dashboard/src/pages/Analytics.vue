@@ -37,15 +37,12 @@ import { computed, ref } from "vue"
 
 const { preset, rangeParams } = useAnalyticsRange()
 
-// The overview owns the store currency, so every money figure on the page reads it from here
-// rather than each widget asking the server for the same string.
 const overview = useCall<AnalyticsOverview, AnalyticsRangeParams>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_overview",
 	params: () => rangeParams.value,
 	refetch: true,
 })
 
-// One read-back for both provider cards: the endpoint returns GA4 and Meta together.
 const externalSummaries = useCall<ExternalSummaries>({
 	url: "/api/v2/method/ls_shop.api.analytics_dashboard.get_external_summaries",
 })
@@ -83,8 +80,6 @@ function openProductDrilldown(itemCode: string) {
 		</PageHeader>
 
 		<ScrollArea class="min-h-0 flex-1" viewport-class="pb-40">
-			<!-- Section order follows the Desk dashboard: what is happening now, then the period's
-			     numbers, then the journey, then the catalogue, then acquisition, then diagnostics. -->
 			<div class="mx-auto max-w-6xl space-y-4 px-3 pt-5 sm:px-5">
 				<LiveViewCard :currency="currency" />
 

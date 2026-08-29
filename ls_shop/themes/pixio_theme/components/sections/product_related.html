@@ -1,9 +1,4 @@
-{# Reference: product-default.html 1426-1590. The reference's five hand-written .shop-card
-   blocks are one variant_card call - the homepage rails already ship that card.
-
-   .card-container on the slide is not decoration: it is the hook pixio.css already hangs the
-   3/4 photo frame on, and without it the tallest merchant upload in the track sets the height
-   of every other slide. #}
+{# .card-container is the hook pixio.css hangs the 3/4 photo frame on; without it the tallest merchant upload sets every slide's height. #}
 {% from "components/macros/product_card.html" import variant_card %}
 <section class="content-inner-1 overflow-hidden">
 	<div class="container">

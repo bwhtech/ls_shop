@@ -18,12 +18,8 @@ IN_CLAUSE_CHUNK_SIZE = 1000
 
 
 def validate_document_access(doctype: str, name: str):
-	"""Return the document only if the session owns it, or holds read permission on it.
-
-	Storefront endpoints take a document name straight from the request, and Sales Order names are
-	sequential — without this the id in the payload is the only thing standing between a shopper and
-	someone else's order.
-	"""
+	"""Return the document only if the session owns it, or holds read permission on it."""
+	# Sales Order names are sequential, so the id in the payload is all that guards someone else's order.
 	document = frappe.get_doc(doctype, name)
 	if document.owner != frappe.session.user and not document.has_permission("read"):
 		raise frappe.PermissionError
@@ -71,8 +67,7 @@ def get_product_list(filters=None, product_list=None, page=1, page_length=30, so
 	if not ranked_names:
 		return []
 
-	# Hydrate through the retained frappe.qb select so search cards carry exactly the same keys as
-	# browse cards, then restore the engine's rank (frappe.qb returns them ordered by name).
+	# Hydrate through the qb select for one card shape, then restore rank: frappe.qb orders by name.
 	cards_by_name = {
 		card["name"]: card
 		for card in get_product_list_qb(product_list=ranked_names, page_length=len(ranked_names))
@@ -92,7 +87,6 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	item = DocType("Item")
 	has_custom_name_ar = frappe.db.has_column("Item", "custom_item_name_ar")
 
-	# Select Fields
 	discount_expr = (
 		Case()
 		.when(
@@ -130,7 +124,6 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 	)
 	if has_custom_name_ar:
 		query = query.select(item.custom_item_name_ar)
-	# Sorting
 	if sort_by == "price_low":
 		query = query.orderby(Min(item_price_sale.price_list_rate), order=Order.asc)
 	elif sort_by == "price_high":
@@ -143,18 +136,11 @@ def get_product_list_qb(filters=None, product_list=None, page=1, page_length=30,
 		query = query.orderby(discount_expr, order=Order.desc)
 	else:
 		query = query.orderby("name", order=Order.asc)
-	# Execute Query
 	return shape_product_cards(query.run(as_dict=True))
 
 
 def shape_product_cards(cards):
-	"""Give every product card the one storefront card shape, whichever grid built it.
-
-	The search modal is served by the index on one keystroke and by frappe.qb on the next, so a card
-	whose key set changes between the two makes the same product render differently. The index's
-	product_detail snapshot is the canonical shape; keys the frappe.qb select cannot reach are
-	derived from what it did select.
-	"""
+	"""Give every product card the one storefront card shape, whichever grid built it."""
 	from ls_shop.search.record_builder import sizes_for_variants
 	from ls_shop.search.sqlite_product_search import SqliteProductSearch
 
@@ -170,27 +156,21 @@ def shape_product_cards(cards):
 		for column in SqliteProductSearch.PRODUCT_DETAIL_COLUMNS:
 			if column != "doc_id":
 				card.setdefault(column, None)
-		# Mirrors record_builder.aggregate_prices so a price a card was filtered or sorted by means
-		# the same thing on both grids.
+		# Mirrors record_builder.aggregate_prices so both grids agree on the price they filter and sort by.
 		if card["effective_price"] is None:
 			card["effective_price"] = (
 				card["sale_price"] if card["sale_price"] is not None else (card["default_price"] or 0)
 			)
 		if card["has_discount"] is None:
 			card["has_discount"] = 1 if flt(card["discount_percent"]) else 0
-		# frappe.qb hands back a datetime where the index snapshot holds a string, and the card is
-		# json.dumps'd straight into the wishlist attribute in item_card.html.
+		# frappe.qb returns a datetime where the index holds a string, and the card is json.dumps'd into HTML.
 		card["modified"] = cstr(card["modified"]) if card["modified"] else None
 	return cards
 
 
 def attach_live_prices(cards):
-	"""Overlay the live Item Price onto index-hydrated cards.
-
-	Item Price edits fire no Style Attribute Variant event, so the indexed price snapshot can lag a
-	price change until the nightly rebuild. The snapshot still drives filtering and sorting; only the
-	displayed figures are refreshed here.
-	"""
+	"""Overlay the live Item Price onto index-hydrated cards."""
+	# Item Price edits fire no Style Attribute Variant event, so the indexed price lags until the rebuild.
 	from ls_shop.search.record_builder import aggregate_prices, rates_by_item_code
 
 	if not cards:
@@ -231,7 +211,6 @@ def get_product_count_qb(filters=None, product_list=None):
 
 
 def get_product_base_query(filters=None, product_list=None):
-	# Define the DocTypes
 	lifestyle_settings = frappe.get_cached_doc("Lifestyle Settings")
 	default_price_list = lifestyle_settings.default_price_list
 	sale_price_list = lifestyle_settings.sale_price_list
@@ -242,7 +221,6 @@ def get_product_base_query(filters=None, product_list=None):
 	item_price_sale = DocType("Item Price").as_("ip_sale")
 	item = DocType("Item")
 
-	# Base Query
 	query = (
 		frappe.qb.from_(style_attribute_variant)
 		.left_join(website_slideshow_item)
@@ -265,13 +243,11 @@ def get_product_base_query(filters=None, product_list=None):
 		.left_join(item)
 		.on(item.name == style_attribute_variant.item_style)
 	)
-	# Get product details with list of style attribute variant
 	if product_list:
 		query = query.where(style_attribute_variant.name.isin(product_list))
 	else:
 		query = query.where(style_attribute_variant.is_published == 1)
 
-	# Apply Filters
 	if filters:
 		if filters.get("has_discount"):
 			query = query.where(item_price_default.price_list_rate > item_price_sale.price_list_rate)
@@ -290,7 +266,6 @@ def get_product_base_query(filters=None, product_list=None):
 		if filters.get("search"):
 			search = filters.get("search")
 			child_categories = get_complete_nested_links(search)
-			# Start with the base search conditions
 			search_condition = (
 				(style_attribute_variant.display_name.like(f"%{search}%"))
 				| (style_attribute_variant.attribute_name.like(f"%{search}%"))
@@ -303,7 +278,6 @@ def get_product_base_query(filters=None, product_list=None):
 			if child_categories:
 				search_condition |= style_attribute_variant.item_group.isin(child_categories)
 
-			# Add exclusion condition if search starts with "men"
 			if search.lower().startswith("men"):
 				exclusion_condition = (~style_attribute_variant.display_name.like("%women%")) & (
 					~style_attribute_variant.item_group.like("%women%")
@@ -325,9 +299,7 @@ def get_delivery_configuration():
 	return condition.shipping_amount, condition.to_value
 
 
-# The Actual charge row cash on delivery posts through, named once so the checkout that writes it
-# and the order screen that has to label it cannot drift apart. The leading space is historical -
-# live orders carry it - so readers strip before comparing rather than the name losing it.
+# The leading space is historical and live orders carry it: strip before comparing, never remove it.
 COD_CHARGE_DESCRIPTION = " Cash on Delivery Charges"
 
 
@@ -346,9 +318,7 @@ def format_theme_css():
 
 def get_currency_symbol():
 	currency = frappe.get_cached_value("Global Defaults", "Global Defaults", "default_currency")
-	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font. The check
-	# used to fall through on developer_mode as well, which stamped the riyal on every price a
-	# non-SAR dev site rendered.
+	# Riyal has no glyph in the fonts the themes ship, so SAR alone borrows the icon font.
 	if currency == "SAR":
 		return '<span class="saudi-currency-symbol pe-0.5"></span>'
 	return frappe.get_cached_value("Currency", currency, "symbol")
@@ -427,12 +397,8 @@ def get_local_lang_url(path: str) -> str:
 
 
 def get_login_url_for_current_page() -> str:
-	"""Login link that lands the shopper back on the page that refused them, query string intact.
-
-	The login page reads `redirect-to` off its own query string, so an unencoded return URL loses
-	everything from its first `&` onwards - on the gateway return URL that is the payment_mode and
-	session_id the confirmation needs to resolve the payment.
-	"""
+	"""Login link that lands the shopper back on the page that refused them, query string intact."""
+	# The login page reads `redirect-to` off its own query string: unencoded, it truncates at the first `&`.
 	request = getattr(frappe.local, "request", None)
 	# werkzeug always appends the separator to full_path, even with nothing after it.
 	return_to = request.full_path.removesuffix("?") if request else "/"
@@ -574,7 +540,6 @@ def update_sales_order_ecommerce_status(sales_order_name):
 	elif sales_order.docstatus == 0:
 		new_status = "Waiting for Approval"
 	elif sales_order.docstatus == 1:
-		# Check related documents
 		dn_exists = frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order.name})
 		shipment_exists = frappe.db.exists(
 			"Shipment Delivery Note",

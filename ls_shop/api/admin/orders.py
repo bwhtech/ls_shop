@@ -16,17 +16,12 @@ from ls_shop.utils import COD_CHARGE_DESCRIPTION
 
 PAGE_LENGTH = 20
 
-# A page of orders drives four batched lifecycle reads, each with an IN list built from the page.
-# Capped so a caller asking for "everything" cannot turn those into IN lists the database chokes on.
+# Caps the IN lists the batched lifecycle reads build from a page.
 MAX_PAGE_LENGTH = 100
 
-# A store owner thinks in "what do I have to do with this order", not in docstatus and
-# per_delivered. One map turns ERPNext's state into that question.
 OPEN_STATUSES = ("To Deliver and Bill", "To Deliver", "To Bill")
 
-# The fulfilment ladder, read from the top down: an order is described by the furthest rung it has
-# reached, so a delivered order never reads back as merely "Packed". Keys are the contract the
-# dashboard maps to an icon and a colour; the labels are only ever shown to a person.
+# Priority order, read top-down: an order is described by the furthest rung it has reached.
 STAGE_LABELS = {
 	"cancelled": "Cancelled",
 	"returned": "Returned",
@@ -35,23 +30,19 @@ STAGE_LABELS = {
 	"fulfilled": "Fulfilled",
 	"partly_fulfilled": "Partly fulfilled",
 	"packed": "Packed",
-	"delivery_note_drafted": "Delivery note drafted",
+	"delivery_note_drafted": "Preparing for shipment",
 	"to_fulfil": "To fulfil",
 }
 
-# The stepper's spine: the path an order actually walks, in the order it walks it. STAGE_LABELS above
-# is a *priority* ordering - read top-down to answer "where is this order now" - which is not a
-# timeline. These five rungs are the ones that are genuinely sequential, and they are the only nodes
-# the stepper ever draws on the happy path.
+# Sequential timeline, unlike STAGE_LABELS above, which is a priority ordering.
 STEP_SEQUENCE = ("to_fulfil", "delivery_note_drafted", "packed", "shipped", "delivered")
 STEP_POSITIONS = {key: index for index, key in enumerate(STEP_SEQUENCE)}
 
-# Milestone wording, not badge wording. A stepper node names something that happened ("Order
-# placed"); the badge answers what the order still needs ("To fulfil"). Same keys, so the two can
-# only ever describe the same rung.
+# Milestone wording, not badge wording; same keys as STAGE_LABELS.
+# Shop owners don't know what a Delivery Note is, so the wording stays plain even where the key isn't.
 STEP_LABELS = {
 	"to_fulfil": "Order placed",
-	"delivery_note_drafted": "Delivery note",
+	"delivery_note_drafted": "Preparing",
 	"packed": "Packed",
 	"shipped": "Shipped",
 	"delivered": "Delivered",
@@ -59,19 +50,13 @@ STEP_LABELS = {
 	"returned": "Returned",
 }
 
-# Two rungs describe how *much* of the dispatch has happened rather than a step of its own, so they
-# annotate the dispatch node instead of adding a node the order never has to pass through. Nothing
-# in the ladder changes: they still decide the badge, they just do not earn a circle.
+# Rungs that annotate the dispatch node instead of earning a node of their own.
 QUANTITY_STAGES = {"partly_fulfilled": "shipped", "fulfilled": "shipped"}
 
-# Cancelled and returned END the path rather than sitting on it. An order on one of them is drawn as
-# the steps it really reached, then the terminal node - never with the rest of the happy path
-# trailing off as "upcoming", which it is now never going to walk.
+# These END the path rather than sitting on it.
 TERMINAL_STAGES = ("cancelled", "returned")
 
-# bwh_shipping tracks a parcel in the carrier's vocabulary; the dashboard only cares which rung of
-# the ladder that vocabulary lands on. Anything unlisted (Draft, Ready To Ship, Cancelled) is a
-# shipment that has not physically moved, so it leaves the stage to the documents underneath it.
+# Anything unlisted (Draft, Ready To Ship, Cancelled) has not physically moved.
 SHIPMENT_STAGES = {
 	"Delivered": "delivered",
 	"RTO": "returned",
@@ -82,14 +67,10 @@ SHIPMENT_STAGES = {
 	"Lost": "shipped",
 }
 
-# The rungs where the order no longer waits on the owner: the parcel has moved, arrived, come back,
-# or the order is gone. An order on one of these has no business in the "To fulfil" worklist, whatever
-# ERPNext's own status still says. `shipped` sits here deliberately - the owner shipped it, so the
-# only party still to act is the carrier.
+# Rungs where the order no longer waits on the owner; `shipped` is here deliberately.
 SETTLED_STAGES = frozenset({"cancelled", "returned", "delivered", "shipped"})
 
-# The carrier statuses that put an order on a settled rung. Derived from the ladder's own map rather
-# than listed again, so the worklist can never drift from the badge it has to agree with.
+# The carrier statuses that put an order on a settled rung.
 SETTLED_SHIPMENT_STATUSES = tuple(
 	status for status, stage in SHIPMENT_STAGES.items() if stage in SETTLED_STAGES
 )
@@ -103,11 +84,7 @@ OVERVIEW_WINDOW_DAYS = 30
 def get_orders(
 	status: str | None = None, search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH
 ):
-	"""The whole Orders screen in one call.
-
-	Item counts, payment mode and fulfilment stage are all batched across the page, so the list
-	costs the same handful of queries whether it shows one order or a hundred.
-	"""
+	"""The whole Orders screen in one call."""
 	frappe.has_permission("Sales Order", ptype="read", throw=True)
 
 	if status == "open":
@@ -174,15 +151,8 @@ def get_orders(
 
 
 def get_open_order_filters() -> list:
-	"""What "To fulfil" means, in one place: the tab, the Home figure and the fulfil button all read
-	it, so none of them can contradict the badge.
-
-	An order is waiting on the owner when it is confirmed, still open in ERPNext's own status, and
-	has not reached a settled rung of the ladder. The two exclusions are subqueries rather than lists
-	of names, because the stage is derived in Python only after the page is fetched: filtering the
-	derived list would silently corrupt both the page size and the total, and a name list would grow
-	with every order the store has ever shipped.
-	"""
+	"""Subqueries, not name lists: the stage is derived in Python after the page is fetched, so
+	filtering the derived list would corrupt both the page size and the total."""
 	filters = [
 		["docstatus", "=", 1],
 		["status", "in", OPEN_STATUSES],
@@ -196,11 +166,8 @@ def get_open_order_filters() -> list:
 
 
 def get_returned_orders():
-	"""The orders a submitted return has reversed - `pick_stage`'s `has_return` rung, as a subquery.
-
-	A return resets per_delivered, which is why these orders drift back into an open ERPNext status
-	wearing a Returned badge.
-	"""
+	"""The orders a submitted return has reversed, as a subquery. A return resets per_delivered, so
+	these drift back into an open ERPNext status."""
 	delivery_note = frappe.qb.DocType("Delivery Note")
 	delivery_note_item = frappe.qb.DocType("Delivery Note Item")
 	return (
@@ -210,21 +177,15 @@ def get_returned_orders():
 		.select(delivery_note_item.against_sales_order)
 		.where(delivery_note.docstatus == 1)
 		.where(delivery_note.is_return == 1)
-		# A NULL anywhere in a NOT IN subquery makes the whole predicate NULL, which would drop
-		# every order from the worklist; delivery note lines raised outside an order have none.
+		# A NULL anywhere in a NOT IN subquery makes the whole predicate NULL and drops every order.
 		.where(delivery_note_item.against_sales_order.notnull())
 		.where(delivery_note_item.against_sales_order != "")
 	)
 
 
 def get_shipped_orders():
-	"""The orders whose parcel has physically moved, as a subquery.
-
-	Only the latest shipment counts, exactly as `read_shipment_stages` reads it: an order rebooked
-	after a failed pickup carries a stale older request that must not settle it. Comparing the newest
-	moved request against the newest request of any kind picks that out in a single grouped pass, and
-	without a correlated subquery, so MariaDB and Postgres both plan it the same way.
-	"""
+	"""The orders whose parcel has physically moved, as a subquery. Only the latest shipment counts: a
+	rebooked order carries a stale older request that must not settle it."""
 	shipping_request = frappe.qb.DocType("Shipping Request")
 	newest_moved = Max(
 		Case()
@@ -244,9 +205,7 @@ def get_shipped_orders():
 
 
 def get_address_lines(address_display):
-	"""ERPNext builds address_display as HTML, but the dashboard renders it as plain text, so its
-	<br> tags used to show up literally on the order screen. Newlines survive the trip because the
-	element they land in is whitespace-pre-line."""
+	"""ERPNext builds address_display as HTML; the dashboard renders plain text, so <br> tags leak."""
 	if not address_display:
 		return None
 
@@ -258,12 +217,7 @@ def get_address_lines(address_display):
 
 
 def describe_state(order, lifecycle=None):
-	"""Where this order sits on the fulfilment ladder: a stable key plus the owner-facing label.
-
-	The single source of truth behind every order badge in the dashboard. `lifecycle` carries the
-	paperwork found for this order by `read_order_lifecycles`; without it the stage is derived from
-	the Sales Order alone, which is all the coarse pre-fulfilment rungs need.
-	"""
+	"""Where this order sits on the fulfilment ladder: a stable key plus the owner-facing label."""
 	lifecycle = lifecycle or frappe._dict()
 	key = pick_stage(order, lifecycle)
 	label = STAGE_LABELS.get(key)
@@ -282,26 +236,19 @@ def pick_stage(order, lifecycle) -> str:
 		return "fulfilled"
 	if flt(order.per_delivered) > 0:
 		return "partly_fulfilled"
-	# Below fulfilment, not above it: ERPNext refuses a Packing Slip against anything but a draft
-	# Delivery Note, so packing is what happens on the way to shipping, never after it.
+	# Below fulfilment: ERPNext refuses a Packing Slip against anything but a draft Delivery Note.
 	if lifecycle.get("has_packing_slip"):
 		return "packed"
 	if lifecycle.get("has_draft_delivery_note"):
 		return "delivery_note_drafted"
 	if order.status in OPEN_STATUSES:
 		return "to_fulfil"
-	# An order in a status the ladder has no rung for (On Hold, Closed) keeps ERPNext's own word
-	# for it rather than being flattened into a rung it never reached.
+	# On Hold, Closed and friends keep ERPNext's own word rather than a rung they never reached.
 	return cstr(order.status)
 
 
 def describe_progress(order, lifecycle=None) -> list:
-	"""The order's walk along the fulfilment path, as the nodes a stepper draws.
-
-	One opinion about where an order is, not two: the current node is `pick_stage`'s own answer,
-	placed on the sequence rather than re-derived from the paperwork, so the stepper and the badge on
-	the same screen can never disagree.
-	"""
+	"""The order's walk along the fulfilment path, as the nodes a stepper draws."""
 	lifecycle = lifecycle or frappe._dict()
 	stage = pick_stage(order, lifecycle)
 	timestamps = read_step_timestamps(order, lifecycle)
@@ -312,10 +259,7 @@ def describe_progress(order, lifecycle=None) -> list:
 		steps.append(build_step(stage, "current", timestamps))
 		return steps
 
-	# A stage the sequence has no node for - a quantity rung, or ERPNext's own On Hold, Closed or
-	# Draft - has no position of its own. The quantity rungs borrow the dispatch node; anything else
-	# falls back to what the paperwork proves, because a truthful node with an odd caption beats a
-	# confidently wrong position. Either way the stage still gets said, as the node's note.
+	# A stage with no node of its own borrows the dispatch node, or falls back to the paperwork.
 	current = STEP_POSITIONS.get(QUANTITY_STAGES.get(stage, stage), reached)
 	note = None if stage in STEP_POSITIONS else STAGE_LABELS.get(stage) or cstr(order.status)
 
@@ -342,12 +286,7 @@ def build_step(key: str, state: str, timestamps: dict, note: str | None = None) 
 
 
 def furthest_step_reached(order, lifecycle) -> int:
-	"""How far along the sequence the paperwork proves this order got.
-
-	Only used where the stage cannot say it itself - a terminal order, which stopped somewhere the
-	stage no longer records, and an off-ladder status. A stepper marks everything before the furthest
-	node as done, so each rung only needs the evidence that it was passed, not that it was performed.
-	"""
+	"""How far along the sequence the paperwork proves this order got."""
 	reached = 0
 	if lifecycle.get("has_draft_delivery_note") or lifecycle.get("delivery_notes"):
 		reached = STEP_POSITIONS["delivery_note_drafted"]
@@ -365,22 +304,16 @@ def furthest_step_reached(order, lifecycle) -> int:
 
 
 def read_step_timestamps(order, lifecycle) -> dict:
-	"""When each node happened, taken from the documents the lifecycle reader already fetched.
-
-	Every one of these rides along on a query that was being run anyway, so timestamps cost the list
-	screen nothing; a node with no document behind it simply has no date.
-	"""
+	"""When each node happened, from the documents the lifecycle reader already fetched."""
 	return {
 		"to_fulfil": order.transaction_date,
 		"delivery_note_drafted": lifecycle.get("drafted_on"),
 		"packed": lifecycle.get("packed_on"),
 		"shipped": lifecycle.get("shipped_on") or lifecycle.get("dispatched_on"),
 		"delivered": lifecycle.get("delivered_on"),
-		# The return document dates the goods actually coming back; an RTO has no such document, so
-		# the carrier's own word is the fallback rather than the first choice.
+		# An RTO has no return document, so the carrier's word is the fallback, not the first choice.
 		"returned": lifecycle.get("returned_on") or lifecycle.get("carrier_returned_on"),
-		# Cancelling is the last thing that can be done to a Sales Order, so its last write is when
-		# it was cancelled.
+		# Cancelling is the last thing that can be done to a Sales Order.
 		# ponytail: modified stands in for a cancellation timestamp, revisit if a version log is read here
 		"cancelled": order.get("modified") if cint(order.docstatus) == 2 else None,
 	}
@@ -406,12 +339,8 @@ def keep_latest(lifecycle, field: str, value) -> None:
 
 
 def read_order_lifecycles(order_names: list) -> dict:
-	"""The fulfilment paperwork behind a page of orders, in a fixed number of queries.
-
-	Four reads for the whole page - delivery notes, their headers, packing slips, shipments - rather
-	than four per order. Keyed by `cstr(name)` throughout, because an autoincrement-named Sales
-	Order comes back as an int here and as a string from the request.
-	"""
+	"""The fulfilment paperwork behind a page of orders, in a fixed number of queries. Keyed by
+	`cstr(name)`: an autoincrement-named Sales Order is an int here and a string from the request."""
 	if not order_names:
 		return {}
 
@@ -428,8 +357,6 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 	delivery_note_names = list(orders_by_delivery_note)
 	if delivery_note_names:
-		# creation and posting_date ride along on reads that were happening anyway, which is what
-		# lets the stepper date every node without costing the list screen a single extra query.
 		for note in frappe.get_all(
 			"Delivery Note",
 			filters={"name": ["in", delivery_note_names]},
@@ -446,8 +373,7 @@ def read_order_lifecycles(order_names: list) -> dict:
 					keep_earliest(lifecycle, "dispatched_on", note.posting_date)
 				else:
 					lifecycle.has_draft_delivery_note = True
-				# A return note is paperwork about the way back, so it never dates the drafting of
-				# the outbound one.
+				# A return note never dates the drafting of the outbound one.
 				keep_earliest(lifecycle, "drafted_on", note.creation)
 
 		for slip in frappe.get_all(
@@ -467,18 +393,13 @@ def read_order_lifecycles(order_names: list) -> dict:
 
 
 def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
-	"""Fold each order's latest carrier status into its lifecycle, in one read.
-
-	Same query shape as `ls_shop.api.shipping.get_order_tracking`, which is what the customer's own
-	tracking page reads, so the two screens can never disagree about where a parcel is.
-	"""
+	"""Fold each order's latest carrier status into its lifecycle, in one read."""
 	from ls_shop.api.shipping import is_connector_installed
 
 	if not is_connector_installed():
 		return
 
-	# Newest first, and only the first shipment seen per order counts: an order rebooked after a
-	# failed pickup carries a stale older request that would otherwise outrank the live one.
+	# Newest first, first seen wins: a rebooked order carries a stale request that must not outrank it.
 	for request in frappe.get_all(
 		"Shipping Request",
 		filters={"ref_doctype": "Sales Order", "ref_docname": ["in", order_names], "docstatus": ["<", 2]},
@@ -491,32 +412,20 @@ def read_shipment_stages(order_names: list, lifecycles: dict) -> None:
 		stage = SHIPMENT_STAGES.get(cstr(request.status))
 		lifecycle.stage_from_shipment = stage
 		if stage in ("shipped", "delivered", "returned"):
-			# The booking is what put the parcel in the carrier's hands; the pickup date is the
-			# carrier's own word for that day, so it wins where the provider gave one.
+			# The carrier's pickup date wins over the booking date where the provider gave one.
 			keep_earliest(lifecycle, "shipped_on", request.pickup_date or request.creation)
 		if stage in ("delivered", "returned"):
-			# The request is written when a carrier scan is applied to it, so its last write is when
-			# it landed on the status it now holds. The scans themselves live in a child table that
-			# would cost a query per screen to read.
+			# The request's last write is when it landed on the status it now holds.
 			# ponytail: the request's last write stands in for the delivery scan, revisit by reading
 			# the Shipping Tracking Event row once the connector records them on this site
-			# Kept apart from the return note's own posting date rather than folded into it: one is a
-			# date and the other a datetime, and the two must never be compared against each other.
+			# Kept apart from the return note's posting date: one is a date, the other a datetime.
 			field = "delivered_on" if stage == "delivered" else "carrier_returned_on"
 			keep_latest(lifecycle, field, request.modified)
 
 
 def get_order_charges(order):
-	"""Split the charge table into the lines the order screen can name.
-
-	The screen used to show item lines and a grand total with nothing between them to explain the
-	gap. Shipping reaches the table one of two ways - the connector's own Actual row, or ERPNext's
-	Shipping Rule row - and the rule's row is matched on account and cost centre the way ERPNext
-	matches it, because its description is the rule's translated label. Cash on delivery is a charge
-	of its own and would otherwise read as tax. `tax` is the remainder rather than a sum of its own,
-	so subtotal + shipping + cash on delivery + tax reconciles to the grand total even when a charge
-	row is one nothing here recognises.
-	"""
+	"""Split the charge table into the lines the order screen can name. The Shipping Rule row is matched
+	on account and cost centre because its description is the rule's *translated* label."""
 	rule = (
 		frappe.get_cached_value(
 			"Shipping Rule", order.shipping_rule, ["account", "cost_center"], as_dict=True
@@ -593,8 +502,7 @@ def get_order(sales_order: str):
 		order_by="idx asc",
 	)
 
-	# The size lives on the variant's child row, not on the order line, so one batched lookup
-	# turns item codes into something a person can read off a picking list.
+	# The size lives on the variant's child row, not on the order line.
 	sizes_by_item_code = {}
 	item_codes = [row.item_code for row in items if row.item_code]
 	if item_codes:
@@ -647,11 +555,8 @@ def get_order(sales_order: str):
 
 
 def can_fulfil_order(order, state) -> bool:
-	"""Whether there is anything left for the owner to ship.
-
-	per_delivered alone is not the answer: a return resets it, so a returned order used to offer a
-	solid "Fulfil order" button. The ladder already knows the order is done with the owner.
-	"""
+	"""Whether there is anything left for the owner to ship. per_delivered alone is not the answer: a
+	return resets it, so a returned order used to offer a live "Fulfil order" button."""
 	return (
 		cint(order.docstatus) == 1 and flt(order.per_delivered) < 100 and state["key"] not in SETTLED_STAGES
 	)
@@ -659,14 +564,8 @@ def can_fulfil_order(order, state) -> bool:
 
 @frappe.whitelist(methods=["POST"])
 def fulfil_order(sales_order: str):
-	"""Ship what is still outstanding on an order.
-
-	Delegates to ERPNext's own Sales Order -> Delivery Note mapper rather than hand-building the
-	document, so pricing, taxes and the delivered-quantity bookkeeping stay ERPNext's problem.
-	"""
-	# ERPNext moved its transaction mappers out of the doctype module into a sibling `mapper`
-	# module. Both layouts are in the wild across the versions this app runs against, so resolve
-	# whichever one is installed rather than pinning to a single import path.
+	"""Ship what is still outstanding on an order."""
+	# ERPNext moved its mappers to a sibling `mapper` module; both layouts are in the wild.
 	try:
 		from erpnext.selling.doctype.sales_order.mapper import make_delivery_note
 	except ImportError:
@@ -681,8 +580,7 @@ def fulfil_order(sales_order: str):
 	if flt(order.per_delivered) >= 100:
 		frappe.throw(_("This order has already been fulfilled."))
 
-	# The button is hidden for a settled order, but a screen left open on a stale list can still
-	# reach here, so the rule is enforced where it is decided rather than only where it is drawn.
+	# A screen left open on a stale list can still reach here, so enforce and not just hide.
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
 	state = describe_state(order, lifecycle)
 	if state["key"] in SETTLED_STAGES:
@@ -695,15 +593,10 @@ def fulfil_order(sales_order: str):
 	return {"delivery_note": delivery_note.name}
 
 
-# The overview lives here rather than in a module of its own so it ships without a web-process
-# restart; it reads across catalogue and stock through those modules' own batched readers.
 @frappe.whitelist()
 def get_overview(order_status: str | None = None):
-	"""The whole Home screen in one call: four figures, recent orders, and two worklists.
-
-	`order_status` only narrows the recent-orders panel; the figures always describe the whole
-	store, so flipping that toggle must not move them.
-	"""
+	"""The whole Home screen in one call. `order_status` narrows only the recent-orders panel; the
+	figures always describe the whole store."""
 	frappe.has_permission("Sales Order", ptype="read", throw=True)
 	frappe.has_permission("Item", ptype="read", throw=True)
 
@@ -715,8 +608,6 @@ def get_overview(order_status: str | None = None):
 	current_window = read_sales_window(window_start, today)
 	previous_window = read_sales_window(previous_start, previous_end)
 
-	# The same filters the Orders screen's "To fulfil" tab runs, so the figure and the list the owner
-	# lands on after clicking it can never disagree.
 	open_order_filters = get_open_order_filters()
 	to_fulfil = frappe.db.count("Sales Order", open_order_filters)
 	oldest_open = frappe.db.get_value(
@@ -727,8 +618,7 @@ def get_overview(order_status: str | None = None):
 	)
 
 	published_now = frappe.db.count("Style Attribute Variant", {"is_published": 1})
-	# Nothing records when an option went live, so an option created inside the window stands in
-	# for one that went live inside it.
+	# Nothing records when an option went live, so creation stands in.
 	# ponytail: creation date proxies the publish date, revisit if a publish log ever lands
 	published_new = frappe.db.count(
 		"Style Attribute Variant", {"is_published": 1, "creation": [">=", window_start]}
@@ -771,32 +661,20 @@ def get_overview(order_status: str | None = None):
 			},
 		],
 		"recent_orders": get_orders(status=order_status, page_length=OVERVIEW_PANEL_LENGTH)["orders"],
-		# The same availability filter the Inventory screen's "Running low" tab runs, so the panel
-		# and the screen the owner lands on after clicking it can never disagree.
 		"running_low": get_inventory(availability="low", page_length=OVERVIEW_PANEL_LENGTH)["rows"],
 		"needs_attention": get_unpublishable_options(limit=OVERVIEW_PANEL_LENGTH),
 	}
 
 
 def is_webshop_order(sales_order):
-	"""What counts as a sale, in one place: Home's revenue figures and every Analytics order
-	aggregate read it, so two screens one click apart can never report different money for the
-	same window.
-
-	Drafts count - a cash-on-delivery order is placed as a draft and is real revenue from the
-	moment the customer places it; only a cancelled order is out. The order type is filtered
-	because this is a storefront dashboard: Analytics attributes revenue to sessions and traffic
-	sources, which an order keyed in by hand in Desk does not have.
-	"""
+	"""What counts as a sale. Drafts count: a cash-on-delivery order is placed as a draft and is real
+	revenue; only a cancelled order is out."""
 	return (sales_order.docstatus < 2) & (sales_order.order_type == "Shopping Cart")
 
 
 def read_sales_window(from_date, to_date):
-	"""Revenue and order count for one date window, as a single aggregate read.
-
-	Sums base_grand_total, not grand_total: checkout takes whichever currency the customer
-	paid in, so only the company-currency figure is addable across orders.
-	"""
+	"""Revenue and order count for one date window. Sums base_grand_total, not grand_total: only the
+	company-currency figure is addable across orders."""
 	sales_order = frappe.qb.DocType("Sales Order")
 	rows = (
 		frappe.qb.from_(sales_order)

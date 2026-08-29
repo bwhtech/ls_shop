@@ -8,9 +8,6 @@ SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
 
 
 def get_product_detail(route, selected_size=None):
-	# Single source of truth for a product's price, stock and imagery. The product page,
-	# its JSON-LD and the OG card all read this, so a share card can never advertise a
-	# price the page does not show.
 	try:
 		product_variant = frappe.get_doc("Style Attribute Variant", {"route": route})
 	except frappe.DoesNotExistError:

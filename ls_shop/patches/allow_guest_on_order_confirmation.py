@@ -7,11 +7,8 @@ from ls_shop.shop_themes.doctype.shop_theme_settings.shop_theme_settings import 
 
 
 def execute():
-	"""Open the gateway return URL to a logged-out shopper.
-
-	seed_default_routes only ever adds a missing pattern, so a site that already carries this route
-	keeps the requires_auth it was seeded with and would still serve a 403 to a shopper who has paid.
-	"""
+	"""Open the gateway return URL to a logged-out shopper."""
+	# seed_default_routes only adds missing patterns, so an existing route keeps its seeded requires_auth.
 	frappe.db.set_value(
 		"Shop Themed Route",
 		{"url_pattern": rf"^{LANG}/account/orders/confirmation$", "requires_auth": 1},

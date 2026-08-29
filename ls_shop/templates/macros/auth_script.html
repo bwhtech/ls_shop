@@ -1,10 +1,3 @@
-{# The sign-in / sign-up / OTP logic, split out of signup_modal.html so a theme can keep the
-   behaviour while writing its own markup. Every function takes the Alpine `x_data` (and the
-   `$refs` it needs) rather than reaching for elements by id, so it is markup-agnostic.
-
-   signup_modal.html carries the Tailwind dialog the default theme uses; pixio_theme's
-   auth_dialog.html carries the Bootstrap one. Both include this file, so the four
-   ls_shop.api.signup endpoints are called from exactly one place. #}
 <script>
     async function sign_up_user(signup_data, ref) {
         const email = signup_data.email;
@@ -36,20 +29,16 @@
     }
 
     function handle_digit_input(data, refs, event, index) {
-        // Allow only numbers
         event.target.value = event.target.value.replace(/[^0-9]/g, '').substring(0, 1);
 
-        // Update the model
         data.otp[index] = event.target.value;
 
-        // Auto-focus next input after entering a digit
         if (event.target.value && index < 5) {
             refs['otp' + (index + 1)].focus();
         }
     }
 
     function handle_backspace(refs, event, index) {
-        // If current field is empty and there's a previous field, focus on it
         if (!event.target.value && index > 0) {
             refs['otp' + (index - 1)].focus();
         }
@@ -60,10 +49,8 @@
         const clipboardData = event.clipboardData || window.clipboardData;
         const pastedData = clipboardData.getData('Text').trim();
 
-        // Check if pasted content contains only numbers
         if (!/^\d+$/.test(pastedData)) return;
 
-        // Fill the OTP input fields with pasted data
         for (let i = 0; i < 6; i++) {
             if (i < pastedData.length) {
                 data.otp[i] = pastedData.charAt(i);
@@ -72,12 +59,9 @@
             }
         }
 
-        // Focus on the appropriate field based on the length of pasted data
         if (pastedData.length < 6) {
-            // Focus on the next empty field
             refs['otp' + Math.min(startIndex + pastedData.length, 5)].focus();
         } else {
-            // If all fields are filled, focus on the last field
             refs.otp5.focus();
         }
     }
@@ -166,7 +150,6 @@
         try {
             const data = await frappe_call('/api/v2/method/ls_shop.api.signup.send_login_otp', args);
 
-            // Show OTP verification screen
             toast("OTP sent successfully, please check you email.", { type: "success" });
             x_data.otp_sent = true;
 

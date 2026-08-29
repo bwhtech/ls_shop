@@ -1,6 +1,6 @@
 <div x-data="{
     filters: {{ filters }},
-    query_state: window.query_state, // Directly reference QuerySync state
+    query_state: window.query_state,
     accordion: null,
     format_key(key) {
         const formatted = key.replace(/([A-Z])/g, ' $1').trim();
@@ -8,13 +8,11 @@
     },
     reset_filters() {
         Object.keys(this.query_state).forEach((key) => {
-            delete this.query_state[key]; // Removes from state and URL
+            delete this.query_state[key];
         });
         window.location.reload()
     },
-    // A category facet may link several item groups, so `value` is either one option or the
-    // list a facet filters on: it is ticked only when every one of its groups is selected, and
-    // toggling it moves them together.
+    // `value` is either one option or the list of item groups a facet filters on, so it ticks only when every one is selected.
     selected_values(query_key) {
         return this.query_state[query_key] ? this.query_state[query_key].split(',') : [];
     },
@@ -74,7 +72,6 @@
                             clip-rule="evenodd" />
                     </svg>
                 </button>
-                <!-- Normal Filters (brands, sizes, colors) -->
                 <div x-show="current_tab === key && !Array.isArray(values[0]) && !Array.isArray(values)"
                     x-transition class="pt-6 pb-6">
                     <div class="space-y-2">
@@ -90,22 +87,19 @@
                         </template>
                     </div>
                 </div>
-                {# Category facets come from the menu tree: `item_groups` are the groups the
-                   `?subcategory=` filter round-trips, `display_name` is the shop owner's label. #}
+                {# `item_groups` are the groups the `?subcategory=` filter round-trips; `display_name` is the shop owner's label. #}
                 {% block storefront_filter_categories %}
                 <div x-show="current_tab === key && Array.isArray(values) && values.length > 0 && values[0].display_name" x-transition
                     class="pt-6 pb-6">
                     <template x-for="(node, node_index) in values" :key="node_index">
                         <div class="mb-3">
                             <div x-data="{ open: false }">
-                                <!-- Node with children gets an expand/collapse button -->
                                 <div x-show="!node.is_leaf" class="flex items-center">
                                     <span class="flex items-center text-gray-800 font-semibold"
                                         x-text="$store.i18n.t(node.display_name)"></span>
 
                                 </div>
 
-                                <!-- Leaf node gets a checkbox -->
                                 <div x-show="node.is_leaf" class="flex items-center">
                                     <input type="checkbox" :id="`${key}-${node_index}`" :value="node.item_groups.join(',')"
                                         @change="toggle_filter(key, node.item_groups, true)"
@@ -115,11 +109,9 @@
                                         x-text="$store.i18n.t(node.display_name)"></label>
                                 </div>
 
-                                <!-- Recursively render children -->
                                 <div class="pl-3 mt-2 space-y-2">
                                     <template x-for="(child, child_index) in node.children" :key="child_index">
                                         <div x-data="{ childOpen: false }" class="mb-2">
-                                            <!-- Child with its own children -->
 
                                             <div x-show="!child.is_leaf" class="flex items-center">
                                                 <button @click="childOpen = !childOpen"
@@ -129,7 +121,6 @@
                                                 </button>
                                             </div>
 
-                                            <!-- Child leaf node -->
                                             <div x-show="child.is_leaf" class="flex items-center">
                                                 <input type="checkbox"
                                                     :id="`${key}-${node_index}-${child_index}`"
@@ -142,7 +133,6 @@
                                                     x-text="$store.i18n.t(child.display_name)"></label>
                                             </div>
 
-                                            <!-- Grandchildren (third level) -->
                                             <div class="pl-3 mt-2 space-y-2">
                                                 <template x-for="(grandchild, grandchild_index) in child.children"
                                                     :key="grandchild_index">
@@ -230,7 +220,6 @@
 
                     }
                 }" class="flex w-full items-center justify-between gap-3">
-                    <!-- Min Price Input -->
                     <div class="flex flex-1 flex-col ">
                         <input type="number"
                             class="w-full rounded-lg border border-gray-300 p-1.5 ps-4 placeholder-gray-300 focus:ring-2 focus:ring-gray-300 focus:outline-gray-300"
@@ -240,7 +229,6 @@
                             <span x-show="error_min" class="text-red-600 text-xs ms-2" x-text="error_min"></span>
                         </div>
                     </div>
-                    <!-- Max Price Input -->
                     <div class="flex flex-1 flex-col">
                         <input type="number"
                             class="w-full rounded-lg border border-gray-300 p-1.5 ps-4 placeholder-gray-300 focus:ring-2 focus:ring-gray-300 focus:outline-gray-300"

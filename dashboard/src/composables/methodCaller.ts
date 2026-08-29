@@ -3,14 +3,8 @@ import { computed, effectScope, ref } from "vue"
 import { errorMessage } from "../utils/errors"
 
 /**
- * A `call(method, params)` over one module of whitelisted methods.
- *
- * Every method gets its own `useCall`. One call multiplexed over a mutable url does not work:
- * VueUse aborts the request in flight as soon as the next one starts, and every caller resolves
- * from the same `data` - so one endpoint's answer lands in another endpoint's caller.
- *
- * The calls are built in a detached scope because they outlive whichever component first reached
- * for an endpoint; created inside that component's scope they would stop updating on its unmount.
+ * One call over a mutable url does not work: VueUse aborts the in-flight request and every caller reads the same `data`.
+ * Built in a detached scope because the calls outlive whichever component first reached for an endpoint.
  */
 export function createMethodCaller(methodPrefix: string) {
 	const scope = effectScope(true)
@@ -35,26 +29,38 @@ export function createMethodCaller(methodPrefix: string) {
 		return request
 	}
 
-	/** Resolves to the endpoint's answer, or null when it refused - the reason is toasted here. */
-	async function call<TResponse>(
+	/**
+	 * Both halves of the outcome - a toast fades, so a screen that must tell a refusal
+	 * from a genuinely empty answer needs the error handed back, not only logged.
+	 */
+	async function attempt<TResponse>(
 		method: string,
 		params: Record<string, unknown> = {},
-	): Promise<TResponse | null> {
+	): Promise<{ data: TResponse | null; error: Error | null }> {
 		const request = requestFor(method)
 		pending.value += 1
 		try {
-			// `submit` resolves null on a failed request instead of rejecting, so a refusal is
-			// read off the call rather than caught.
+			// `submit` resolves null on a failed request instead of rejecting, so a refusal is read off the call.
 			const data = await request.submit(params)
-			if (request.error) {
-				toast.error(errorMessage(request.error))
-				return null
+			const error = (request.error as Error | null | undefined) ?? null
+			if (error) {
+				toast.error(errorMessage(error))
+				return { data: null, error }
 			}
-			return data as TResponse
+			return { data: data as TResponse, error: null }
 		} finally {
 			pending.value -= 1
 		}
 	}
 
-	return { call, loading: computed(() => pending.value > 0) }
+	/** Resolves to the endpoint's answer, or null when it refused - the reason is toasted here. */
+	async function call<TResponse>(
+		method: string,
+		params: Record<string, unknown> = {},
+	): Promise<TResponse | null> {
+		const { data } = await attempt<TResponse>(method, params)
+		return data
+	}
+
+	return { attempt, call, loading: computed(() => pending.value > 0) }
 }

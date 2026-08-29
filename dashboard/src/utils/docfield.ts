@@ -1,8 +1,3 @@
-/**
- * The docfield vocabulary shared by every screen that renders a doctype's fields from its
- * metadata — the Advanced settings tab and the integration credential forms.
- */
-
 /** As much of a docfield as any of our render paths reads. */
 export type DocField = {
 	fieldname: string

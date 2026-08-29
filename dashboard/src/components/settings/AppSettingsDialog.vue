@@ -36,9 +36,7 @@ const tabGroups = ["Account", "Store", "Advanced"].map((label) => ({
 </script>
 
 <template>
-	<!-- shortcut=false: the library's built-in Cmd/Ctrl+Shift+, is a raw key listener that fires
-	     while a search box has focus and never shows up in KeyboardShortcutsDialog. Our own
-	     Mod+Comma is registered with the rest, so the help stays honest. -->
+	<!-- shortcut=false: the library's built-in Cmd/Ctrl+Shift+, is a raw key listener that fires while a search box has focus. -->
 	<SettingsDialog v-model:open="showSettings" v-model:tab="activeSettingsTab" :shortcut="false">
 		<SettingsSidebar>
 			<SettingsNavGroup v-for="group in tabGroups" :key="group.label" :label="group.label">

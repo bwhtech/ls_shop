@@ -78,8 +78,6 @@ const priceLabel = computed(() =>
 )
 const stockTotal = computed(() => sumStock(props.variant.sizes))
 
-// The switch answers the click, then the server. Bound straight to the prop it would sit unflipped
-// for the whole round trip, so it holds the owner's choice and goes back only if the save is refused.
 const isLive = ref(props.variant.is_published)
 const publishing = ref(false)
 
@@ -104,8 +102,6 @@ async function setLive(published: boolean) {
 	}
 }
 
-// Only the sizes with a quantity typed into them: the map keeps a key for every field that was
-// ever focused, and the blanks and zeroes among them are not part of the receipt.
 const pendingReceipt = computed(() =>
 	Object.fromEntries(
 		Object.entries(receiveQuantities.value).filter(
@@ -156,8 +152,6 @@ function confirmRemoveImage(fileUrl: string) {
 
 <template>
 	<div>
-		<!-- Every value sits in a fixed-width slot so price, stock and the switch form columns
-		     down the list rather than drifting with the option name's length. -->
 		<div class="flex items-center gap-4 py-2.5">
 			<button
 				type="button"
@@ -264,8 +258,7 @@ function confirmRemoveImage(fileUrl: string) {
 								<span class="truncate text-base text-ink-gray-9">{{ size.size }}</span>
 							</ListCell>
 							<ListCell class="justify-end">
-								<!-- The browser's own text-align on <input> beats the wrapper's, so the
-								     numeric alignment has to reach the control slot itself. -->
+								<!-- The browser's own text-align on <input> beats the wrapper's, so it has to reach the control slot. -->
 								<TextInput
 									class="w-24 [&_[data-slot=control]]:text-right"
 									type="number"

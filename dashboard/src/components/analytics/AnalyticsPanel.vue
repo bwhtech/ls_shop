@@ -16,13 +16,6 @@ withDefaults(
 )
 </script>
 
-<!--
-	The card every non-chart widget on the analytics page sits in.
-
-	`ChartCard` draws the surface and `ChartContainer` the header, but the container sizes its
-	body to a plot and floats the states over it - which a table of unknown height cannot give
-	it. This keeps the container's header and its four states, laid out for content that grows.
--->
 <template>
 	<ChartCard>
 		<div class="flex h-full flex-col gap-3">

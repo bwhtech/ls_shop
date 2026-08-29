@@ -53,10 +53,7 @@ export type AnalyticsRangeParams = {
 	to_date: string
 }
 
-/**
- * What a list screen puts in place of its rows. ListView v-binds `button` straight onto a Button,
- * so the click handler travels with the rest of the button's props.
- */
+/** ListView v-binds `button` straight onto a Button, so the click handler travels with the button's props. */
 export type ListEmptyState = {
 	title: string
 	description: string
@@ -107,9 +104,8 @@ export type OrderDetail = {
 	currency: string
 	total: number
 	/**
-	 * The charges that make up the difference between `net_total` and `grand_total`. `tax` is the
-	 * remainder of the charges table rather than a tax figure in its own right, so the four always
-	 * sum to the total even when a charge row is of a kind neither side recognises.
+	 * `tax` is the unrecognised remainder of the charges table, not a tax figure in its own right,
+	 * so the four always sum to the grand total.
 	 */
 	net_total: number
 	shipping: number
@@ -222,9 +218,6 @@ export type FooterEditorData = {
 	pages: FooterPage[]
 	modified: string
 }
-
-// ── Storefront analytics ────────────────────────────────────────────────────
-// One type per `ls_shop.api.analytics_dashboard` endpoint, named after it.
 
 /** Every KPI tile carries the same figure for the equal-length window before it. */
 export type AnalyticsKpi = {

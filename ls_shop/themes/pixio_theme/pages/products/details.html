@@ -1,8 +1,5 @@
 {% extends "components/theme_layout.html" %}
 
-{# Reference: reference_themes/pixio/product-default.html 1015-1591. Every band below is
-   full-bleed - .page-content, .content-inner and the related rail all open their own
-   container - so the page lives in uncontained_body. #}
 {% block head %}
 	{{ super() }}
 	<link rel="stylesheet" href="{{ shop_theme_asset_url('css/products-detail.css') }}">

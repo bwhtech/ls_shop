@@ -18,7 +18,6 @@ const props = defineProps<{ currency: string }>()
 
 const { rangeCaption } = useAnalyticsRange()
 
-// source, medium and campaign are one group server-side, so they are one identity here too.
 type TrafficSourceGroupRow = TrafficSourceRow & { group: string; key: string }
 
 const columns: AnalyticsTableColumn<TrafficSourceGroupRow>[] = [

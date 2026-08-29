@@ -18,12 +18,7 @@ MAX_MENU_DEPTH = 3
 
 
 def root_filter():
-	"""Filter value matching top-level entries, for use with ``frappe.get_all``.
-
-	``create_node`` writes ``parent or None``, so roots hold NULL, while NestedSet's own writes and
-	rows that predate it hold "". Only DatabaseQuery (``frappe.get_all``) wraps the column in
-	``ifnull`` — ``frappe.db.get_value`` emits a plain comparison and silently matches neither.
-	"""
+	"""Roots hold NULL or ""; only ``frappe.get_all`` wraps the column in ``ifnull``, ``get_value`` does not."""
 	return ["in", ["", None]]
 
 
@@ -66,25 +61,15 @@ class EcommerceCategory(NestedSet):
 	nsm_parent_field = "parent_ecommerce_category"
 
 	def on_update(self):
-		# Bulk tree copies place every row first and rebuild the bounds once, instead of paying two
-		# full-table updates per row. The flag is private to this doctype on purpose: ERPNext's own
-		# Account and Department controllers read frappe.local.flags.ignore_update_nsm, so holding
-		# that one across an insert would skip their bookkeeping and corrupt the chart of accounts.
+		# Private flag: ERPNext's Account/Department read ignore_update_nsm and would skip their NSM bookkeeping.
 		if self.flags.ignore_update_nsm or frappe.local.flags.ignore_ecommerce_category_nsm:
-			# update_nsm decides what a later save or delete owes the tree by comparing old_parent
-			# against the parent field, so the skipped bookkeeping still has to happen. Left NULL,
-			# both sides read as "no parent" and nothing runs: deleting the row never reclaims its
-			# lft/rgt band, and dragging it out to the top level leaves the band inside its old
-			# parent, so get_descendants_of keeps returning it.
+			# update_nsm compares old_parent to parent; left NULL both read as "no parent" and the lft/rgt band leaks.
 			self.db_set("old_parent", self.parent_ecommerce_category or "", update_modified=False)
 			return
 		super().on_update()
 
 	def on_trash(self, allow_root_deletion=False):
-		# A root holds old_parent "" and on_trash blanks the parent field to "" as well, so update_nsm
-		# compares "" against "", takes neither the add nor the move branch, and the row is deleted
-		# with its lft/rgt band still reserved — a permanent hole. Re-seating the root at the end of
-		# the tree first moves that band to where the delete lands.
+		# A root compares "" to "", so update_nsm runs no branch and the delete leaves its lft/rgt band as a hole.
 		if not self.get(self.nsm_parent_field) and cint(self.rgt) < self.last_bound():
 			self.validate_if_child_exists()
 			update_move_node(self, self.nsm_parent_field)
@@ -101,16 +86,8 @@ class EcommerceCategory(NestedSet):
 		self.set_defaults()
 
 	def validate_link_target(self):
-		"""Keep only the target the selected link type uses, and check it.
-
-		Switching a type in the Desk form leaves the old target on the doc; left there, a later
-		switch back silently resurrects a target the shop owner thought they had cleared.
-
-		A menu URL is written straight into an href on a public page, and Frappe's Jinja environment
-		has autoescaping off, so a `javascript:` scheme here is stored XSS. The navbar editor
-		endpoint already checks this, but a Desk form write, a REST insert or a fixture bypasses that
-		endpoint — the model is the only place that covers every write path.
-		"""
+		"""Keep only the target the link type uses. Jinja autoescaping is off, so a `javascript:` URL is
+		stored XSS, and the model is the only place covering the Desk, REST and fixture write paths."""
 		if self.link_type != "Item Group":
 			self.link_item_groups = []
 		if self.link_type != "Brand":
@@ -122,11 +99,7 @@ class EcommerceCategory(NestedSet):
 		self.link_url = require_safe_url(self.link_url, frappe._("URL is required."))
 
 	def validate_route_slug(self):
-		"""Only top-level entries own a storefront URL, so only they need a slug.
-
-		A nested entry is reached through its parent's listing page; forcing a slug on it would
-		burn a unique route on something no shopper can land on.
-		"""
+		"""Only top-level entries own a storefront URL, so only they need a slug."""
 		if self.parent_ecommerce_category:
 			self.route_slug = None
 			return
@@ -164,11 +137,7 @@ class EcommerceCategory(NestedSet):
 
 
 def build_listing_href(root_slug, item_groups, language):
-	"""Product listing URL for a menu entry's item groups, as the `?subcategory=` filter expects.
-
-	The filter reads the parameter as a comma-separated list and matches any of the groups, so an
-	entry linking several of them lands on one listing holding all their products.
-	"""
+	"""Product listing URL for a menu entry's item groups, as the `?subcategory=` filter expects."""
 	subcategory = quote(",".join(item_groups))
 	if root_slug:
 		return f"/{language}/products?category={root_slug}&subcategory={subcategory}"
@@ -176,10 +145,7 @@ def build_listing_href(root_slug, item_groups, language):
 
 
 def get_depth(name):
-	"""Level this entry sits on, counting from 1 — a top-level tab is 1, and an empty name is 0.
-
-	Callers placing a new child pass its parent and add 1.
-	"""
+	"""Level this entry sits on, counting from 1 — a top-level tab is 1, and an empty name is 0."""
 	depth = 0
 	while name and depth <= MAX_MENU_DEPTH:
 		name = frappe.db.get_value("Ecommerce Category", name, "parent_ecommerce_category")
@@ -201,11 +167,7 @@ def get_subtree_height(name):
 
 
 def get_item_groups_by_entry(entry_names):
-	"""Item groups each menu entry links, keyed by entry and in the order the editor stored them.
-
-	One query for the whole menu rather than one per node — the storefront renders this tree on
-	every page.
-	"""
+	"""Item groups each menu entry links, keyed by entry and in the order the editor stored them."""
 	item_groups_by_entry = {}
 	for offset in range(0, len(entry_names), IN_CLAUSE_CHUNK_SIZE):
 		rows = frappe.get_all(
@@ -223,12 +185,7 @@ def get_item_groups_by_entry(entry_names):
 
 
 def add_item_group_links(item_groups_by_entry):
-	"""Link the given item groups to the given menu entries, in the order they are passed.
-
-	Writes the child rows directly rather than through the parent: migrations call this over the
-	whole menu, and loading every entry would re-run tree validation for a change that touches
-	nothing else. An entry that already links groups is left alone, so a re-run adds nothing.
-	"""
+	"""Link the given item groups to the given menu entries, in the order they are passed."""
 	already_linked = get_item_groups_by_entry(list(item_groups_by_entry))
 	timestamp = now()
 
@@ -251,11 +208,7 @@ def add_item_group_links(item_groups_by_entry):
 
 
 def get_menu_tree(enabled_only=False):
-	"""The whole menu as nested nodes, in one query.
-
-	Read on every storefront render, so it never walks the tree per node: one ordered pass over the
-	entries, assembled in Python.
-	"""
+	"""The whole menu as nested nodes, in one query."""
 	filters = {"enabled": 1} if enabled_only else {}
 	entries = frappe.get_all(
 		"Ecommerce Category",
@@ -295,8 +248,6 @@ def get_menu_tree(enabled_only=False):
 			"parent": entry.parent_ecommerce_category or "",
 			"route_slug": entry.route_slug or "",
 			"link_type": entry.link_type or "",
-			# Always a list, never None: the menu editor counts it and the storefront joins it, and
-			# both would have to guard a null first.
 			"item_groups": item_groups_by_entry.get(entry.name, []),
 			"brand": entry.link_brand or "",
 			"url": entry.link_url or "",
@@ -305,8 +256,7 @@ def get_menu_tree(enabled_only=False):
 			"meta_title": entry.meta_title or "",
 			"meta_description": entry.meta_description or "",
 			"og_image": entry.og_image or "",
-			# A checkbox, not a string: `or ""` would turn an unticked 0 into a blank the editor
-			# cannot tell from "never set", leaving the control indeterminate.
+			# cint, not `or ""`: a Check field's 0 would blank out and leave the editor control indeterminate.
 			"noindex": cint(entry.noindex),
 			"visible": bool(entry.enabled),
 			"display_order": entry.display_order,

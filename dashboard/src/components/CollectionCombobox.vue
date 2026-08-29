@@ -5,8 +5,6 @@ import { computed } from "vue"
 
 const props = defineProps<{ required?: boolean }>()
 
-// A store owner cannot be expected to type an Item Group's exact name, so offer the real list
-// rather than validating a free-text guess after the fact.
 const collection = defineModel<string>({ required: true })
 
 const { open, query, results } = useLinkSearch<string>(

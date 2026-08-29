@@ -21,9 +21,6 @@ no_cache = True
 def get_context(context):
 	current_user = frappe.session.user
 	if current_user == "Guest":
-		# A guest deep-linking to checkout used to get Frappe's bare 403. The cart is where both
-		# themes offer the sign-in dialog, and it is the step this shopper has to come back through
-		# anyway, so send them there rather than to an error page.
 		frappe.redirect(f"/{frappe.local.lang}/cart")
 	cart_quotation = _get_cart_quotation()
 	if not cart_quotation or not cart_quotation.items:
@@ -115,12 +112,10 @@ def get_checkout_items(cart_quotation):
 
 @site_cache(ttl=60 * 60)
 def get_store_pickup_addresses():
-	# Get all warehouse names with store pickup
 	warehouses = frappe.get_all("Warehouse", filters={"custom_store_pickup": 1}, pluck="name")
 	if not warehouses:
 		return []
 
-	# Get all dynamic links for those warehouses and build a warehouse -> address map
 	links = frappe.get_all(
 		"Dynamic Link",
 		filters={
@@ -134,7 +129,6 @@ def get_store_pickup_addresses():
 	if not links:
 		return []
 
-	# Map address to warehouse
 	address_to_warehouse = {link["parent"]: link["link_name"] for link in links}
 	address_names = list(address_to_warehouse.keys())
 	addresses = frappe.get_all(
@@ -154,7 +148,6 @@ def get_store_pickup_addresses():
 			"email_id",
 		],
 	)
-	# Format and attach warehouse info
 	formatted_addresses = format_addresses(addresses, address_type="Shop")
 	for addr in formatted_addresses:
 		addr["warehouse_name"] = address_to_warehouse.get(addr["name"])

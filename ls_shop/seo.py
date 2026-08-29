@@ -139,8 +139,7 @@ def build_product_seo(
 def build_product_json_ld(product_variant, product, images, price=None, availability=None, currency=None):
 	override = product_variant.get("json_ld")
 	if override:
-		# A half-edited override is admin typo territory, and orjson raises straight through
-		# frappe.parse_json. Falling back to the generated block keeps the product page up.
+		# orjson raises straight through frappe.parse_json, so a half-edited override falls back to generated.
 		try:
 			parsed = frappe.parse_json(override)
 		except Exception:

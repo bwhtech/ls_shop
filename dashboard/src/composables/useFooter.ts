@@ -5,13 +5,15 @@ import { createMethodCaller } from "./methodCaller"
 const sections = ref<FooterSection[]>([])
 const pages = ref<FooterEditorData["pages"]>([])
 
-// The preview frames the rendered storefront footer, so it cannot be told the columns moved -
-// it has to fetch again. Every mutation bumps this.
+// The preview frames the rendered storefront footer and cannot be told the columns moved, so every mutation bumps this.
 const previewToken = ref(0)
 
-const { call, loading } = createMethodCaller(
+const { attempt, call, loading } = createMethodCaller(
 	"/api/v2/method/ls_shop.api.admin.footer.",
 )
+
+// A refused read leaves `sections` empty, which reads as "this store has no footer" unless the failure is kept.
+const loadError = ref<Error | null>(null)
 
 function apply(data: FooterEditorData | null) {
 	if (!data) return
@@ -30,7 +32,9 @@ async function mutate(name: string, params: Record<string, unknown> = {}) {
 }
 
 async function load() {
-	apply(await call<FooterEditorData>("get_editor_data"))
+	const { data, error } = await attempt<FooterEditorData>("get_editor_data")
+	loadError.value = error
+	apply(data)
 }
 
 /** The order a list ends up in after `oldIndex` is lifted out and dropped at `newIndex`. */
@@ -45,6 +49,7 @@ export function useFooter() {
 	return {
 		sections,
 		pages,
+		loadError,
 		previewToken,
 		loading,
 		load,

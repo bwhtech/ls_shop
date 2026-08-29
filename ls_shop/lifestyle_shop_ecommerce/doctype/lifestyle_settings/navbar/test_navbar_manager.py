@@ -55,8 +55,7 @@ class TestNavbarManager(IntegrationTestCase):
 		self.women = self.add_node(None, "Test MM Women")["name"]
 
 	def tearDown(self):
-		# IntegrationTestCase only rolls back once, after the whole class finishes, so each test's rows
-		# must be cleared explicitly to avoid duplicate-name collisions with the next test's setUp.
+		# IntegrationTestCase rolls back once per class, so each test must clear its own rows.
 		delete_menu_entries({"name": ["like", "Test MM%"]})
 		frappe.db.delete("Item Group", {"name": ["like", "Test MM%"]})
 		frappe.db.delete("Brand", {"name": ["like", "Test MM%"]})
@@ -479,8 +478,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		# No images: unpublish_if_incomplete_data would revert a publish, so the cascade must skip it.
 		cls.incomplete = cls.make_variant("ZZ Pub Draft", "ZZ Pub Dresses", is_published=0, images=False)
 
-		# ZZ Pub Gowns is a child of the linked ZZ Pub Dresses, so the cascade reaches the gown too:
-		# publish expands every linked group over its Item Group descendants.
+		# publish expands every linked group over its Item Group descendants, so the child gown is reached.
 		cls.cascaded = [cls.dress, cls.gown, cls.shoe]
 
 	@classmethod
@@ -658,11 +656,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 		self.assertEqual(self.indexed_variants(), sorted([*self.cascaded, self.bag]))
 
 	def test_the_bulk_publish_tool_shares_the_publish_path(self):
-		"""Bulk Publish Variants had no index sync at all, so it left ghosts the storefront kept serving.
-
-		Routing it through publish_variants gives it the cascade's sync and the same completeness gate:
-		one definition of publishable for both callers.
-		"""
+		"""Bulk Publish Variants had no index sync at all, so it left ghosts the storefront kept serving."""
 		tool = frappe.get_single("Bulk Publish Variants")
 		tool.vendor_code = tool.dcs = tool.brand = tool.item_code = tool.season_code = None
 
@@ -678,9 +672,7 @@ class TestNavbarPublishCascade(IntegrationTestCase):
 	def test_publishing_a_named_set_ignores_filters_left_on_the_bulk_publish_form(self):
 		"""The Item tab's "Publish all ready" sends an explicit list, and it must publish that list.
 
-		`bulk_toggle_publish` ANDs the Single's stored filter fields into its query, so a stale
-		`brand` left on the Bulk Publish Variants form would silently shrink someone else's
-		selection down to nothing and report success.
+		`bulk_toggle_publish` ANDs the Single's stored filters in, so a stale `brand` silently empties the set.
 		"""
 		tool = frappe.get_single("Bulk Publish Variants")
 		tool.vendor_code = tool.dcs = tool.brand = tool.season_code = None

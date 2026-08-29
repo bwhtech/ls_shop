@@ -7,12 +7,7 @@ from ls_shop.core import send_otp
 
 
 def verify_otp(email: str, otp: str):
-	"""Check the OTP and burn it.
-
-	Replay is the whole risk here: the key used to survive the full cache TTL, so one intercepted code
-	stayed valid for every later attempt. cint keeps a non-numeric code a clean "Invalid OTP" rather
-	than an uncaught ValueError.
-	"""
+	"""Check the OTP and burn it, a code is single-use."""
 	cache_key = f"otp:{email}"
 	stored_otp = frappe.cache.get_value(cache_key)
 	if not stored_otp or cint(otp) != cint(stored_otp):
@@ -41,8 +36,7 @@ def send_login_otp(email: str):
 
 
 @frappe.whitelist(allow_guest=True)
-# Keyed on email, not the default caller IP: an IP-bound limit leaves a 6-digit code brute-forceable
-# from a pool of addresses inside its own validity window.
+# Keyed on email, not the caller IP: an IP-bound limit leaves a 6-digit code brute-forceable.
 @rate_limit(key="email", limit=5, seconds=60 * 5)
 def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 	verify_otp(email, otp)
@@ -64,7 +58,5 @@ def verify_signup_otp(email: str, first_name: str, last_name: str, otp: str):
 @frappe.whitelist(allow_guest=True)
 @rate_limit(key="email", limit=5, seconds=60 * 5)
 def verify_login_otp(email: str, otp: str):
-	"""Check OTP from Redis instead of DB"""
-
 	verify_otp(email, otp)
 	frappe.local.login_manager.login_as(email)

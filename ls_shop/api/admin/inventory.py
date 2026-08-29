@@ -13,11 +13,7 @@ LOW_STOCK_THRESHOLD = 5
 def get_inventory(
 	availability: str | None = None, search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH
 ):
-	"""Every sellable size and what is left of it.
-
-	The question this screen answers is "what am I about to run out of", which no per-product
-	page can answer - so it reads across every variant at once, in a fixed number of queries.
-	"""
+	"""Every sellable size and what is left of it."""
 	frappe.has_permission("Item", ptype="read", throw=True)
 
 	variants = frappe.get_all(
@@ -83,7 +79,6 @@ def get_inventory(
 			if needle in cstr(row["product"]).casefold() or needle in cstr(row["item_code"]).casefold()
 		]
 
-	# Whatever is closest to running out is what the owner needs to see first.
 	rows.sort(key=lambda row: (row["stock"], cstr(row["product"])))
 
 	start = cint(start)
@@ -119,11 +114,7 @@ def get_stock_levels(item_codes):
 
 @frappe.whitelist(methods=["POST"])
 def receive_stock(received_quantities: dict | str):
-	"""Take stock in across any mix of products in one receipt.
-
-	Grouped by variant because that is the level the existing receive_stock guards operate at -
-	it validates that an item really is a size of the variant before moving anything.
-	"""
+	"""Take stock in across any mix of products in one receipt."""
 	received_quantities = frappe.parse_json(received_quantities)
 	if not isinstance(received_quantities, dict):
 		frappe.throw(_("received_quantities must map item codes to quantities"))

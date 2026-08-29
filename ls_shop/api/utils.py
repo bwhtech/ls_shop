@@ -22,8 +22,7 @@ def auth_required(func):
 	return wrapper
 
 
-# Only what an order-detail screen renders. The whole document carries contact_email, contact_phone
-# and the full address block, and Sales Order names are sequential.
+# Only what the screen renders: the whole document carries contact_email, phone and the address block.
 ORDER_DETAIL_FIELDS = (
 	"name",
 	"status",

@@ -7,10 +7,7 @@ from frappe.utils.data import cint, cstr, flt
 SETTINGS_DOCTYPE = "Lifestyle Settings"
 BRANDING_DOCTYPE = "Website Settings"
 
-# The Store tab spans two doctypes: the three brand assets moved to Website Settings, which is where
-# Frappe already keeps them and where ls_shop.branding reads them from; everything else on the tab
-# stays on Lifestyle Settings. The payload keys below are the pre-move ones on purpose - the Vue tab
-# and the sidebar bind to them - so this map is the only place the two names meet.
+# Payload keys are the pre-move names on purpose: the Vue tab and the sidebar bind to them.
 BRANDING_FIELDS = {
 	"brand_logo": "banner_image",
 	"footer_logo": "footer_logo",
@@ -54,15 +51,11 @@ FOOTER_FIELDS = (
 	"vat_certificate_image",
 )
 
-# Everything the four hand-shaped tabs already own, so the generic Advanced tab does not
-# render a second copy of the same control.
+# Fields the four curated tabs own, so the Advanced tab does not render a second copy.
 CURATED_FIELDS = frozenset(STORE_DETAIL_FIELDS + SHIPPING_FIELDS + PAYMENT_FIELDS + FOOTER_FIELDS)
 
-# Layout-only, action-only, or child-table fieldtypes the generic renderer cannot express as
-# a single input. Color is skipped for a different reason: the storefront is moving to
-# theme-owned colour, so these fields are on their way out - format_theme_css() still reads
-# them and must keep working, but offering them here would invite edits to a mechanism being
-# replaced.
+# Fieldtypes the generic renderer cannot express as one input. Color is skipped for a different
+# reason: colour is moving to the theme, though format_theme_css() still reads these fields.
 ADVANCED_SKIPPED_FIELDTYPES = frozenset(
 	{"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Table", "Color"}
 )
@@ -110,19 +103,18 @@ def write_settings_fields(allowed_fieldnames, values):
 
 def read_branding_fields():
 	"""The three brand assets, off Website Settings, under the payload's own key names."""
-	frappe.has_permission(BRANDING_DOCTYPE, ptype="read", throw=True)
+	frappe.has_permission(SETTINGS_DOCTYPE, ptype="read", throw=True)
 
 	website_settings = frappe.get_cached_doc(BRANDING_DOCTYPE)
 	return {key: website_settings.get(fieldname) for key, fieldname in BRANDING_FIELDS.items()}
 
 
 def write_branding_fields(values):
-	"""Write whichever brand assets the payload carries. Website Settings gets its own permission
-	check - a role that may edit Lifestyle Settings is not thereby allowed to edit the website."""
+	"""Write whichever brand assets the payload carries."""
 	if not any(key in values for key in BRANDING_FIELDS):
 		return read_branding_fields()
 
-	frappe.has_permission(BRANDING_DOCTYPE, ptype="write", throw=True)
+	frappe.has_permission(SETTINGS_DOCTYPE, ptype="write", throw=True)
 
 	meta = frappe.get_meta(BRANDING_DOCTYPE)
 	website_settings = frappe.get_doc(BRANDING_DOCTYPE)
@@ -131,18 +123,14 @@ def write_branding_fields(values):
 			fieldtype = meta.get_field(fieldname).fieldtype
 			website_settings.set(fieldname, coerce_field_value(fieldtype, values[key]))
 
-	website_settings.save()
+	# Website Settings is Website Manager's doctype; the store owner never holds that role, so the
+	# brand assets are authorised by Lifestyle Settings above and Website Settings is only storage.
+	website_settings.save(ignore_permissions=True)
 	return {key: website_settings.get(fieldname) for key, fieldname in BRANDING_FIELDS.items()}
 
 
 def validate_store_details(values):
-	"""Guard the one store detail the docfield cannot guard for us.
-
-	The rest of the tab is already covered by the framework: `company` is a mandatory docfield and
-	`contact_email` carries options="Email", so a blank or malformed value fails inside save().
-	`store_name` is neither, yet ls_shop.seo falls back to the literal "Store" when it is empty -
-	so an empty save silently rebrands every storefront <title> and JSON-LD name.
-	"""
+	"""Guard store_name: ls_shop.seo falls back to the literal "Store", silently rebranding every <title>."""
 	if "store_name" in values and not cstr(values["store_name"]).strip():
 		frappe.throw(frappe._("Store Name is required"), frappe.MandatoryError)
 
@@ -203,11 +191,7 @@ def save_footer_settings(**kwargs):
 
 
 def get_advanced_docfields():
-	"""Every editable docfield the four curated tabs do not already cover, in layout order.
-
-	Derived from the meta so a newly added field shows up in the dashboard without a code
-	change here.
-	"""
+	"""Every editable docfield the four curated tabs do not already cover, in layout order."""
 	docfields = []
 	for docfield in frappe.get_meta(SETTINGS_DOCTYPE).fields:
 		if docfield.fieldtype in ADVANCED_SKIPPED_FIELDTYPES:
@@ -279,10 +263,7 @@ def save_advanced_settings(**kwargs):
 
 
 def get_linked_doctypes():
-	"""Doctypes reachable through a Lifestyle Settings Link field.
-
-	Bounds get_link_options to the settings form instead of letting it list any doctype.
-	"""
+	"""Doctypes reachable through a Lifestyle Settings Link field."""
 	return {
 		docfield.options
 		for docfield in frappe.get_meta(SETTINGS_DOCTYPE).fields

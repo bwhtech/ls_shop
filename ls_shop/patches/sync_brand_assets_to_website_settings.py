@@ -7,12 +7,7 @@ from ls_shop.branding import BRAND_ASSET_FIELDS, LEGACY_SETTINGS, WEBSITE_SETTIN
 
 
 def execute():
-	"""Seed Website Settings from the legacy Lifestyle Settings branding fields.
-
-	The store dashboard edits Website Settings, so it has to open showing whatever the storefront
-	is already serving. A Website Settings value that is already set is the newer of the two and
-	is left alone, which is also what makes a second run a no-op.
-	"""
+	"""Seed Website Settings from the legacy Lifestyle Settings branding fields."""
 	legacy_settings = frappe.get_cached_doc(LEGACY_SETTINGS)
 	website_settings = frappe.get_doc(WEBSITE_SETTINGS)
 

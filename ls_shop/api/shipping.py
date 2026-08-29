@@ -5,8 +5,7 @@ from frappe.utils.data import flt
 from ls_shop.core import _get_cart_quotation
 from ls_shop.utils import validate_document_access
 
-# The Actual charge row the chosen delivery option posts through. Matched on description to find and
-# replace the row on re-selection, the same way ERPNext's own shipping rule row is identified.
+# The Actual charge row the chosen option posts through, matched on description on re-selection.
 DELIVERY_CHARGE_DESCRIPTION = "Delivery Charges"
 
 # ponytail: one notional box for the whole cart, since ls_shop has no parcel templates; swap for a
@@ -26,8 +25,7 @@ def is_connector_installed() -> bool:
 def get_shipping_options() -> dict:
 	"""Delivery options priced for the cart's current shipping address.
 
-	Never raises: checkout has to render even when the carrier is down. Each branch is reported so the
-	storefront can say why the list is empty instead of showing a bare gap.
+	Never raises: checkout has to render even when the carrier is down.
 	"""
 	quotation = _get_cart_quotation()
 	if not quotation or not quotation.items:
@@ -42,10 +40,7 @@ def get_shipping_options() -> dict:
 	try:
 		options = get_quoted_options(quotation)
 	except Exception:
-		# The connector itself failed — misconfigured, mid-upgrade, or a provider raising where it should
-		# have degraded. Checkout still has to render, so it falls back to the flat Shipping Rule and the
-		# storefront says the options are unavailable rather than showing an empty list as if there were
-		# none.
+		# The connector failed, so checkout falls back to the flat Shipping Rule and says so.
 		frappe.log_error(title="Shipping options could not be quoted")
 		return {"options": [], "unavailable": True}
 
@@ -55,9 +50,7 @@ def get_shipping_options() -> dict:
 def get_quoted_options(quotation) -> list[dict]:
 	"""Priced options for this cart, cached against a fingerprint of everything that changes the price.
 
-	Cached because the storefront re-renders this block on every address edit, and each miss is a live
-	carrier round trip. Anything that would change a quote — address, contents, value — is in the key, so
-	a stale price cannot outlive what it was quoted for.
+	Everything that changes a quote is in the key, so a stale price cannot outlive what it priced.
 	"""
 	cache_key = f"ls_shop:shipping_rates:{quotation.name}:{get_cart_fingerprint(quotation)}"
 	cached = frappe.cache.get_value(cache_key)
@@ -84,8 +77,7 @@ def get_cart_fingerprint(quotation) -> str:
 def get_services_stamp() -> str:
 	"""When the delivery options were last edited.
 
-	In the fingerprint because the cart alone cannot see a change made in the desk: without it, an option
-	disabled or repriced by an admin keeps being offered until every cached quote expires.
+	In the fingerprint because the cart cannot see a desk edit, which would otherwise stay cached.
 	"""
 	latest = frappe.get_all("Shipping Service", fields=["modified"], order_by="modified desc", limit=1)
 	return str(latest[0].modified) if latest else ""
@@ -94,9 +86,7 @@ def get_services_stamp() -> str:
 def quote_options(quotation) -> list[dict]:
 	"""Live-quote every enabled delivery option for this cart.
 
-	No origin is passed: each provider ships from its own configured pickup address. Picking one origin for
-	the whole store looks harmless until two providers ship from different countries, at which point the
-	wrong one wins and every option silently drops to its backup charge.
+	No origin is passed: one shared origin drops every option to its backup charge across countries.
 	"""
 	from bwh_shipping.bwh_shipping.pricing import quote_services
 	from bwh_shipping.bwh_shipping.utils import get_address_payload
@@ -125,8 +115,7 @@ def get_cart_context(quotation) -> dict:
 def get_cart_weight(quotation) -> float:
 	"""Total cart weight in kg, from each item's own weight where ERPNext knows it.
 
-	Read in one query rather than per line: this runs on every checkout render, and a get_doc per item is
-	the classic N+1 on a big cart.
+	One query, not a get_doc per line: this runs on every checkout render.
 	"""
 	item_codes = list({item.item_code for item in quotation.items})
 	if not item_codes:
@@ -172,8 +161,7 @@ def get_cart_parcels(quotation) -> list[dict]:
 def set_delivery_option(delivery_option: str | None = None) -> dict:
 	"""Persist the customer's choice and reprice the delivery fee server-side.
 
-	The price is taken from a fresh server-side quote, never from the request: a client that could name its
-	own delivery charge could ship for nothing.
+	The price comes from a fresh server-side quote, never the request: a client could ship for nothing.
 	"""
 	from ls_shop.api.payments import validate_cart_is_not_in_checkout
 
@@ -223,10 +211,7 @@ def clear_delivery_option(quotation):
 def set_delivery_charge_row(quotation, amount: float, title: str):
 	"""Replace the delivery fee with an Actual charge row for the chosen option.
 
-	The flat Shipping Rule is dropped first, row and all. Clearing only the link would leave the tax row
-	ERPNext already appended sitting in the table, and the customer would pay the rule's charge on top of
-	the option they picked. The rule's row goes before the option's, so a store whose rule and option share
-	one account still ends up with exactly one delivery line.
+	The Shipping Rule's row is dropped first: clearing only the link leaves its tax row and double-charges.
 	"""
 	remove_shipping_rule_row(quotation)
 	quotation.shipping_rule = None
@@ -241,8 +226,7 @@ def set_delivery_charge_row(quotation, amount: float, title: str):
 				"charge_type": "Actual",
 				"account_head": get_charge_account(title),
 				"tax_amount": amount,
-				# ERPNext refuses an inclusive Actual charge outright, and a site-level default of 1 would
-				# otherwise fail the shopper's checkout. Pinned, exactly as the COD charge row does.
+				# ERPNext refuses an inclusive Actual charge, and a site default of 1 would fail checkout.
 				"included_in_print_rate": 0,
 			},
 		)
@@ -260,9 +244,7 @@ def remove_delivery_charge_row(quotation):
 def remove_shipping_rule_row(quotation):
 	"""Drop the tax row ERPNext's Shipping Rule appended, identified the way ERPNext identifies it.
 
-	`ShippingRule.add_shipping_rule_to_tax_table` finds its own row by matching charge_type, account_head
-	and cost_center, so the same triple is what separates it from a genuine tax the store charges. Matching
-	on the description instead would miss a renamed rule and would break as soon as the label is translated.
+	Matched on charge_type, account_head and cost_center: the description is renamed and translated.
 	"""
 	if not quotation.shipping_rule:
 		return
@@ -316,9 +298,7 @@ def get_delivery_summary(quotation) -> dict:
 def reprice_selected_option(quotation) -> bool:
 	"""Re-apply the stored delivery option to the cart, as it stands now.
 
-	Called on the way into payment, so a cart edited after the option was chosen is billed the delivery
-	price its final contents earn rather than the one quoted for an older basket. Returns whether an option
-	was applied at all, so the caller can fall back to the flat Shipping Rule.
+	Returns whether an option was applied, so the caller can fall back to the flat Shipping Rule.
 	"""
 	if not (quotation.custom_delivery_option and is_connector_installed()):
 		return False
@@ -330,8 +310,7 @@ def reprice_selected_option(quotation) -> bool:
 			apply_delivery_option(quotation, option)
 			return True
 
-	# The option is no longer quotable for this address — disabled mid-checkout, or the carrier dropped the
-	# route. Fall back to what the option can still be priced at rather than losing the charge entirely.
+	# No longer quotable for this address, so fall back to its stored price rather than lose the charge.
 	amount = get_charge_amount(
 		quotation.custom_delivery_option,
 		get_cart_context(quotation),

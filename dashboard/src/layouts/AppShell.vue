@@ -27,14 +27,11 @@ const storeName = computed(() => store.data?.store_name || "Your store")
 
 const { colorScheme, setColorScheme } = useColorScheme()
 
-/** A tick against whichever theme is active, the way Gameplan marks the current choice. */
 function themeCheckmark(theme: ColorScheme) {
 	if (colorScheme.value !== theme) return null
 	return h("span", { class: "lucide-check size-4 text-ink-gray-6" })
 }
 
-// SidebarHeader hands `menu-items` straight to Dropdown, so the nested theme submenu Dropdown
-// already supports survives the move off the hand-rolled trigger.
 const menuItems = computed(() => [
 	{
 		icon: "lucide-settings",
@@ -74,8 +71,6 @@ const menuItems = computed(() => [
 </script>
 
 <template>
-	<!-- scroll=false: each page owns its own scroll region, so a list scrolls independently of
-	     its sticky header instead of the whole shell scrolling. -->
 	<DesktopShell :scroll="false" class="app-shell">
 		<template #sidebar>
 			<Sidebar disable-collapse width="14rem">
@@ -87,9 +82,6 @@ const menuItems = computed(() => [
 				/>
 
 				<ScrollArea class="min-h-0 flex-1" viewport-class="px-2 pb-6">
-					<!-- One landmark for the whole sidebar: a <nav> per section would announce as
-					     several unnamed "navigation" regions, and the pinned first section has no
-					     heading to name itself with. -->
 					<nav aria-label="Main">
 						<div v-for="section in navSections" :key="section.label" class="mb-3">
 							<SidebarLabel v-if="section.label">{{ section.label }}</SidebarLabel>
@@ -136,11 +128,8 @@ const menuItems = computed(() => [
 </template>
 
 <style scoped>
-/* The sidebar column is painted by the app root (bg-surface-sidebar over bg-surface-base),
-   which in dark mode resolves to the same colour as the pages. The rule gives the content
-   area its own surface plus the divider that separates it from the sidebar. */
-/* SidebarLabel hardcodes text-base (14px) on its heading, which renders a group label larger
-   than the 13px links it groups. A group name should be the quieter of the two. */
+/* The app root paints sidebar and base the same colour in dark mode, so the content area needs its own surface and divider. */
+/* SidebarLabel hardcodes text-base (14px), larger than the 13px links it groups. */
 .app-shell :deep([data-slot="sidebar-label"] h3) {
 	@apply text-xs font-medium text-ink-gray-5;
 }

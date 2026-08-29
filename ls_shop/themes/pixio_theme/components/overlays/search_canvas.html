@@ -1,11 +1,3 @@
-{# Reference: reference_themes/pixio/index.html 566-700.
-
-   Opened by $dispatch('open-search') on window; chrome state lives on the pixio_header component
-   the header root binds, typeahead state on the nested pixio_search component.
-
-   The reference's "You May Also Like" rail is replaced by the live result list rather than
-   dropped: it is the same .shop-card skeleton, and header_data carries no catalogue read to
-   fill a static rail with. #}
 
 {% set language = frappe.lang or "en" %}
 <script src="{{ shop_theme_asset_url('js/pixio_search.js') }}"></script>
@@ -54,16 +46,14 @@
 			<div class="row" x-cloak x-show="!loading && products.length">
 				<template x-for="product in products" :key="product.name">
 					<div class="col-6 col-md-4 col-xl-2 mb-4">
-						{# No .wow here: pixio.js reveals those on an IntersectionObserver wired at load,
-						   so a card added later would stay hidden. #}
+						{# No .wow here: pixio.js wires its reveal observer at load, so a card added later would stay hidden. #}
 						<div class="shop-card">
 							<div class="dz-media">
 								<img :src="product.image || '/assets/ls_shop/images/1.jpg'" :alt="get_product_name(product)">
 							</div>
 							<div class="dz-content">
 								<h5 class="title"><a :href="get_product_url(product)" x-text="get_product_name(product)"></a></h5>
-								{# The currency symbol is a markup glyph, so it is stamped by Jinja either side
-								   of the amount rather than concatenated into an x-text string. #}
+								{# Concatenating the currency symbol into x-text would escape it, so Jinja stamps it beside the amount. #}
 								<h5 class="price">
 									{{ get_currency_symbol() }}<span x-text="format_amount(product.effective_price)"></span>
 									<template x-if="product.has_discount">

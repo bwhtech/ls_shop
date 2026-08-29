@@ -43,7 +43,6 @@ const columns: AnalyticsTableColumn<AbandonedCartRow>[] = [
 	{ key: "quotation", label: "" },
 ]
 
-/** Recovered is the win, recoverable is the one worth an email, abandoned is just gone. */
 const statusThemes: Record<AbandonedCartStatus, BadgeTheme> = {
 	Abandoned: "gray",
 	Recoverable: "amber",
@@ -80,7 +79,6 @@ const tiles = computed(() => {
 		empty-message="No carts were started in this period."
 	>
 		<div class="space-y-3">
-			<!-- card=false: the panel already draws the surface these readings sit on. -->
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 				<NumberCard
 					v-for="tile in tiles"

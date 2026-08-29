@@ -15,17 +15,6 @@ export function normalizeValue(value: unknown): string {
 	return String(value)
 }
 
-/**
- * One load/edit/save cycle for a slice of settings, shared by every settings tab so each tab
- * is only its field list and its markup.
- *
- * `apiModule` names the file under ls_shop/api/admin/ that owns the pair of endpoints - most
- * tabs read Lifestyle Settings out of settings.py, but a tab backed by its own doctype does not.
- *
- * `TSettings` is what the read endpoint actually returns: a tab whose payload carries more than
- * its editable fields (a child table, a "secret is set" flag) names its own type and reads
- * `settings.data` without a cast.
- */
 export function useSettingsForm<
 	TFieldname extends string,
 	TSettings extends Record<TFieldname, SettingsValue> = Record<
@@ -57,10 +46,6 @@ export function useSettingsForm<
 	)
 
 	/**
-	 * The same values as `form`, narrowed for the controls that take one shape: Attach and Link
-	 * hand back text, Checkbox hands back a flag. Both write straight back into `form`, so the
-	 * dirty check and the save still read one set of values.
-	 *
 	 * `Object.fromEntries` types its keys as a plain string index, which is why the map is named
 	 * before `reactive` unwraps each ref into a plain property.
 	 */

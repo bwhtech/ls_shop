@@ -1,8 +1,4 @@
-{# Reference: reference_themes/pixio/index.html 1019-1164.
-
-   Upstream syncs .slider-main and .slider-thumbs with two slick instances; here they are two
-   Embla carousels paired through data-carousel-sync, and the .slick-slide / .slick-current
-   class names are kept because style.css scales the off-centre banners off them. #}
+{# The .slick-slide / .slick-current class names are kept because style.css scales the off-centre banners off them. #}
 {% set settings = shop_theme_config() %}
 {% set language = frappe.lang or "en" %}
 <div class="main-slider-wrapper">
@@ -49,8 +45,7 @@
 				</div>
 			</div>
 		</div>
-		{# slick injected this arrow into .slider-thumbs at runtime; style.css still positions it
-		   off .slider-inner, so it is authored here and pointed at the thumbnail carousel. #}
+		{# slick injected this arrow at runtime and style.css still positions it off .slider-inner, so it is authored here. #}
 		<button type="button" class="slick-arrow slick-next" data-carousel-next="hero-thumbs" aria-label="{{ _("Next slide") }}"></button>
 		{% if settings.hero_caption_label or settings.hero_caption %}
 		<div class="bottom-content align-items-end wow fadeInUp" data-wow-delay="1.0s">

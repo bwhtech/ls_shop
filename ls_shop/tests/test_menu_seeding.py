@@ -1,13 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
 # See license.txt
 
-"""The menu is a copy of the Item Group tree, taken once.
-
-A fresh store gets one Ecommerce Category per Item Group so the storefront has navigation before
-anyone opens the editor, and an existing store gets its item-group links gathered onto the entry's
-own `link_item_groups` table from wherever its data sits. After that the two trees are independent:
-the shop owner reorders, renames and prunes the menu without any of it reaching the catalogue.
-"""
+"""The menu is a copy of the Item Group tree, taken once; afterwards the two trees are independent."""
 
 from urllib.parse import quote
 
@@ -45,19 +39,14 @@ def make_item_group(name, parent=None):
 
 def add_legacy_column():
 	"""Restore the dropped `item_group` column so the migration runs against a real one.
-
-	Left in place afterwards: dropping it is DDL on a shared test database, and an orphan column is
-	exactly what a migrated site carries anyway — the migration only ever reads and clears it.
+	Left in place afterwards: dropping it would be DDL on a shared test database.
 	"""
 	if "item_group" not in frappe.db.get_table_columns("Ecommerce Category"):
 		frappe.db.add_column("Ecommerce Category", "item_group", "Link")
 
 
 def purge_stale_fixtures():
-	"""The legacy migration drops a table, and DDL commits the open transaction in MariaDB. Anything
-	this module wrote before that point survives the framework's end-of-class rollback — worse, the
-	rollback then undoes tearDown's own deletes and resurrects it. Names are unique per test so a
-	stale row can never collide, and this sweep keeps a developer's site from collecting them."""
+	"""Sweep rows the end-of-class rollback cannot: DDL in the migration commits the open transaction in MariaDB."""
 	delete_menu_entries({"name": ["like", f"{PREFIX}%"]})
 	frappe.db.delete("Item Group", {"name": ["like", f"{PREFIX}%"]})
 
@@ -75,8 +64,7 @@ def find_node(nodes, name):
 class TestMenuSeeding(IntegrationTestCase):
 	def setUp(self):
 		purge_stale_fixtures()
-		# Unique per test: the class-wide rollback runs once at the end, and a sibling class in this
-		# module commits mid-run, so a fixed name is a duplicate-key error waiting for the next run.
+		# Unique per test: a sibling class commits mid-run, so a fixed name is a duplicate-key error next run.
 		self.prefix = f"{PREFIX} {frappe.generate_hash(length=8)}"
 		self.shoes = make_item_group(f"{self.prefix} Shoes").name
 		self.sneakers = make_item_group(f"{self.prefix} Sneakers", self.shoes).name
@@ -119,8 +107,7 @@ class TestMenuSeeding(IntegrationTestCase):
 		self.assertEqual(entries[self.sneakers].parent_ecommerce_category, root.name)
 		self.assertEqual(entries[self.boots].parent_ecommerce_category, root.name)
 
-		# A parent that ended up with children has to be marked a group, or the editor renders it as
-		# a leaf and the storefront never opens the branch.
+		# A parent with children must be marked a group, or the editor renders it as a leaf.
 		self.assertEqual(root.is_group, 1)
 
 	def test_seeding_gives_every_entry_valid_tree_bounds(self):
@@ -128,8 +115,7 @@ class TestMenuSeeding(IntegrationTestCase):
 
 		entries = self.seeded_entries()
 		root = entries[self.shoes]
-		# Bulk seeding suppresses per-row nested-set bookkeeping and rebuilds once at the end, so the
-		# bounds are the thing most likely to be left at 0/0 by a regression here.
+		# Bulk seeding suppresses per-row nested-set bookkeeping, so the bounds are what a regression leaves at 0/0.
 		self.assertGreater(root.rgt, root.lft)
 		for item_group in (self.sneakers, self.boots):
 			child = entries[item_group]
@@ -194,9 +180,7 @@ class TestMenuSeeding(IntegrationTestCase):
 
 def make_interim_child_doctype():
 	"""Rebuild the interim child table so the migration runs against real rows, not a stand-in.
-
-	`custom` keeps it in the database only. A regular DocType would write a JSON file back into the
-	app folder that the test has no way to take back.
+	`custom` keeps it in the database: a regular DocType would write a JSON file into the app folder.
 	"""
 	if frappe.db.exists("DocType", INTERIM_DOCTYPE):
 		return
@@ -235,11 +219,7 @@ def add_interim_link(category, item_group, idx):
 
 
 class TestItemGroupLinkMigration(IntegrationTestCase):
-	"""Every starting point converges on the entry's own `link_item_groups` table.
-
-	A site arrives holding its links in one of three places: the table itself, the interim child
-	table the app briefly shipped, or the single `item_group` column that preceded that.
-	"""
+	"""Every starting point converges on the entry's own `link_item_groups` table."""
 
 	def setUp(self):
 		purge_stale_fixtures()
@@ -294,8 +274,7 @@ class TestItemGroupLinkMigration(IntegrationTestCase):
 
 		self.assertEqual(self.linked_item_groups(), [self.shirts, self.belts])
 		self.assertFalse(frappe.db.exists("DocType", INTERIM_DOCTYPE))
-		# Deleting the DocType does not take its table with it, and an orphan table survives every
-		# later migrate — so the drop is the half of this that actually needs guarding.
+		# Deleting the DocType does not drop its table, and an orphan table survives every later migrate.
 		self.assertFalse(frappe.db.table_exists(INTERIM_DOCTYPE))
 
 	def test_the_column_link_lands_on_the_entry(self):

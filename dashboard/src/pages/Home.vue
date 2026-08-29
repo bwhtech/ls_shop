@@ -57,8 +57,6 @@ function formatStat(stat: Overview["stats"][number]) {
 
 		<ScrollArea class="min-h-0 flex-1" viewport-class="pb-40">
 			<div class="mx-auto max-w-4xl space-y-6 px-3 pt-5 sm:px-5">
-				<!-- One card per figure, reflowing 4 -> 2 -> 1 across the breakpoints so a KPI
-				     never gets squeezed narrower than its own value. -->
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 					<div
 						v-for="stat in stats"
@@ -92,7 +90,6 @@ function formatStat(stat: Overview["stats"][number]) {
 					</div>
 				</div>
 
-				<!-- Recent orders -->
 				<section class="space-y-2">
 					<div class="flex h-7 items-center justify-between">
 						<h3 class="text-sm font-semibold text-ink-gray-8">Recent orders</h3>
@@ -102,8 +99,6 @@ function formatStat(stat: Overview["stats"][number]) {
 							@click="$router.push({ name: 'Orders' })"
 						/>
 					</div>
-					<!-- list-row-px-0 drops the row inset so the cells sit flush with this
-					     section's own heading rather than 12px inside it. -->
 					<List
 						v-if="recentOrders.length"
 						class="list-row-px-0"
@@ -139,7 +134,6 @@ function formatStat(stat: Overview["stats"][number]) {
 				</section>
 
 				<div class="grid gap-3 sm:grid-cols-2">
-					<!-- Running low -->
 					<section
 						class="space-y-2 rounded-6 border border-outline-gray-1 bg-surface-base p-4"
 					>
@@ -178,7 +172,6 @@ function formatStat(stat: Overview["stats"][number]) {
 						</p>
 					</section>
 
-					<!-- Needs attention -->
 					<section
 						class="space-y-2 rounded-6 border border-outline-gray-1 bg-surface-base p-4"
 					>

@@ -10,7 +10,7 @@ import AnalyticsPanel from "./AnalyticsPanel.vue"
 const props = defineProps<{
 	title: string
 	subtitle: string
-	/** Which key of the summary holds this provider's daily series - the two do not agree. */
+	/** The summary key holding this provider's daily series - it does not match the provider name. */
 	dailyField: "daily_sessions" | "daily_pageviews"
 	dailyLabel: string
 	notConnectedMessage: string
@@ -46,7 +46,6 @@ function openAnalyticsSettings() {
 		:error="error"
 		:skeleton-rows="3"
 	>
-		<!-- Not connected is a settled state, not a failure: it gets a way forward, not a warning. -->
 		<div v-if="!readback?.configured" class="space-y-2 py-2">
 			<p class="text-p-sm text-ink-gray-5">{{ notConnectedMessage }}</p>
 			<Button
@@ -57,7 +56,6 @@ function openAnalyticsSettings() {
 			/>
 		</div>
 
-		<!-- The provider errors are written to be acted on, so they are printed as they arrive. -->
 		<div
 			v-else-if="readback.error"
 			class="rounded-4 border border-outline-amber-3 bg-surface-amber-2 px-3 py-2"

@@ -1,23 +1,10 @@
-{# Reference: reference_themes/pixio/index.html 1326-1413 ("Dz Silder"). The rotation, the hairline
-   rules, the 50px letterspaced type and the ticker keyframes all live in style.css already
-   (.dz-features-wrapper / .text-wrapper / @keyframes ticker) - only the two-track layout that
-   makes the loop seamless is new, and it sits in pixio.css.
-
-   The reference's words are template demo copy. Pixio Theme Settings has no field that reads as
-   a word strip, so the strip is driven off the enabled category tree the header already binds -
-   which is what a category marquee should say anyway. #}
 {% set category_labels = header_data.navigation_menu | map(attribute="label") | list %}
 
-{# The reference runs 10 titles per pass, which is what keeps the track wider than the viewport
-   at every breakpoint. A merchant with three enabled categories would otherwise leave a gap
-   behind the wrapping track, so the list is cycled until it reaches that density. #}
 {% set pass_count = (6 / (category_labels | length)) | round(0, "ceil") | int %}
 
 <section class="content-inner-3 overflow-hidden">
 	<div class="dz-features-wrapper overflow-hidden">
-		{# Two identical tracks: @keyframes ticker ends at translateX(-100%), so the second track
-		   lands exactly where the first started and the wrap point is invisible. dz.carousel.js
-		   used to clone this; the duplicate is decorative, hence aria-hidden. #}
+		{# @keyframes ticker ends at translateX(-100%), so the second track lands where the first started; the duplicate is decorative. #}
 		{% for track in range(2) %}
 		<ul class="dz-features text-wrapper"{% if not loop.first %} aria-hidden="true"{% endif %}>
 			{% for pass in range(pass_count) %}{% for label in category_labels %}

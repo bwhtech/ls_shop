@@ -1,15 +1,8 @@
-{# Reference: reference_themes/pixio/shop-sidebar.html 1187-1275.
-
-   The reference's per-page <select> is dropped: the page length is fixed server-side and a
-   control that cannot change it is a dead input. The list view is dropped with it - its card
-   needs ratings and a description the catalogue does not carry - leaving the reference's
-   two-column and three-column tabs, which Alpine swaps instead of bootstrap's pill JS. #}
 
 {% set first_result = ((current_page - 1) * page_length) + 1 %}
 {% set last_result = [current_page * page_length, total_count] | min %}
 
-{# A `subcategory` chip carries the CSV of item groups the filter round-trips, which is not a
-   shopper-facing string. Walking the facet tree once recovers the merchant's own label for it. #}
+{# A `subcategory` chip carries the CSV of item groups the filter round-trips, not a shopper-facing string. #}
 {% set facet_labels = namespace(pairs=[]) %}
 {% macro collect_facet_labels(nodes) %}
 {%- for node in nodes -%}
@@ -39,8 +32,7 @@
 			{% endfor %}
 			{% endfor %}
 		</ul>
-		{# Guarded on the page's own rows, not on the total: a bookmarked ?page=7 that a narrowed
-		   filter has emptied would otherwise read "Showing 181-19 Of 19". #}
+		{# Guarded on the page's own rows, not the total: a bookmarked ?page=7 emptied by a filter would read "Showing 181-19 Of 19". #}
 		{% if products %}
 		<span>{{ _("Showing {0}-{1} Of {2} Results").format(first_result, last_result, total_count) }}</span>
 		{% endif %}

@@ -1,28 +1,14 @@
-{# Reference: reference_themes/pixio/index.html 66-869 (bar, nav, extra-nav, search bar, cart sidebar).
-
-   The mobile menu is not a separate overlay: style.css turns this very .header-nav into the
-   slide-in drawer below 992px off a .show class, so a second component would be the same
-   markup twice. The nav link list is ours, not the reference's seven demo tabs - it is driven
-   by header_data.navigation_menu, mapped onto Pixio's mega-menu skeleton. #}
 
 {% from "components/macros/navigation.html" import brand_logo, menu_tab %}
 {% set language = frappe.lang or "en" %}
 {% set settings = header_data.settings %}
 
-{# The route table's LANG regex (shop_theme_settings.py) is a Python constant and Lifestyle
-   Settings carries no language field, so there is nothing to read the pair from - a themed
-   storefront serves exactly /en and /ar. #}
 {% set languages = [("en", "English"), ("ar", "العربية")] %}
 
-{# Both scripts are synchronous on purpose. Alpine's core is deferred in the base head, so a
-   deferred script here would run after alpine:init has already fired and the component would
-   never register; a sync body script runs before every deferred one. #}
+{# Synchronous on purpose: Alpine's core is deferred in the base head, so a deferred script here would register after alpine:init. #}
 <script src="/assets/ls_shop/js/vendor/alpinejs/plugins/focus.js"></script>
 <script src="{{ shop_theme_asset_url('js/pixio_header.js') }}"></script>
 
-{# header-transparent is the reference's own class on this page. It drops the bar's white fill
-   so the cream page shows through, widens the gutter to 80px, and lifts the bar out of flow -
-   which is what puts the hero's first line at the same y as upstream. #}
 <header class="site-header mo-left header style-1 header-transparent" x-data="pixio_header"
 	@open-search.window="open_search()"
 	@open-cart.window="open_cart()"
@@ -79,12 +65,7 @@
 								<a class="nav-link" href="/{{ language }}/account/dashboard">{{ _("My Account") }}</a>
 								{% endif %}
 							</li>
-							{# Bootstrap's dropdown CSS ships inside style.css but its JS does not, so Alpine
-							   stamps .show and the panel's offsets are taken from the [data-bs-popper] rules the
-							   script would otherwise write. It lives in the icon cluster at every breakpoint
-							   rather than being repeated in the drawer: below 767px .extra-nav is the fixed bottom
-							   bar, which is this theme's mobile home for exactly these controls, and one copy of
-							   the markup cannot drift from the other. pixio.css flips the panel upwards there. #}
+							{# Bootstrap's dropdown CSS ships in style.css but its JS does not, so Alpine stamps .show and the [data-bs-popper] offsets are authored here. #}
 							<li class="nav-item language-link dropdown" @click.outside="language_open = false"
 								@keydown.escape="language_open = false"
 								x-data="{
@@ -136,8 +117,7 @@
 
 			</div>
 		</div>
-		{# Sits on the bar's bottom edge; the observer that reveals the mobile icon bar watches it
-		   instead of listening on scroll. #}
+		{# The observer that reveals the mobile icon bar watches this element instead of listening on scroll. #}
 		<div x-ref="header_sentinel"></div>
 	</div>
 
@@ -147,10 +127,7 @@
 		{% include "components/overlays/auth_dialog.html" %}
 	{% endif %}
 
-	{# Bootstrap writes this element from the JS this theme does not load, so the header emits it
-	   itself; style.css already carries .offcanvas-backdrop. The mobile drawer is deliberately
-	   left out - it is a full-width panel, upstream dims nothing behind it, and .header-nav sits
-	   at z-index 99 where the backdrop would paint over the menu rather than behind it. #}
+	{# Bootstrap writes this backdrop from the JS this theme does not load, so the header emits it itself. #}
 	<div class="offcanvas-backdrop fade" x-show="search_open || cart_open" :class="(search_open || cart_open) ? 'show' : ''"
 		@click="close_overlays()" x-cloak></div>
 </header>

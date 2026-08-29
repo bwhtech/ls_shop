@@ -311,12 +311,7 @@ def get_linked_nodes():
 
 
 def seed_categories_from_item_groups(item_group=None, parent=""):
-	"""Copy the Item Group tree into the menu as Ecommerce Category entries.
-
-	A one-time copy, never a live mirror: from here on the shop owner reorders, renames and prunes
-	the menu without any of it reaching the catalogue. Re-running is safe — an entry already linked
-	to the same group under the same parent is reused rather than duplicated.
-	"""
+	"""Copy the Item Group tree into the menu - a one-time copy, never a live mirror, and safe to re-run."""
 	root_names, source_groups = get_source_item_groups(item_group)
 	if not source_groups:
 		return
@@ -366,12 +361,8 @@ def seed_categories_from_item_groups(item_group=None, parent=""):
 
 
 def seed_menu_when_empty():
-	"""Give a store with no menu one copied from its Item Group tree.
-
-	Runs on install and on the upgrade that introduced the copy, so the storefront has navigation
-	before anyone opens the editor. Never on every migrate — a shop owner who emptied the menu on
-	purpose must not have the catalogue poured back into it.
-	"""
+	"""Give a store with no menu one copied from its Item Group tree. Install and upgrade only - never
+	on every migrate, or a menu the shop owner emptied on purpose gets refilled."""
 	if frappe.db.count("Ecommerce Category"):
 		return
 

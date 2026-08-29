@@ -1,20 +1,3 @@
-"""
-Demo Data Installation Script for LS Shop
-==========================================
-
-This script populates the system with demo data to test the complete e-commerce workflow.
-
-Usage:
-    bench --site your-site-name execute ls_shop.install_demo_data.install_demo_data
-
-Features:
-- Creates ERPNext prerequisites (Attributes, Price Lists, Brands, Shipping Rules)
-- Creates demo product templates with variants
-- Sets up Style Attribute Configurators and Variants
-- Configures Lifestyle Settings
-- Publishes products to website with proper routing
-"""
-
 import random
 
 import frappe
@@ -55,10 +38,7 @@ def install_demo_data():
 		print("\nStep 4: Publishing Style Attribute Variants...")
 		publish_style_variants()
 
-		# Step 5: Create Website Items and Publish
-		# Website Item ships with webshop, which this app no longer depends on. Skipping keeps the
-		# demo catalog installable on a bench without it - the storefront reads Style Attribute
-		# Variants, not Website Items.
+		# Website Item ships with webshop, which this app does not depend on; the storefront reads SAVs.
 		if frappe.db.exists("DocType", "Website Item"):
 			print("\nStep 5: Creating and Publishing Website Items...")
 			create_website_items()
@@ -152,8 +132,7 @@ def ensure_attribute_values(attribute_name, values, numeric=False):
 		frappe.db.commit()
 		print(f"    ✓ {attribute_name} attribute created")
 	else:
-		# Attribute exists, just print message
-		# Don't try to update to avoid abbreviation conflicts
+		# Not updated: a changed abbreviation collides with the existing attribute values.
 		print(f"    • {attribute_name} attribute already exists")
 
 
@@ -364,8 +343,8 @@ def create_demo_products():
 			"item_group": "Brake System",
 			"brand": "Lifestyle Store",
 			"description": "High-performance ceramic brake pads with superior stopping power and minimal dust.",
-			"colors": colors_to_use[:3],  # Use up to 3 colors
-			"sizes": sizes_to_use[:4],  # Use up to 4 sizes (can represent different fitment types)
+			"colors": colors_to_use[:3],
+			"sizes": sizes_to_use[:4],
 			"base_price": 89.99,
 			"sale_price": 74.99,
 		},
@@ -375,8 +354,8 @@ def create_demo_products():
 			"item_group": "Engine Parts",
 			"brand": "K&N",
 			"description": "Performance air filter for improved engine airflow and horsepower. Washable and reusable.",
-			"colors": colors_to_use[:2],  # Use up to 2 colors
-			"sizes": sizes_to_use[:3],  # Use up to 3 sizes
+			"colors": colors_to_use[:2],
+			"sizes": sizes_to_use[:3],
 			"base_price": 49.99,
 			"sale_price": 39.99,
 		},
@@ -386,8 +365,8 @@ def create_demo_products():
 			"item_group": "Interior Accessories",
 			"brand": "Lifestyle Store",
 			"description": "Durable rubber floor mats with raised edges to contain spills and debris. Perfect fit guaranteed.",
-			"colors": colors_to_use[:4],  # Use up to 4 colors
-			"sizes": sizes_to_use[:5],  # Use up to 5 sizes (different vehicle models)
+			"colors": colors_to_use[:4],
+			"sizes": sizes_to_use[:5],
 			"base_price": 59.99,
 			"sale_price": 49.99,
 		},
@@ -752,8 +731,7 @@ def fix_product_routes():
 				frappe.db.set_value("Style Attribute Variant", sav.name, "route", clean_route)
 				sav_count += 1
 
-	# Fix Website Item routes. Website Item ships with webshop, which this app no longer
-	# depends on, so a bench without it simply has no rows to correct.
+	# Website Item ships with webshop, which this app does not depend on; absent, there are no rows.
 	website_items = (
 		frappe.get_all("Website Item", fields=["name", "item_code", "route"])
 		if frappe.db.exists("DocType", "Website Item")
@@ -846,8 +824,6 @@ def get_root_item_group():
 def create_ecommerce_categories():
 	"""Create default Ecommerce Categories (now database-driven instead of hardcoded)"""
 
-	# Default categories - users can rename or modify these later
-	# Using car parts theme as per requirements
 	categories = [
 		{
 			"category_name": "Engine Parts",

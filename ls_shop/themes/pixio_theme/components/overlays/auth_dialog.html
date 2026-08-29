@@ -1,16 +1,4 @@
-{# Sign in / sign up, as a dialog rather than a trip to /login.
-
-   The default theme gets this from templates/macros/signup_modal.html, whose markup is Tailwind —
-   and this theme loads no Tailwind, so that macro would render unstyled here. Only the markup is
-   rewritten: the behaviour comes from templates/macros/auth_script.html, which both dialogs
-   include, so the four ls_shop.api.signup endpoints keep exactly one caller.
-
-   Opened by $dispatch('open-auth') on window, the same way cart_drawer.html takes 'open-cart'.
-   The state lives here rather than in the header so any page can open it without owning the fields.
-
-   `hidden` and `animate-spin` are Tailwind class names the shared script toggles to drive the
-   button spinners. They are kept as-is and given rules in css/auth-dialog.css, because renaming
-   them here would mean forking the script, which is the one thing this split exists to avoid. #}
+{# `hidden` and `animate-spin` are toggled by templates/macros/auth_script.html, so renaming them here would fork the script. #}
 
 <div class="pixio-auth" x-data="pixio_auth()" @open-auth.window="open_dialog()"
 	@keydown.escape.window="close_dialog()">
@@ -46,7 +34,6 @@
 
 				<div class="tab-content pt-4">
 
-					{# Sign in - email only, the OTP is the credential #}
 					<div class="tab-pane fade show active" role="tabpanel"
 						x-show="selected_tab === 'login' && !otp_sent" x-cloak>
 						<form @submit.prevent="login_user($data, $refs)">
@@ -62,7 +49,6 @@
 						</form>
 					</div>
 
-					{# Sign up #}
 					<div class="tab-pane fade show active" role="tabpanel"
 						x-show="selected_tab === 'sign_in' && !otp_sent" x-cloak>
 						<form @submit.prevent="sign_up_user($data, $refs)">
@@ -88,7 +74,6 @@
 						</form>
 					</div>
 
-					{# OTP, shared by both tabs - the script branches on selected_tab #}
 					<div class="tab-pane fade show active" role="tabpanel" x-show="otp_sent" x-cloak>
 						<p class="text-center mb-4">{{ _("Enter the verification code sent to your email") }}</p>
 						<form @submit.prevent="verify_otp($data, $refs)">
@@ -144,8 +129,7 @@
 			close_dialog() {
 				if (!this.is_open) return;
 				this.is_open = false;
-				// A dialog reopened after a half-finished attempt would otherwise show the OTP panel
-				// for a code the shopper has already abandoned.
+// A dialog reopened after a half-finished attempt would otherwise show the OTP panel for an abandoned code.
 				this.otp_sent = false;
 				this.otp = ["", "", "", "", "", ""];
 				clearInterval(this.resend_interval);

@@ -7,28 +7,19 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.ecommerce_category.ecommerce_categ
 from ls_shop.utils import IN_CLAUSE_CHUNK_SIZE
 
 PARENT_DOCTYPE = "Ecommerce Category"
-# The shape this app briefly shipped between the single link and the table it is back on.
 INTERIM_DOCTYPE = "Ecommerce Category Item Group Link"
 LEGACY_COLUMN = "item_group"
 
 
 def execute():
-	"""Land every item group a menu entry links on the entry's own `link_item_groups` table.
-
-	A site arrives here from one of three starting points, and each one is read where its data
-	actually sits: the interim child table, the single `item_group` column that preceded it, or —
-	for a site that never left the original table — nowhere, because the rows are already home.
-
-	The interim table is read first: where a site holds both, its rows are the newer truth.
-	"""
+	"""Land every item group a menu entry links on the entry's own `link_item_groups` table."""
 	add_links_from_interim_table()
 	add_links_from_legacy_column()
 	drop_interim_table()
 
 
 def add_links_from_interim_table():
-	# Read through the table, not the DocType: migrate deletes a DocType whose JSON left the app,
-	# and the rows outlive that deletion.
+	# Read through the table, not the DocType: migrate deletes a DocType whose JSON left the app.
 	if not frappe.db.table_exists(INTERIM_DOCTYPE):
 		return
 
@@ -52,8 +43,7 @@ def add_links_from_interim_table():
 def add_links_from_legacy_column():
 	"""Carry the one link that used to sit in a column of its own.
 
-	The column is read through the query builder because the field is gone from the DocType, which
-	is what `frappe.get_all` validates against — and migrate leaves the column itself behind.
+	Read via the query builder: the field is gone from the DocType that `frappe.get_all` validates against.
 	"""
 	if LEGACY_COLUMN not in frappe.db.get_table_columns(PARENT_DOCTYPE):
 		return
@@ -82,9 +72,8 @@ def clear_legacy_column(names):
 
 
 def drop_interim_table():
-	# Deleting the DocType does not take its table with it, and an orphan table survives every later
-	# migrate — so both have to be asked for. The drop goes through the query builder rather than a
-	# literal statement because MariaDB and Postgres quote the identifier differently.
+	# Deleting the DocType does not take its table with it, so both have to be asked for.
+	# The drop goes through the query builder: MariaDB and Postgres quote the identifier differently.
 	if frappe.db.exists("DocType", INTERIM_DOCTYPE):
 		frappe.delete_doc("DocType", INTERIM_DOCTYPE, ignore_permissions=True)
 

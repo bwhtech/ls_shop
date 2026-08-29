@@ -1,23 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""Provider-agnostic engine behind every integration screen on the dashboard.
-
-Nothing here knows what a payment is. A caller supplies a registry entry and gets the read and the
-write for free, so `bwh_shipping` adds its screen with a second registry plus two whitelisted wrappers:
-
-	{
-		"slug": "razorpay",                                # stable id the dashboard writes back
-		"label": "Razorpay",                               # profile name, and the shopper-facing name
-		"blurb": "Cards, UPI, netbanking and wallets.",
-		"settings_doctype": "Razorpay Gateway Settings",   # the Single holding credentials
-		"docs_url": "https://...",
-		"profile_doctype": "Payment Gateway Profile",      # registry row the integration owns
-		"profile_settings_fieldname": "gateway_settings",  # its Link back to the Single
-		"webhook_path": "/api/method/...?gateway={profile}",  # optional
-		"on_enable": callable(integration) | None,         # side setup an enabled provider needs
-	}
-"""
+"""Provider-agnostic engine behind every integration screen on the dashboard."""
 
 import frappe
 from frappe.utils import get_url
@@ -25,26 +9,18 @@ from frappe.utils.data import cint
 
 from ls_shop.api.admin.settings import coerce_field_value
 
-# Layout-only, action-only, and child-table fieldtypes the generic renderer cannot express as a
-# single input.
+# Fieldtypes the generic renderer cannot express as a single input.
 SKIPPED_FIELDTYPES = frozenset({"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Table"})
 
-# The card's own toggle owns this field, so offering it inside a group would render two controls
-# that fight over the same value.
+# The card's own toggle owns this field; offering it in a group would render two fighting controls.
 ENABLED_FIELDNAME = "enabled"
 
-# The fields a provider declares before its first Section Break. They are behaviour flags as often
-# as credentials, so the fallback label has to stay neutral - calling it "Credentials" put Razorpay's
-# Test Mode switch under a heading that promised API keys.
+# Neutral on purpose: "Credentials" put Razorpay's Test Mode switch under a heading promising API keys.
 DEFAULT_GROUP_LABEL = "General"
 
 
 def is_available(integration) -> bool:
-	"""Whether the provider's app is installed on this site.
-
-	A registry entry outlives the app that backs it - bwh_payments can be uninstalled, or a gateway
-	dropped - and the dashboard has to keep rendering the other cards instead of erroring.
-	"""
+	"""Whether the provider's app is installed on this site."""
 	return bool(frappe.db.exists("DocType", integration["settings_doctype"]))
 
 
@@ -181,8 +157,7 @@ def write_settings(integration, values):
 			continue
 
 		value = values[fieldname]
-		# The dashboard never receives a stored secret, so it submits an empty box for one it did not
-		# touch. Only an explicit null - a deliberate "clear this" - may wipe what is stored.
+		# A blank secret keeps the stored one; only an explicit null clears it.
 		if docfield.fieldtype == "Password" and value == "":
 			continue
 
@@ -192,11 +167,8 @@ def write_settings(integration, values):
 
 
 def save_profile(integration, enabled):
-	"""Upsert the registry row that makes the provider visible to the rest of the app.
-
-	Saved as a Document rather than db_set so the profile's own hooks run - they are what clear the
-	site cache the storefront reads its available providers from.
-	"""
+	"""Upsert the registry row that makes the provider visible to the rest of the app."""
+	# Saved as a Document, not db_set: the profile's hooks are what clear the storefront provider cache.
 	profile_doctype = integration["profile_doctype"]
 	label = integration["label"]
 

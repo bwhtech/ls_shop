@@ -1,17 +1,9 @@
-{# Reference: reference_themes/pixio/index.html 2790-2805 (the whole <section class="collection-bx">).
-   style.css already carries every mask, float animation and responsive rule for .collection-bx and
-   .collection1..5, so this section only supplies markup plus the two gaps home-collage.css fills.
-
-   The stylesheet link lives here rather than in theme_layout.html because the collage is one
-   homepage band - same pattern as components/core/account_shell.html. #}
 {% set settings = shop_theme_config() %}
 {% set language = frappe.lang or "en" %}
 {% set products_url = "/" ~ language ~ "/products" %}
 {% set categories = header_data.navigation_menu[:5] %}
 {% set category_images = settings.shop_by_category %}
 
-{# Upstream's five positions only balance when all five are filled, so a shorter menu picks the
-   subset that still reads as symmetric instead of leaving one corner orphaned. #}
 {% set collage_slots = {1: [5], 2: [1, 3], 3: [1, 3, 5], 4: [1, 3, 2, 4], 5: [1, 3, 2, 4, 5]} %}
 
 {% if categories %}

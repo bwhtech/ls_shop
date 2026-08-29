@@ -1,12 +1,3 @@
-{# Reference: reference_themes/pixio/shop-checkout.html 1010-1281.
-
-   Two of the reference's accordions are dropped: "Returning customer? Click here to login"
-   is dead on a route that already refuses guests, and the coupon accordion has no
-   counterpart in the app's cart-level pricing (the sibling cart page drops it for the same
-   reason). The reference's free-text Town/City and State selects become the app's country
-   list plus plain city/PO box fields, because that is what Address actually stores. The
-   banner keeps .dz-bnr-inr's default light fill rather than the reference's dark bg1.jpg:
-   header-transparent leaves the nav links dark and unreadable over a dark band. #}
 
 {% extends "components/theme_layout.html" %}
 
@@ -96,8 +87,6 @@
 {% endmacro %}
 
 {% block uncontained_body %}
-	{# header-transparent overlays whatever opens the page, and the banner's own 90px top
-	   padding is the offset that keeps the heading clear of the bar. #}
 	<div class="dz-bnr-inr">
 		<div class="container">
 			<div class="dz-bnr-inr-entry">
@@ -152,7 +141,6 @@
 					</div>
 
 					<form class="row" x-show="!address_saved" @submit.prevent="save_address()">
-						{# Store pickup #}
 						<template x-if="delivery_option === 'store_pickup'">
 							<div class="col-md-12">
 								<div class="m-b25">
@@ -168,7 +156,6 @@
 							</div>
 						</template>
 
-						{# Home delivery #}
 						<template x-if="delivery_option === 'home_delivery'">
 							<div class="col-md-12">
 								<div class="row">
@@ -340,10 +327,7 @@
 							</tbody>
 						</table>
 
-						{# Delivery options come from the shipping connector and are priced for the saved address, so
-						   they cannot render before it is saved. A store with no connector shows nothing here and keeps
-						   its flat delivery charge. Built on the same accordion the payment methods below use, so the
-						   radio, label and blurb inherit the theme's own spacing instead of new CSS. #}
+						{# Delivery options are priced for the saved address, so they cannot render before it is saved. #}
 						<template x-if="delivery_option === 'home_delivery' && address_saved">
 							<div class="checkout-delivery-options">
 								<h5 class="title m-b15">{{ _("Delivery Method") }}</h5>
@@ -526,8 +510,7 @@
 
 				get shipping_amount() {
 					if (this.delivery_option !== "home_delivery") return 0;
-					// A chosen delivery option is priced and stored by the server, and replaces the flat
-					// shipping rule outright — so its charge wins over the advertised one.
+// A chosen delivery option is priced and stored by the server and replaces the flat shipping rule, so its charge wins.
 					if (this.selected_shipping_option) return this.selected_shipping_charge;
 					return this.config.net_total < this.delivery_charge_applicable_below ? this.delivery_charge : 0;
 				},
@@ -546,8 +529,7 @@
 					this.payment_mode = this.available_payment_modes[0] || null;
 				},
 
-				// The shipping rule lives on the quotation, so the charge the server will actually
-				// bill can differ from the one Lifestyle Settings advertises on page load.
+// The shipping rule lives on the quotation, so the billed charge can differ from what Lifestyle Settings advertised on page load.
 				async set_delivery_charge() {
 					const response = await frappe_call("/api/v2/method/ls_shop.api.checkout.apply_shipping_rule");
 					[this.delivery_charge, this.delivery_charge_applicable_below] = response.data.map(Number);
@@ -556,16 +538,13 @@
 				reset_address_step() {
 					this.address_saved = false;
 					this.errors = [];
-					// Switching between home delivery and store pickup invalidates any quote: the parcel is
-					// going somewhere else, or nowhere. The server clears its own copy when the address saves.
+// Switching between delivery and pickup invalidates any quote; the server clears its own copy when the address saves.
 					this.shipping_options = [];
 					this.shipping_options_message = "";
 					this.selected_shipping_option = null;
 					this.selected_shipping_charge = 0;
 				},
 
-				// Carrier rates depend on the destination, so options can only be fetched once the address is
-				// saved on the server — not on page load.
 				async load_shipping_options() {
 					if (this.delivery_option !== "home_delivery") return;
 
@@ -576,8 +555,7 @@
 						const data = response.data || {};
 						this.shipping_options = data.options || [];
 						if (!this.shipping_options.length) {
-							// No options is a legitimate configuration (the store may price delivery with a flat
-							// rule), so this only explains itself when the connector actually offered a menu.
+// No options is a legitimate configuration (a flat delivery rule), so this only explains itself when the connector offered a menu.
 							this.shipping_options_message = data.connector_missing ? "" : NO_SHIPPING_OPTIONS_MESSAGE;
 							return;
 						}
@@ -592,8 +570,6 @@
 					}
 				},
 
-				// The server prices the choice and stores it on the cart, so the summary follows the charge it
-				// returns rather than the amount that was rendered in the list.
 				async select_shipping_option(title) {
 					const response = await frappe_call(
 						"/api/v2/method/ls_shop.api.shipping.set_delivery_option",

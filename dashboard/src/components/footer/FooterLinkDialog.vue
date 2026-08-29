@@ -4,19 +4,15 @@ import { Button, Combobox, Dialog, FormControl, toast } from "frappe-ui"
 import { computed, ref, useId, watch } from "vue"
 
 const props = defineProps<{
-	/** The column the link belongs to. */
 	section: FooterSection | null
-	/** The link being edited, or null when adding a new one. */
 	link: FooterLink | null
 	pages: FooterPage[]
-	/** Runs the server call. Resolves false when the server refused it, and the dialog stays open. */
 	submit: (payload: { label: string; url: string }) => Promise<boolean>
 }>()
 
 const open = defineModel<boolean>("open", { required: true })
 
-// The submit button sits in the dialog's own action row, outside the form. `form` is how HTML
-// associates the two, so the browser runs each field's `required` check on click.
+// The submit button sits outside the form, so `form` is what makes the browser run each field's `required` check.
 const formId = useId()
 
 const SOURCE_OPTIONS = [
@@ -36,16 +32,12 @@ const pageOptions = computed(() =>
 	props.pages.map((row) => ({ label: row.name, value: row.name })),
 )
 
-// Core `Web Page` routes are relative ("about" -> /about); the storefront's own routes already
-// arrive as absolute paths.
 function pageUrl(route: string) {
 	return route.startsWith("/") ? route : `/${route}`
 }
 
 watch(open, (isOpen) => {
 	if (!isOpen) return
-	// Editing starts on the URL field: the link already has one, and re-picking a page would
-	// overwrite a label the owner may have deliberately changed.
 	source.value = "url"
 	page.value = ""
 	label.value = props.link?.link_label ?? ""
@@ -62,8 +54,6 @@ watch(page, (name) => {
 async function save() {
 	saving.value = true
 	try {
-		// A refused save resolves false rather than throwing, so closing the dialog waits on
-		// the answer - closing it regardless would throw away what the owner typed.
 		const saved = await props.submit({
 			label: label.value.trim(),
 			url: url.value.trim(),

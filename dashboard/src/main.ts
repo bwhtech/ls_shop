@@ -7,9 +7,8 @@ import router from "./router"
 
 const app = createApp(App)
 
-// Both are required and they are not the same thing: the plugin installs the app-level
-// injections the data-fetching composables rely on, the provider (in App.vue) mounts the
-// imperative dialog/toast portals.
+// Both are required: the plugin installs the app-level injections the data-fetching composables rely on,
+// the provider (in App.vue) mounts the imperative dialog/toast portals.
 app.use(router)
 app.use(FrappeUI)
 

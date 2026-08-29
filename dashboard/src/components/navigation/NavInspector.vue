@@ -40,8 +40,6 @@ const saving = ref(false)
 
 const isRoot = computed(() => Boolean(selected.value && !selected.value.parent))
 
-// Reload the form whenever a different entry is picked. Watching `name` rather than the node
-// keeps the fields still while the tree is replaced by a save that did not change selection.
 watch(
 	() => selected.value?.name,
 	() => {
@@ -66,8 +64,6 @@ type LinkOption = { label: string; value: string }
 const LINK_OPTIONS_URL =
 	"/api/v2/method/ls_shop.api.admin.navigation.get_link_options"
 
-// The same server-side search the settings pickers use: the endpoint decides what matches, not
-// the client, so a large catalog stays searchable rather than being capped at a first page.
 const itemGroupSearch = useLinkSearch<LinkOption>(LINK_OPTIONS_URL, () => ({
 	doctype: "Item Group",
 }))
@@ -77,8 +73,7 @@ const brandSearch = useLinkSearch<LinkOption>(
 	() => form.brand,
 )
 
-// Already-linked values are merged into the options: a search only returns what matches the
-// current query, and without this a saved group vanishes from the control as soon as someone types.
+// A search returns only what matches the query, so linked values are merged in or a saved group vanishes as soon as someone types.
 function withSelected(options: LinkOption[], selected: string[]) {
 	const merged = new Map(options.map((option) => [option.value, option]))
 	for (const value of selected) {
@@ -108,15 +103,12 @@ async function save() {
 
 	saving.value = true
 	try {
-		// A refused save resolves to null rather than throwing, so success is read off the answer;
-		// the reason is already on screen as a toast.
 		const saved = await mutate("update_node", {
 			name: node.name,
 			display_name: form.label,
 			link_type: form.link_type,
 			link_target: linkTarget(),
-			// The server rejects a blank slug outright, so an untouched optional slug is left
-			// out of the payload rather than sent as "" and thrown back.
+			// The server rejects a blank slug outright, so an untouched optional slug is left out of the payload.
 			route_slug: form.route_slug || undefined,
 			icon: form.icon,
 			meta_title: form.meta_title,

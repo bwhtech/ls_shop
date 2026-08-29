@@ -1,10 +1,3 @@
-{# Reference: reference_themes/pixio/shop-cart.html 1013-1187.
-
-   The reference's coupon form and "UPDATE CART" button are dropped: nothing in the app exposes
-   a cart-level coupon, and the quantity stepper writes straight to the store so there is no
-   pending state left for an update button to submit. The banner is left on .dz-bnr-inr's default
-   light fill rather than the reference's dark bg1.jpg: header-transparent keeps the nav links
-   dark and they are unreadable over a dark band. #}
 
 {% extends "components/theme_layout.html" %}
 
@@ -17,8 +10,6 @@
 {% endblock %}
 
 {% block uncontained_body %}
-	{# header-transparent overlays whatever opens the page, and the banner's own 90px top
-	   padding is the offset that keeps the heading clear of the bar. #}
 	<div class="dz-bnr-inr">
 		<div class="container">
 			<div class="dz-bnr-inr-entry">
@@ -79,8 +70,7 @@
 											<strong>{{ currency_symbol }}<span x-text="format_amount(cart_item.price)"></span></strong>
 										</td>
 										<td class="product-item-quantity">
-											{# Written out by hand because upstream generates it with bootstrap-touchspin;
-											   the class names are touchspin's own so style.css still shapes it. #}
+											{# Written out by hand with bootstrap-touchspin's own class names, so style.css still shapes it. #}
 											<div class="btn-quantity">
 												<div class="input-group bootstrap-touchspin">
 													<input type="text" class="form-control" readonly :value="cart_item.qty"
@@ -149,9 +139,6 @@
 							</tbody>
 						</table>
 						{% if frappe.session.user == "Guest" %}
-							{# The dialog lives in site_header.html and reloads the page once the OTP lands,
-							   which re-renders this block as the Place Order button - so signing in never
-							   leaves the cart, and never hands the shopper Frappe's own login page. #}
 							<button type="button" class="btn btn-secondary w-100"
 								@click="$dispatch('open-auth')">
 								{{ _("Sign In to Checkout") }}

@@ -42,8 +42,6 @@ watch(
 	{ immediate: true },
 )
 
-// Only the fields the owner actually touched go back, so a save never rewrites the rest of
-// the doctype with values it merely rendered.
 const changedValues = computed(() => {
 	const changes: Record<string, SettingsValue> = {}
 	for (const fieldname of Object.keys(form)) {

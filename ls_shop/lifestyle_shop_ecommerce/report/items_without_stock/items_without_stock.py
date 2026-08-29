@@ -88,7 +88,6 @@ def get_data(filters=None):
 	website_slideshow_item = DocType("Website Slideshow Item")
 	available_qty_expr = Sum(bin.actual_qty - bin.reserved_qty)
 
-	# CASE expressions to compute the checkboxes
 	published_no_stock = (
 		Case()
 		.when(

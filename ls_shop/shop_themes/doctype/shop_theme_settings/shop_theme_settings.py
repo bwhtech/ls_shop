@@ -7,10 +7,8 @@ from ls_shop.shop_themes.doctype.shop_theme.shop_theme import clear_render_theme
 
 LANG = r"(?P<lang>en|ar)"
 
-# The routes the bundled themes ship pages for. Seeded from after_install AND after_migrate
-# AND the patch: frappe writes every patch into the Patch Log as applied WITHOUT running it
-# on a fresh install, and that log entry then blocks it from ever running, so a patch alone
-# leaves new sites with no themed routes at all.
+# The routes the bundled themes ship pages for.
+# Seeded from after_install and after_migrate too: a fresh install marks patches applied without running them.
 DEFAULT_ROUTES = [
 	{"url_pattern": rf"^{LANG}$", "template_path": "pages/index.html", "requires_auth": 0},
 	{
@@ -24,9 +22,7 @@ DEFAULT_ROUTES = [
 		"requires_auth": 0,
 	},
 	{"url_pattern": rf"^{LANG}/cart$", "template_path": "pages/cart/cart.html", "requires_auth": 0},
-	# Gated by www.cart.checkout.get_context, not here. The resolver's own gate raises before any
-	# controller runs, so a guest deep-linking to checkout got a bare 403 with no way back; the
-	# controller sends them to the cart instead, where both themes offer the sign-in dialog.
+	# requires_auth 0 on purpose: the resolver's gate 403s before the controller can send a guest to the cart.
 	{
 		"url_pattern": rf"^{LANG}/cart/checkout$",
 		"template_path": "pages/cart/checkout.html",
@@ -52,9 +48,7 @@ DEFAULT_ROUTES = [
 		"template_path": "pages/account/orders/detail.html",
 		"requires_auth": 1,
 	},
-	# The only account route open to a logged-out shopper: it is the gateway return URL, so the money
-	# is already taken by the time it loads. Refusing it outright leaves the shopper on a 403 with no
-	# way back; the page asks for the login itself and shows nothing until it has one.
+	# requires_auth 0 on purpose: this is the gateway return URL, so the page asks for the login itself.
 	{
 		"url_pattern": rf"^{LANG}/account/orders/confirmation$",
 		"template_path": "pages/account/orders/confirmation.html",
@@ -88,8 +82,7 @@ class ShopThemeSettings(Document):
 
 
 def seed_default_routes():
-	"""Add any missing default route. Idempotent on url_pattern, so custom routes survive
-	and dynamic_pages_enabled is never re-enabled behind an admin's back."""
+	"""Add any missing default route; idempotent on url_pattern so custom routes survive."""
 	settings = frappe.get_single("Shop Theme Settings")
 	existing_patterns = {row.url_pattern for row in settings.routes}
 
@@ -129,8 +122,7 @@ def build_compiled_routes():
 
 
 def get_compiled_routes():
-	# Memoised on frappe.local over redis as well: regex compilation showed up hot when
-	# every request re-read the table.
+	# Memoised on frappe.local over redis too: regex compilation showed up hot per request.
 	routes = getattr(frappe.local, "shop_theme_compiled_routes", None)
 	if routes is None:
 		routes = frappe.cache.get_value(COMPILED_ROUTES_CACHE_KEY, generator=build_compiled_routes)

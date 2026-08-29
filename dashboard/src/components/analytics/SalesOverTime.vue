@@ -19,8 +19,6 @@ const { data, loading, error } = useAnalyticsReport<SalesTimeseries>(
 const rows = computed(() => {
 	const timeseries = data.value
 	if (!timeseries) return []
-	// A period every store has slept through plots as a flat pair of zero lines, which reads as
-	// a broken chart rather than as an empty one - so it is handed no rows at all.
 	const hasActivity =
 		timeseries.sales.some(Boolean) || timeseries.orders.some(Boolean)
 	if (!hasActivity) return []

@@ -32,14 +32,8 @@ export function publishTheme(publishedCount: number) {
 }
 
 /**
- * One badge per rung of the fulfilment ladder, keyed by the stage key the API returns rather than
- * by its English label, so every order badge in the app agrees and translation cannot break it.
- *
- * Badge ships six themes for nine stages, so the ladder is separated on the theme x variant grid:
- * within one hue, `outline` reads lighter than `subtle`, which reads lighter than `solid`. Hue
- * carries the meaning - gray/amber before anything leaves the shelf, violet while the warehouse
- * works, blue once goods are moving, green only for the terminal success, red for the two states
- * that need attention - and every (theme, variant) pair is used once, so no two stages look alike.
+ * Keyed by the stage key the API returns rather than its English label, so translation cannot break the mapping.
+ * Badge ships six themes for nine stages, so the ladder is separated on the theme x variant grid.
  */
 const orderStateBadges: Record<
 	string,
@@ -79,13 +73,6 @@ export function availabilityTheme(availability: string): BadgeTheme {
 	return themes[availability] ?? "gray"
 }
 
-/**
- * Money is rendered in the store's own currency, which only the API knows.
- *
- * `compact` shortens the figure for a KPI tile or an axis tick, where the full
- * grouping would not fit - it is the same function so no call site is tempted to
- * assemble a price out of a code and a number.
- */
 export function formatMoney(amount: number, currency: string, compact = false) {
 	try {
 		return new Intl.NumberFormat(undefined, {
@@ -138,9 +125,8 @@ export function formatShortDate(value: string) {
 }
 
 /**
- * ListView puts a right-aligned column's cell in a block-level wrapper that still carries
- * `justify-end`, which does nothing outside a flex box - so the value has to right-align itself or
- * it drifts left, out from under its own header.
+ * ListView puts a right-aligned cell in a block-level wrapper still carrying `justify-end`, which does nothing
+ * outside a flex box - so the value has to right-align itself or it drifts out from under its header.
  */
 export function cellAlignClass(align?: string) {
 	return align === "right" || align === "end" ? "block w-full text-right" : ""

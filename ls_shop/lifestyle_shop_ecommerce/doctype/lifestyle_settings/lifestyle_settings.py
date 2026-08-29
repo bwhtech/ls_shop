@@ -169,11 +169,7 @@ class LifestyleSettings(Document):
 
 	@frappe.whitelist()
 	def get_content_field_options(self, search_doctype):
-		"""Newline-joined indexable field names of `search_doctype` for the Search Content Field Select.
-
-		Served from Python so the grid offers exactly what the index will accept — duplicating the
-		fieldtype allowlist in the client let the two drift and offered fields the build then dropped.
-		"""
+		"""Newline-joined indexable field names of `search_doctype` for the Search Content Field Select."""
 		if search_doctype not in ALLOWED_CONTENT_DOCTYPES:
 			return ""
 		fields = [
@@ -227,10 +223,7 @@ class LifestyleSettings(Document):
 	@frappe.whitelist()
 	def install_demo_data(self):
 		"""Seed the Pixio demo storefront.
-
-		Points at install_pixio_demo, not the older install_demo_data: that one seeds a car-parts
-		catalogue and creates its price lists in USD, which mismatches any non-USD company and blocks
-		every Sales Invoice the demo goes on to raise.
+		Not install_demo_data: its price lists are hardcoded USD, which blocks every Sales Invoice on a non-USD company.
 		"""
 		from ls_shop.install_pixio_demo import install_pixio_demo
 

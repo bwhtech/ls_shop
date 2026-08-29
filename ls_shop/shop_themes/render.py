@@ -8,12 +8,7 @@ from ls_shop.shop_themes.theme_resolver import get_theme_environment
 def render_themed_template(template, context=None, theme_name=None):
 	"""Render a template through the active theme's loader outside a request.
 
-	OG cards, emails and background jobs run on the global jenv, which sees no theme
-	overrides at all. Resolution here is from the settings only - never ?preview_theme,
-	which needs a request - and falls back to frappe.render_template when no theme is
-	active, so an unthemed site behaves exactly as before.
-
-	`template` is a path or a template string, matching frappe.render_template.
+	Resolves from settings only, never ?preview_theme. `template` is a path or a template string.
 	"""
 	theme_context = get_theme_context(theme_name or resolve_active_theme())
 	if not theme_context["dirs"]:

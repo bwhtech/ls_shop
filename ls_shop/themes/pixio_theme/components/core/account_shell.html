@@ -1,32 +1,9 @@
-{# The chrome every account page shares: the page banner, the sidebar column and the content
-   column. A page wraps its body in it and writes no layout of its own:
-
-       {% extends "components/theme_layout.html" %}
-       {% from "components/core/account_shell.html" import account_shell %}
-
-       {% block head %}
-           {{ super() }}
-           <link rel="stylesheet" href="{{ shop_theme_asset_url('css/account.css') }}">
-       {% endblock %}
-
-       {% block uncontained_body %}
-           {% call account_shell(_("Orders")) %}
-               <div class="account-card">...</div>
-           {% endcall %}
-       {% endblock %}
-
-   parent_crumbs is an optional list of {"label", "href"} rows for a nested route - an order
-   detail page passes the Orders crumb so the trail reads Home / Orders / Order Details. #}
 
 {% macro account_shell(page_title, parent_crumbs=None) %}
 {% set language = frappe.lang or "en" %}
-{# The order confirmation is the one account route a logged-out shopper can reach - it is the
-   gateway return URL. The sidebar reads the signed-in User and offers a Log Out link, both
-   meaningless there, so it stands down and the content column takes the full width. #}
+{# The order confirmation is the one account route a logged-out shopper can reach - it is the gateway return URL. #}
 {% set is_signed_in = frappe.session.user != "Guest" %}
 
-{# The banner is left on .dz-bnr-inr's light fill rather than the reference's dark bg1.jpg:
-   header-transparent keeps the nav links dark and they are unreadable over a dark band. #}
 <div class="dz-bnr-inr account-banner">
 	<div class="container">
 		<div class="dz-bnr-inr-entry">

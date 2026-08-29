@@ -32,10 +32,6 @@ function formatTileValue(value: number, kind: TileKind) {
 	return formatCount(value)
 }
 
-/**
- * A rate moves in percentage points, not in percent: conversion 4.7% -> 4.9% is +0.2 pp, and
- * printing the +4.3% relative change instead would read as a move twenty times the size.
- */
 function tileDelta(kpi: AnalyticsKpi | undefined, kind: TileKind) {
 	if (!kpi) return null
 	if (kind === "rate") return Number((kpi.value - kpi.previous).toFixed(1))

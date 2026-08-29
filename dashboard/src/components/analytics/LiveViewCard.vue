@@ -11,7 +11,6 @@ const props = defineProps<{ currency: string }>()
 
 const REFRESH_INTERVAL_MS = 30000
 
-// No params: "right now" is not a window, so this card is the one widget the range does not move.
 const { data, loading, error, reload } = useAnalyticsReport<LiveView>(
 	"get_live_view",
 	() => ({}),
@@ -46,7 +45,6 @@ const tiles = computed(() => {
 		empty-message="Nothing has happened on the store yet."
 		:skeleton-rows="2"
 	>
-		<!-- card=false: the panel already draws the surface these readings sit on. -->
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
 			<NumberCard
 				v-for="tile in tiles"

@@ -6,14 +6,18 @@ import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe.tests import IntegrationTestCase
 
-from ls_shop.api.admin.catalog import update_product
+from ls_shop.api.admin.catalog import (
+	create_product,
+	get_attribute_values,
+	get_product,
+	update_product,
+)
 from ls_shop.api.admin.inventory import LOW_STOCK_THRESHOLD, get_inventory
 from ls_shop.api.admin.orders import get_overview
 from ls_shop.api.utils import get_stock_for_items
 from ls_shop.api.variant_pricing import set_variant_prices
 
-# "L" is deliberately unused by the variant under test, so a test needing a second leaf SKU
-# on the same template has one available.
+# "L" is deliberately unused by the variant under test, leaving a second leaf SKU available.
 ATTRIBUTE_VALUES = ["S", "M", "L"]
 SIZES = ["S", "M"]
 
@@ -369,8 +373,7 @@ class TestUpdateProduct(ProductOnboardingTestCase):
 		self.assertEqual(frappe.db.get_value("Item", self.item_template, "item_name"), original_title)
 
 	def test_the_framework_would_have_kept_the_old_title_without_complaining(self):
-		"""Without this the guard reads as belt-and-braces: Item backfills a blank item_name from
-		the item_code, which is how a cleared title used to report success and change nothing."""
+		"""Item backfills a blank item_name from the item_code, so a cleared title reports success silently."""
 		item = frappe.get_doc("Item", self.item_template)
 		item.item_name = "Cotton Shirt"
 		item.save()
@@ -394,13 +397,7 @@ class TestUpdateProduct(ProductOnboardingTestCase):
 
 
 class TestRunningLowPanel(ProductOnboardingTestCase):
-	"""Home's "Running low" panel and the Inventory screen's low filter have to be one list.
-
-	Out of stock is not running low - it is the other tab - so a panel that merely shows the
-	smallest numbers in the store is still wrong. The fixture stocks one size well above the
-	threshold and one size just under it, so the panel has something real to include and something
-	real to leave out.
-	"""
+	"""Home's "Running low" panel and the Inventory screen's low filter have to be one list."""
 
 	def setUp(self):
 		super().setUp()
@@ -435,6 +432,75 @@ class TestRunningLowPanel(ProductOnboardingTestCase):
 		self.assertNotIn(self.well_stocked_item_code, panel_item_codes)
 
 	def test_a_size_just_under_the_threshold_is_what_the_low_filter_is_for(self):
-		"""Guards the fixture itself: without a genuinely low size in the store the panel could be
-		empty and the two tests above would prove nothing."""
 		self.assertIn(self.running_low_item_code, self.get_item_codes(availability="low"))
+
+
+class TestCreateProduct(ProductOnboardingTestCase):
+	def setUp(self):
+		super().setUp()
+		self.colour_attribute = self.make_named_attribute("Colour", ["Crimson", "Teal"])
+		self.size_attribute = self.make_named_attribute("Size", ["S", "M", "L"])
+
+	def make_named_attribute(self, label, values):
+		attribute = frappe.new_doc("Item Attribute")
+		attribute.attribute_name = f"Onboarding {label} {self.suffix}"
+		for value in values:
+			attribute.append("item_attribute_values", {"attribute_value": value, "abbr": value[:3].upper()})
+		attribute.insert()
+		return attribute.name
+
+	def add_product(self, option_sizes):
+		return create_product(
+			title=f"Onboarding Product {frappe.generate_hash(length=6).upper()}",
+			collection=self.item_group,
+			option_attribute=self.colour_attribute,
+			size_attribute=self.size_attribute,
+			option_sizes=option_sizes,
+		)
+
+	def get_sizes_by_option(self, item_template):
+		return {
+			variant["option"]: sorted(size["size"] for size in variant["sizes"])
+			for variant in get_product(item_template)["variants"]
+		}
+
+	def test_a_colour_only_gets_the_sizes_it_is_stocked_in(self):
+		product = self.add_product(
+			[
+				{"option": "Crimson", "sizes": ["S", "M", "L"]},
+				{"option": "Teal", "sizes": ["M"]},
+			]
+		)
+
+		self.assertEqual(
+			self.get_sizes_by_option(product["name"]),
+			{"Crimson": ["L", "M", "S"], "Teal": ["M"]},
+		)
+		# The full grid would be six. The two Teal sizes nobody stocks must not exist as Items at all.
+		self.assertEqual(frappe.db.count("Item", {"variant_of": product["name"]}), 4)
+
+	def test_a_colour_with_no_sizes_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.add_product([{"option": "Crimson", "sizes": ["S"]}, {"option": "Teal", "sizes": []}])
+
+	def test_one_colour_spelled_two_ways_stays_one_colour(self):
+		# ERPNext matches attribute values case-insensitively, so the second pass would collide.
+		product = self.add_product(
+			[{"option": "Crimson", "sizes": ["S"]}, {"option": "crimson", "sizes": ["M"]}]
+		)
+
+		self.assertEqual(self.get_sizes_by_option(product["name"]), {"Crimson": ["M", "S"]})
+
+	def test_option_sizes_accepts_a_json_string(self):
+		product = self.add_product(frappe.as_json([{"option": "Teal", "sizes": ["S"]}]))
+
+		self.assertEqual(self.get_sizes_by_option(product["name"]), {"Teal": ["S"]})
+
+	def test_a_colour_the_owner_typed_joins_the_attribute(self):
+		product = self.add_product([{"option": "Saffron", "sizes": ["S"]}])
+
+		self.assertIn("Saffron", get_attribute_values(self.colour_attribute))
+		self.assertEqual(self.get_sizes_by_option(product["name"]), {"Saffron": ["S"]})
+
+	def test_get_attribute_values_keeps_the_stored_order(self):
+		self.assertEqual(get_attribute_values(self.size_attribute), ["S", "M", "L"])

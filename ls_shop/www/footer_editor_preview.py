@@ -1,8 +1,7 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""Renders the storefront footer with the *unsaved* Desk form values so the footer editor's iframe
-shows what the shop owner is typing before they hit save."""
+"""Renders the storefront footer with the *unsaved* Desk form values for the footer editor's iframe."""
 
 import re
 
@@ -91,8 +90,6 @@ def get_context(context):
 
 	footer_context = get_preview_context(settings, lang)
 
-	# The footer preview is the page with its header taken out, not the footer partial on a page of
-	# its own - see chrome_preview for why that distinction matters.
 	rendered = render_chrome_preview(footer_context, COMMON_BLANKED_BLOCKS + HEADER_BLOCKS)
 	if rendered:
 		context.rendered_html = rendered

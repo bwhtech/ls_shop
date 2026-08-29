@@ -16,12 +16,7 @@ export type SettingsTab = {
 	group: string
 }
 
-/**
- * Every panel the settings dialog holds, in sidebar order.
- *
- * The panel components are resolved in AppSettingsDialog rather than named here, so the command
- * palette can list every tab without pulling all eight panels into its own chunk.
- */
+/** Panels are resolved in AppSettingsDialog, so the command palette can list every tab without pulling all eight into its chunk. */
 export const settingsTabs: SettingsTab[] = [
 	{
 		label: "Profile",

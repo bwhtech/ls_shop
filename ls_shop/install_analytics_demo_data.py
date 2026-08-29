@@ -1,19 +1,6 @@
-"""
-Storefront Analytics Demo Data for LS Shop
-==========================================
+"""Seeds ~60 days of storefront analytics events plus the orders they attribute to.
 
-Seeds ~60 days of storefront analytics events plus the webshop Sales Orders and draft Quotations
-they attribute to, so every widget on the analytics dashboard renders a believable store.
-
-Usage:
-    bench --site your-site-name execute ls_shop.install_analytics_demo_data.install_analytics_demo_data
-    bench --site your-site-name execute ls_shop.install_analytics_demo_data.remove_analytics_demo_data
-
-Everything it writes is marked, so a re-run replaces (never doubles) the previous run:
-- Storefront Analytics Event rows are named "dmoev*"
-- Sales Orders / Quotations it creates carry a "dmo-" analytics session id
-- attribution stamped onto pre-existing orders uses the separate "dmolegacy-" prefix, so removal
-  can unstamp those instead of deleting them
+Re-runs replace rather than double: "dmoev*" events, "dmo-" sessions, "dmolegacy-" on orders removal unstamps.
 """
 
 import json
@@ -36,15 +23,12 @@ DEMO_CUSTOMER_COUNT = 300
 BASE_SESSIONS_PER_DAY = 175
 LOGGED_IN_SHARE = 0.35
 RECOVERABLE_QUOTATIONS = 15
-# older Sales Orders that seed returning_customer_rate and the "vs previous period" tiles.
-# Deliberately parked outside every dashboard range preset (7/30/90 days) so they never
-# contaminate a preset's revenue with orders that have no matching purchase events.
+# Parked outside every dashboard range preset (7/30/90 days) so they never contaminate its revenue.
 PRIOR_HISTORY_FROM_DAY = -180
 PRIOR_HISTORY_TO_DAY = -150
 PRIOR_HISTORY_ORDERS = 15
 
 # funnel step-through rates for an average session; multiplied by each channel's intent.
-# Together they land on a Shopify-like low single-digit overall conversion.
 VIEW_ITEM_RATE = 0.45
 ADD_TO_CART_RATE = 0.31
 BEGIN_CHECKOUT_RATE = 0.38
@@ -57,8 +41,7 @@ LIVE_TAIL_MARGIN_MINUTES = 60
 # a session must not span two days, and the longest visit runs about seven events four minutes apart
 LAST_HOUR_OF_DAY = 23
 MAX_SESSION_MINUTES = 28
-# session growth from the first day of the window to the last, so the "vs previous period" deltas
-# come out positive rather than losing to the noise in a few hundred orders
+# session growth across the window, so the "vs previous period" deltas come out positive.
 GROWTH_OVER_WINDOW = 0.45
 
 # hour-of-day weights, index = hour. Each channel gets the shape its audience actually browses in.
@@ -160,8 +143,6 @@ CHANNELS = (
 		"landing": (("product", 0.66), ("/en/products", 0.34)),
 	},
 	{
-		# the same channel running a second campaign is what proves the traffic-source table
-		# separates campaigns instead of collapsing to one row per channel
 		"key": "instagram-holi",
 		"utm_source": "instagram",
 		"utm_medium": "social",
@@ -229,12 +210,7 @@ CLEARED_ATTRIBUTION = {
 
 
 def get_campaign_windows(start_date, end_date):
-	"""Festival campaigns clustered into contiguous bursts inside the seeded window.
-
-	These are demo dates, not a calendar: the real Diwali (November) and Holi (March) fall outside
-	a rolling ~60-day window, so each burst is anchored by an offset from the window instead, which
-	also keeps the shape intact when the seeder is re-run on a different date.
-	"""
+	"""Festival campaigns clustered into contiguous bursts inside the seeded window."""
 	return {
 		"holi": (add_days(end_date, -30), add_days(end_date, -20)),
 		"diwali": (add_days(end_date, -16), end_date),
@@ -266,8 +242,7 @@ def get_company():
 def get_selling_price_list(company_currency):
 	"""A price list in company currency keeps grand_total == base_grand_total.
 
-	The KPI tiles sum base_grand_total while the purchase event carries grand_total, so the two
-	dashboard numbers only agree when the order needs no currency conversion.
+	The KPI tiles sum base_grand_total while the purchase event carries grand_total.
 	"""
 	price_list = frappe.db.get_value(
 		"Price List", {"selling": 1, "enabled": 1, "currency": company_currency}, "name"
@@ -381,8 +356,7 @@ def get_sessions_for_day(day, day_index):
 
 
 def get_item_modifiers(product, hero_route, quiet_route):
-	"""Two deliberate outliers are what make the engagement widget worth reading:
-	a heavily-viewed product that rarely converts, and a quiet one that converts well."""
+	"""Two deliberate outliers that make the engagement widget worth reading."""
 	if product["route"] == hero_route:
 		return 0.06, 0.7
 	if product["route"] == quiet_route:
@@ -391,8 +365,7 @@ def get_item_modifiers(product, hero_route, quiet_route):
 
 
 class Clock:
-	"""Strictly increasing event timestamps — get_landing_pages joins on MIN(creation) per session,
-	so two events sharing a timestamp would double-count a landing page."""
+	"""Strictly increasing timestamps: get_landing_pages joins on MIN(creation), so ties double-count."""
 
 	def __init__(self, started_at, rng):
 		self.now = started_at
@@ -516,10 +489,8 @@ def build_day_plans(rng, day, day_index, context):
 	active = get_active_channels(day, context["campaign_windows"])
 	plans = []
 	cutoff = context["cutoff"]
-	# today is only part-elapsed, so its sessions are squeezed into the hours that have already
-	# happened rather than dropped, which would leave the Live View "today" tiles looking dead.
-	# The clamp is whole hours because randint over a varying range consumes a varying number of
-	# bits, which would desynchronise the seeded stream and break the run-to-run determinism.
+	# today is only part-elapsed, so its sessions squeeze into the hours that have already happened.
+	# Whole hours: randint over a varying range consumes varying bits and desyncs the seeded stream.
 	hours = (list(range(cutoff.hour)) or [0]) if cutoff else list(range(24))
 	for sequence in range(get_sessions_for_day(day, day_index)):
 		channel = pick_weighted(rng, active)
@@ -549,8 +520,7 @@ def build_day_plans(rng, day, day_index, context):
 
 
 def build_live_session(rng, plan, products, stop_after):
-	"""Live View reads the last 5 and 10 minutes; a shopper who is checking out must already
-	have the add_to_cart that put them there, or the two buckets contradict each other."""
+	"""Live View reads the last 5 and 10 minutes, so a checkout must carry its own earlier add_to_cart."""
 	clock = Clock(plan.started_at, rng)
 	product = rng.choice(products)
 	item_code = rng.choice(product["item_codes"])
@@ -667,8 +637,7 @@ def create_sales_order(customer, transaction_date, items, context, attribution, 
 		)
 	sales_order.update(attribution)
 	sales_order.insert(ignore_permissions=True)
-	# the sales heatmap buckets on creation, so the order has to look like it was placed when the
-	# shopper actually checked out rather than when this script ran
+	# the sales heatmap buckets on creation, so the order must look placed at checkout time.
 	frappe.db.set_value("Sales Order", sales_order.name, "creation", placed_at, update_modified=False)
 	return sales_order
 
@@ -812,8 +781,7 @@ def get_event_rows(plans, currency, start_index):
 def stamp_existing_orders(order_names):
 	"""The orders that were already on the site get attribution too.
 
-	No purchase event is written for them — events.py already logged one when each order was
-	placed, so mirroring it here would double their revenue in the traffic-source table.
+	No purchase event is written: events.py already logged one, and a second would double their revenue.
 	"""
 	for position, name in enumerate(sorted(order_names)):
 		frappe.db.set_value(

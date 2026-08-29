@@ -5,7 +5,6 @@ import { Button, FileUploader } from "frappe-ui"
 const props = withDefaults(
 	defineProps<{
 		modelValue: string | null
-		/** Show a thumbnail rather than the bare file name. */
 		image?: boolean
 		fileTypes?: string[]
 	}>(),
@@ -50,7 +49,7 @@ function setFile(file: UploadedFile) {
 
 		<FileUploader
 			:file-types="props.fileTypes ?? (props.image ? ['image/*'] : undefined)"
-			:upload-args="{ private: false }"
+			:private="false"
 			@success="setFile"
 		>
 			<template #default="{ openFileSelector, uploading }">

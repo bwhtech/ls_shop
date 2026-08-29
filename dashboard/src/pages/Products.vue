@@ -15,7 +15,6 @@ import { useRouter } from "vue-router"
 
 const router = useRouter()
 
-// Matches the endpoint's own default, so the first screenful is the page it already returns.
 const PAGE_LENGTH = 20
 
 const {
@@ -57,7 +56,6 @@ const listOptions = computed(() => ({
 		name: "Product",
 		params: { name: row.name },
 	}),
-	// Selection stays off until a bulk action consumes it.
 	selectable: false,
 	showTooltip: false,
 	resizeColumn: true,
@@ -66,8 +64,7 @@ const listOptions = computed(() => ({
 		description: "Add your first product to start selling.",
 		button: {
 			label: "Add product",
-			// Subtle, not solid: the page header already carries the one solid primary, and a
-			// second solid gray button inverts to near-white in dark mode.
+			// Subtle, not solid: a second solid gray button inverts to near-white in dark mode.
 			variant: "subtle",
 			theme: "gray",
 			onClick: () => {
@@ -124,8 +121,7 @@ const listOptions = computed(() => ({
 			:rows="rows"
 			:options="listOptions"
 		>
-			<!-- The #cell slot replaces ListView's default rendering for every column, a column's
-			     own prefix included, so the thumbnail is drawn here rather than declared there. -->
+			<!-- The #cell slot replaces ListView's default rendering for every column, a column's own prefix included. -->
 			<template #cell="{ item, row, column }">
 				<div v-if="column.key === 'title'" class="flex min-w-0 items-center gap-2.5">
 					<img

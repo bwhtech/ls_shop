@@ -1,11 +1,5 @@
 import type { ColorScheme, KeyboardShortcutCombo } from "frappe-ui"
 
-/**
- * The app-chrome tables: one list of places the owner can go, and one list of theme choices.
- * The sidebar, the command palette and the keyboard-shortcut registry all read them, so a
- * destination cannot exist in one of the three and be missing from the others.
- */
-
 export type NavDestination = {
 	label: string
 	/** Route name, as declared in router.ts. */
@@ -45,8 +39,7 @@ export const navDestinations: NavDestination[] = [
 		label: "Inventory",
 		route: "Inventory",
 		icon: "lucide-boxes",
-		// Not Mod+Shift+I: that is the browser's own devtools shortcut on every platform, so the
-		// keystroke is swallowed before the app ever sees it.
+		// Not Mod+Shift+I: the browser's own devtools shortcut swallows it before the app ever sees it.
 		shortcut: "Mod+Shift+U",
 		group: "Catalog",
 	},
@@ -72,11 +65,6 @@ export type NavSection = {
 	destinations: NavDestination[]
 }
 
-/**
- * The destinations cut into the sidebar's runs, in table order. Grouped by the job the owner
- * came to do, not by which doctype backs the page, the way CRM and Gameplan pin their everyday
- * destinations above the first group header.
- */
 export const navSections: NavSection[] = navDestinations.reduce<NavSection[]>(
 	(sections, destination) => {
 		const label = destination.group ?? ""
