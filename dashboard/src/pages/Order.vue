@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ErrorState from "@/components/ErrorState.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
+import AnalyticsPanel from "@/components/analytics/AnalyticsPanel.vue"
 import OrderProgress from "@/components/orders/OrderProgress.vue"
 import type { OrderProgressStep } from "@/components/orders/types"
 import type { OrderDetail } from "@/types"
@@ -86,15 +87,26 @@ function confirmFulfil() {
 					{ label: order.data?.name ?? 'Loading', route: '' },
 				]"
 			/>
-			<Button
-				v-if="order.data?.can_fulfil"
-				variant="solid"
-				theme="gray"
-				icon-left="lucide-truck"
-				:loading="fulfil.loading"
-				label="Fulfil order"
-				@click="confirmFulfil"
-			/>
+			<div class="flex items-center gap-3">
+				<a
+					v-if="order.data"
+					class="text-p-sm text-ink-blue-link hover:underline"
+					:href="`/app/sales-order/${order.data.name}`"
+					target="_blank"
+					rel="noopener"
+				>
+					View in Desk
+				</a>
+				<Button
+					v-if="order.data?.can_fulfil"
+					variant="solid"
+					theme="gray"
+					icon-left="lucide-truck"
+					:loading="fulfil.loading"
+					label="Fulfil order"
+					@click="confirmFulfil"
+				/>
+			</div>
 		</header>
 
 		<LoadingText v-if="order.loading && !order.data" class="p-5" :lines="4" />
@@ -213,21 +225,30 @@ function confirmFulfil() {
 					</div>
 				</section>
 
-				<section class="mt-6 grid gap-6 sm:grid-cols-2">
-					<div>
-						<h2 class="text-md text-ink-gray-9">Customer</h2>
-						<dl class="mt-2 space-y-1.5 text-base">
+				<section class="mt-6 grid items-start gap-4 sm:grid-cols-2">
+					<AnalyticsPanel title="Customer">
+						<template #actions>
+							<a
+								class="text-p-sm text-ink-blue-link hover:underline"
+								:href="`/app/customer/${order.data.customer}`"
+								target="_blank"
+								rel="noopener"
+							>
+								View in Desk
+							</a>
+						</template>
+						<dl class="space-y-1.5 text-base">
 							<dd class="text-ink-gray-9">{{ order.data.customer }}</dd>
 							<dd v-if="order.data.email" class="text-ink-gray-7">{{ order.data.email }}</dd>
 							<dd v-if="order.data.phone" class="text-ink-gray-7">{{ order.data.phone }}</dd>
 						</dl>
-					</div>
-					<div>
-						<h2 class="text-md text-ink-gray-9">Shipping to</h2>
-						<p class="mt-2 whitespace-pre-line text-p-base text-ink-gray-7">
+					</AnalyticsPanel>
+					<!-- The address arrives already rendered to lines, so there is no Address docname to link. -->
+					<AnalyticsPanel title="Shipping to">
+						<p class="whitespace-pre-line text-p-base text-ink-gray-7">
 							{{ order.data.shipping_address ?? "No address on this order" }}
 						</p>
-					</div>
+					</AnalyticsPanel>
 				</section>
 
 				<section v-if="order.data.deliveries.length" class="mt-6">
