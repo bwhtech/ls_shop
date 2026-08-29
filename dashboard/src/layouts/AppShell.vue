@@ -98,7 +98,7 @@ const menuItems = computed(() => [
 					</nav>
 				</ScrollArea>
 
-				<div class="shrink-0 space-y-0.5 border-t border-outline-gray-1 p-2">
+				<div class="shrink-0 border-t border-outline-gray-1 p-2">
 					<Button
 						class="w-full !justify-start"
 						variant="ghost"
@@ -110,13 +110,6 @@ const menuItems = computed(() => [
 							<KeyboardShortcut combo="Mod+K" bg />
 						</template>
 					</Button>
-					<Button
-						class="w-full !justify-start"
-						variant="ghost"
-						icon-left="lucide-settings"
-						label="Settings"
-						@click="openSettings()"
-					/>
 				</div>
 			</Sidebar>
 		</template>
