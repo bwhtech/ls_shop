@@ -24,7 +24,9 @@ const LANGUAGES = [
 	{ label: "العربية", value: "ar" },
 ]
 
-const language = ref("en")
+// ponytail: the storefront's audience is Arabic, so the preview opens RTL; key it off a
+// storefront default-language field once Lifestyle Settings carries one.
+const language = ref("ar")
 const reloadToken = ref(0)
 
 const stage = ref<HTMLElement | null>(null)

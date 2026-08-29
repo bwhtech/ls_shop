@@ -226,3 +226,31 @@
 		margin-bottom: var(--bs-dropdown-spacer);
 	}
 }
+
+/* style.css pins the dropdown's text and its own edge to the physical left, so an Arabic menu
+   reads flush-left inside a right-anchored panel. The logical value leaves English untouched. */
+.header-nav .nav > li .mega-menu,
+.header-nav .nav > li .sub-menu,
+.header-nav.w3menu .nav > li .mega-menu,
+.header-nav.w3menu .nav > li .sub-menu {
+	text-align: start;
+}
+
+/* The child-menu marker is a Font Awesome chevron-right floated right: a glyph cannot be made
+   logical, so Arabic needs the mirrored codepoint (\f053) on the opposite edge. */
+[dir="rtl"] .header-nav .nav > li .mega-menu .menu-item-has-children > a:before,
+[dir="rtl"] .header-nav .nav > li .sub-menu .menu-item-has-children > a:before {
+	content: "\f053";
+	float: left;
+}
+
+/* The subscribe button is absolutely positioned at right: 0, which in Arabic parks it on top of
+   the placeholder where the text begins. */
+.dzSubscribe .form-group .input-group .input-group-addon {
+	inset-inline-start: auto;
+	inset-inline-end: 0;
+}
+
+[dir="rtl"] .dzSubscribe .form-group .input-group .input-group-addon .btn i {
+	transform: scaleX(-1);
+}
