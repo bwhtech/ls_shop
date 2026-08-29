@@ -7,7 +7,7 @@ import { showAddProduct } from "@/components/addProduct"
 import { usePagedList } from "@/composables/usePagedList"
 import type { ProductRow } from "@/types"
 import { errorMessage } from "@/utils/errors"
-import { cellAlignClass, formatRowPrice, publishTheme } from "@/utils/format"
+import { cellAlignClass, formatRowPrice, publishStatus } from "@/utils/format"
 import { Badge, Breadcrumbs, Button, FormControl } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed } from "vue"
@@ -41,9 +41,7 @@ const rows = computed(() =>
 	loadedProducts.value.map((product) => ({
 		...product,
 		price: formatRowPrice(product, currency.value),
-		status: product.published_count
-			? `${product.published_count} of ${product.variant_count} live`
-			: "Not live",
+		status: publishStatus(product.published_count, product.variant_count),
 	})),
 )
 
@@ -147,8 +145,8 @@ const listOptions = computed(() => ({
 				<Badge
 					v-else-if="column.key === 'status'"
 					variant="subtle"
-					:theme="publishTheme(row.published_count)"
-					:label="row.status"
+					:theme="row.status.theme"
+					:label="row.status.label"
 				/>
 
 				<span

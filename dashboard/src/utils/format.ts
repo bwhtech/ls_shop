@@ -39,6 +39,23 @@ export function publishTheme(publishedCount: number) {
 }
 
 /**
+ * A fraction only earns its place when the product is genuinely part-published;
+ * "1 of 1 live" reads as a puzzle rather than a status.
+ */
+export function publishStatus(publishedCount: number, variantCount: number) {
+	if (publishedCount && publishedCount < variantCount) {
+		return {
+			label: `${publishedCount} of ${variantCount} live`,
+			theme: "amber" as BadgeTheme,
+		}
+	}
+	return {
+		label: publishedCount ? "Live" : "Not live",
+		theme: publishTheme(publishedCount) as BadgeTheme,
+	}
+}
+
+/**
  * Keyed by the stage key the API returns rather than its English label, so translation cannot break the mapping.
  * Badge ships six themes for nine stages, so the ladder is separated on the theme x variant grid.
  */
@@ -80,18 +97,30 @@ export function availabilityTheme(availability: string): BadgeTheme {
 	return themes[availability] ?? "gray"
 }
 
-export function formatMoney(amount: number, currency: string, compact = false) {
+export function formatMoney(
+	amount: number,
+	currency: string,
+	compact = false,
+	symbol?: string,
+) {
 	try {
-		return new Intl.NumberFormat(undefined, {
+		const formatter = new Intl.NumberFormat(undefined, {
 			style: "currency",
 			currency,
 			currencyDisplay: "narrowSymbol",
 			notation: compact ? "compact" : "standard",
 			maximumFractionDigits: compact ? 1 : undefined,
-		}).format(amount)
+		})
+		// Intl has no narrow symbol for AED or SAR in a Latin locale and prints the code instead, so the
+		// site's own symbol is swapped in where Intl placed the currency.
+		if (!symbol) return formatter.format(amount)
+		return formatter
+			.formatToParts(amount)
+			.map((part) => (part.type === "currency" ? symbol : part.value))
+			.join("")
 	} catch {
 		// An unset or unrecognised currency code makes Intl throw; the figure still has to render.
-		return `${currency} ${amount.toFixed(2)}`
+		return `${symbol || currency} ${amount.toFixed(2)}`
 	}
 }
 
