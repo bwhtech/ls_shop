@@ -13,6 +13,9 @@ const props = defineProps({
   label: { type: String, required: true },
   format: { type: String, default: 'number' },
   description: { type: String, default: undefined },
+  // No popover, no pencil — for a value ls_shop has nothing to write to yet
+  // (see callers for why), shown as the same tabular-nums text either way.
+  readonly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -32,7 +35,11 @@ function cancel(close) {
 </script>
 
 <template>
-  <Popover align="start" :offset="4">
+  <span v-if="readonly" class="px-1.5 py-0.5 text-base tabular-nums">
+    {{ format === 'money' ? money(modelValue) : modelValue }}
+  </span>
+
+  <Popover v-else align="start" :offset="4">
     <template #trigger="{ open }">
       <button
         class="group flex items-center gap-1 rounded-4 px-1.5 py-0.5 tabular-nums"

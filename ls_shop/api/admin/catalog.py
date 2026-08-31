@@ -4,10 +4,14 @@
 import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe import _
-from frappe.utils import get_url
+from frappe.utils import add_days, get_url, nowdate
 from frappe.utils.data import cint, cstr, flt
 
-from ls_shop.api.variant_pricing import get_selling_price_lists, set_variant_prices
+from ls_shop.api.variant_pricing import (
+	get_base_price_rows_by_key,
+	get_selling_price_lists,
+	set_variant_prices,
+)
 
 PAGE_LENGTH = 20
 
@@ -186,6 +190,43 @@ def get_ecommerce_stock(item_codes):
 	return {cstr(row.item_code): flt(row.actual_qty) for row in rows}
 
 
+def get_size_prices(item_codes):
+	"""Both price lists for a set of sizes, keyed by item_code - what a size-level price editor
+	needs (get_default_rates() above only serves the list screen's single price_from/price_to)."""
+	if not item_codes:
+		return {}
+
+	default_price_list, sale_price_list = get_selling_price_lists()
+	price_rows_by_key = get_base_price_rows_by_key(item_codes, [default_price_list, sale_price_list])
+
+	prices = {}
+	for (item_code, price_list), row in price_rows_by_key.items():
+		bucket = prices.setdefault(item_code, {"default_rate": None, "sale_rate": None})
+		if price_list == default_price_list:
+			bucket["default_rate"] = flt(row.price_list_rate)
+		elif price_list == sale_price_list:
+			bucket["sale_rate"] = flt(row.price_list_rate)
+	return prices
+
+
+def get_size_stock(item_codes):
+	"""On-hand and committed (Bin.reserved_qty) for a set of sizes, keyed by item_code - a superset
+	of get_ecommerce_stock() above, which only serves the list screen's summed total."""
+	if not item_codes:
+		return {}
+
+	warehouse = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
+	if not warehouse:
+		return {}
+
+	rows = frappe.get_all(
+		"Bin",
+		filters={"item_code": ["in", item_codes], "warehouse": warehouse},
+		fields=["item_code", "actual_qty", "reserved_qty"],
+	)
+	return {cstr(row.item_code): {"stock": flt(row.actual_qty), "committed": flt(row.reserved_qty)} for row in rows}
+
+
 @frappe.whitelist()
 def get_product(item_template: str):
 	"""Everything one product's edit screen needs, in one call."""
@@ -194,7 +235,7 @@ def get_product(item_template: str):
 	template = frappe.db.get_value(
 		"Item",
 		item_template,
-		["name", "item_name", "image", "item_group", "description", "disabled"],
+		["name", "item_name", "image", "item_group", "description", "disabled", "modified"],
 		as_dict=True,
 	)
 	if not template:
@@ -235,17 +276,25 @@ def get_product(item_template: str):
 		else []
 	)
 
-	rates_by_item_code = get_default_rates([row.item_code for row in sizes if row.item_code])
-	stock_by_item_code = get_ecommerce_stock([row.item_code for row in sizes if row.item_code])
+	item_codes = [row.item_code for row in sizes if row.item_code]
+	prices_by_item_code = get_size_prices(item_codes)
+	stock_by_item_code = get_size_stock(item_codes)
 
 	sizes_by_variant = {}
 	for row in sizes:
+		price = prices_by_item_code.get(cstr(row.item_code), {})
+		stock = stock_by_item_code.get(cstr(row.item_code), {})
 		sizes_by_variant.setdefault(row.parent, []).append(
 			{
 				"size": row.size,
 				"item_code": row.item_code,
-				"rate": rates_by_item_code.get(cstr(row.item_code)),
-				"stock": stock_by_item_code.get(cstr(row.item_code), 0),
+				# default_rate is the MRP shown struck through once a sale_rate is set (see
+				# ls_shop/product_detail.py's get_discount_percent, which treats default_rate as
+				# the higher reference and sale_rate as what the shopper actually pays).
+				"default_rate": price.get("default_rate"),
+				"sale_rate": price.get("sale_rate"),
+				"stock": stock.get("stock", 0),
+				"committed": stock.get("committed", 0),
 			}
 		)
 
@@ -260,6 +309,7 @@ def get_product(item_template: str):
 		"collection": template.item_group,
 		"description": template.description,
 		"disabled": bool(template.disabled),
+		"updated": template.modified,
 		"option_attribute": configurators[0].item_attribute if configurators else None,
 		"variants": [
 			{
@@ -276,6 +326,36 @@ def get_product(item_template: str):
 			}
 			for row in variants
 		],
+		"recent_sales": get_recent_product_sales(item_codes),
+	}
+
+
+def get_recent_product_sales(item_codes, window_days: int = 30):
+	"""Units/orders/revenue for one product's own sizes over the trailing window - a single query
+	scoped to one product's item codes, not the store-wide scan orders.get_overview() runs."""
+	if not item_codes:
+		return {"window_days": window_days, "units_sold": 0, "order_count": 0, "revenue": 0}
+
+	sales_order = frappe.qb.DocType("Sales Order")
+	sales_order_item = frappe.qb.DocType("Sales Order Item")
+	rows = (
+		frappe.qb.from_(sales_order_item)
+		.join(sales_order)
+		.on(sales_order.name == sales_order_item.parent)
+		.select(sales_order_item.qty, sales_order_item.amount, sales_order.name)
+		.where(
+			(sales_order_item.item_code.isin(item_codes))
+			& (sales_order.docstatus == 1)
+			& (sales_order.transaction_date >= add_days(nowdate(), -window_days))
+		)
+		.run(as_dict=True)
+	)
+
+	return {
+		"window_days": window_days,
+		"units_sold": sum(flt(row.qty) for row in rows),
+		"order_count": len({row.name for row in rows}),
+		"revenue": sum(flt(row.amount) for row in rows),
 	}
 
 
@@ -548,6 +628,26 @@ def save_product_prices(style_attribute_variant: str, size_prices: list | str):
 	"""Edit the per-size default and sale prices of one option."""
 	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
 	return variant.save_size_prices(size_prices)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_variant_price(style_attribute_variant: str, default_rate=None, sale_rate=None):
+	"""Reprice every size under one option in a single pass.
+
+	The product page's variant-row editor shows one price for what is really N size-level prices
+	(save_product_prices/save_size_prices above edits those individually); this is the bulk form,
+	built on the same set_variant_prices() the create-product flow uses.
+	"""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	variant.check_permission("write")
+
+	return set_variant_prices(
+		variant.item_style,
+		default_rate=default_rate,
+		sale_rate=sale_rate,
+		overwrite_existing=1,
+		style_attribute_variant_list=[style_attribute_variant],
+	)
 
 
 @frappe.whitelist(methods=["POST"])

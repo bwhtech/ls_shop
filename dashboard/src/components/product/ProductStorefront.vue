@@ -5,6 +5,12 @@ import { FormControl, TextInput } from 'frappe-ui'
 const props = defineProps({ product: { type: Object, required: true } })
 
 const handle = computed(() => props.product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+
+// Display-only, unchanged from the prototype: the real SEO fields (route,
+// meta_title, meta_description) live per option on Style Attribute Variant —
+// each published colour/size gets its own storefront URL — not on the
+// product template shown here, and no admin endpoint reads or writes them
+// yet. The handle above is computed client-side, same as before.
 </script>
 
 <template>

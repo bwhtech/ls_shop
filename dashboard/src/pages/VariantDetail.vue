@@ -1,86 +1,178 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, FormControl, TextInput, toast } from 'frappe-ui'
+import { Button, FormControl, Switch, TextInput, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import Thumb from '../components/Thumb.vue'
 import VariantMedia from '../components/VariantMedia.vue'
-import { inventory, products } from '../data/mock'
+import { useAdminRead, useAdminAction } from '../data/api'
 
 const route = useRoute()
-const product = computed(() => products.find((p) => p.id === route.params.id) ?? products[0])
-const variant = computed(
-  () => product.value.variants.find((v) => v.id === route.params.variantId) ?? product.value.variants[0],
+
+const productRequest = useAdminRead('catalog.get_product', {
+  params: () => ({ item_template: route.params.id }),
+  refetch: true,
+})
+
+const product = computed(() => productRequest.data)
+const variant = computed(() =>
+  product.value?.variants.find((v) => v.name === route.params.variantId) ?? null,
 )
-const stockRows = computed(() => inventory.filter((row) => row.variantId === variant.value?.id))
+
+// One draft row per size — this is the fine-grained editor (the product
+// page's matrix row only offers one bulk price for every size at once).
+// Price is what a shopper pays (sale_rate if a discount is on, otherwise
+// default_rate); Compare at is the higher, struck-through reference
+// (default_rate) and is only meaningful once it is filled in — see
+// ls_shop/product_detail.py's get_discount_percent for the same convention.
+const sizeDrafts = reactive({})
+watch(
+  variant,
+  (value) => {
+    for (const key of Object.keys(sizeDrafts)) delete sizeDrafts[key]
+    if (!value) return
+    for (const size of value.sizes) {
+      const hasSale = size.sale_rate != null && size.sale_rate < (size.default_rate ?? Infinity)
+      sizeDrafts[size.item_code] = {
+        price: hasSale ? size.sale_rate : (size.default_rate ?? 0),
+        compareAt: hasSale ? size.default_rate : null,
+        receiveQty: '',
+      }
+    }
+  },
+  { immediate: true },
+)
+
+const priceAction = useAdminAction('catalog.save_product_prices')
+const stockAction = useAdminAction('catalog.receive_product_stock')
+const publishAction = useAdminAction('catalog.set_variant_published')
+
+async function save() {
+  const size_prices = variant.value.sizes.map((size) => {
+    const draft = sizeDrafts[size.item_code]
+    const hasCompareAt = draft.compareAt != null && draft.compareAt !== ''
+    return {
+      item_code: size.item_code,
+      default_rate: hasCompareAt ? draft.compareAt : draft.price,
+      sale_rate: hasCompareAt ? draft.price : undefined,
+    }
+  })
+  await priceAction.submit({ style_attribute_variant: variant.value.name, size_prices })
+  if (priceAction.error) return
+
+  const received_quantities = Object.fromEntries(
+    Object.entries(sizeDrafts)
+      .filter(([, draft]) => Number(draft.receiveQty) > 0)
+      .map(([item_code, draft]) => [item_code, Number(draft.receiveQty)]),
+  )
+  if (Object.keys(received_quantities).length) {
+    await stockAction.submit({ style_attribute_variant: variant.value.name, received_quantities })
+    if (stockAction.error) return
+  }
+
+  toast.success('Variant saved')
+  productRequest.reload()
+}
+
+async function togglePublish() {
+  await publishAction.submit({ style_attribute_variant: variant.value.name, publish: !variant.value.is_published })
+  if (publishAction.error) return
+  productRequest.reload()
+}
 </script>
 
 <template>
-  <AppPageHeader
-    :title="variant?.title ?? product.title"
-    :back-to="`/products/${product.id}`"
-    :breadcrumbs="[
-      { label: 'Products', route: '/products' },
-      { label: product.title, route: `/products/${product.id}` },
-      { label: variant?.title ?? '—' },
-    ]"
-  >
-    <template #actions>
-      <Button label="Save" variant="solid" theme="gray" @click="toast.success('Variant saved')" />
-    </template>
-  </AppPageHeader>
+  <template v-if="product && variant">
+    <AppPageHeader
+      :title="variant.option"
+      :back-to="`/products/${product.name}`"
+      :breadcrumbs="[
+        { label: 'Products', route: '/products' },
+        { label: product.title, route: `/products/${product.name}` },
+        { label: variant.option },
+      ]"
+    >
+      <template #actions>
+        <Button label="Save" variant="solid" theme="gray" @click="save" />
+      </template>
+    </AppPageHeader>
 
-  <PageBody width="narrow">
-    <div class="flex items-center gap-3">
-      <Thumb :emoji="variant.thumb" size="size-16" />
-      <div>
-        <p class="text-base text-ink-gray-8">{{ product.title }}</p>
-        <p class="mt-1 text-sm text-ink-gray-5">{{ variant.title }}</p>
+    <PageBody width="narrow">
+      <div class="flex items-center gap-3">
+        <Thumb :image="variant.images[0]" size="size-16" />
+        <div>
+          <p class="text-base text-ink-gray-8">{{ product.title }}</p>
+          <p class="mt-1 text-sm text-ink-gray-5">{{ variant.option }}</p>
+        </div>
       </div>
-    </div>
 
-    <div class="mt-8 space-y-11">
-      <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Photos</h2>
-        <p class="mt-1 text-p-sm text-ink-gray-5">
-          Shown when a shopper picks this combination. The first one is the cover.
-        </p>
-        <VariantMedia class="mt-4" :variant="variant" :thumb="variant.thumb" />
-      </section>
-
-      <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Options</h2>
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TextInput
-            v-for="part in variant.combo"
-            :key="part.name"
-            :model-value="part.value"
-            class="w-full"
-            :label="part.name"
-          />
-        </div>
-      </section>
-
-      <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Pricing and identifiers</h2>
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormControl :model-value="String(variant.price)" type="number" label="Price" />
-          <FormControl :model-value="variant.compareAt ? String(variant.compareAt) : ''" type="number" label="Compare at" />
-          <FormControl :model-value="variant.sku" label="SKU" />
-          <FormControl :model-value="variant.barcode" label="Barcode" />
-        </div>
-      </section>
-
-      <section>
-        <h2 class="text-lg-semibold text-ink-gray-8">Stock</h2>
-        <div class="mt-4 divide-y divide-outline-gray-1 border-y border-outline-gray-1">
-          <div v-for="row in stockRows" :key="row.id" class="flex items-center justify-between py-3">
-            <span class="text-base text-ink-gray-7">{{ row.location }}</span>
-            <TextInput :model-value="String(row.onHand)" size="sm" class="w-20" />
+      <div class="mt-8 space-y-11">
+        <section>
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg-semibold text-ink-gray-8">Published</h2>
+              <p class="mt-1 text-p-sm text-ink-gray-5">
+                Visible on the storefront to shoppers.
+                <span v-if="variant.blockers.length" class="text-ink-amber-7">
+                  {{ variant.blockers.join(' · ') }}
+                </span>
+              </p>
+            </div>
+            <!-- Disabled up front with the reason, rather than surprising the
+                 owner with an error after they flip it — the rule this switch
+                 enforces is Style Attribute Variant.unpublish_if_incomplete_data. -->
+            <Switch
+              :model-value="variant.is_published"
+              :disabled="!variant.is_published && variant.blockers.length > 0"
+              @update:model-value="togglePublish"
+            />
           </div>
-        </div>
-      </section>
-    </div>
-  </PageBody>
+        </section>
+
+        <section>
+          <h2 class="text-lg-semibold text-ink-gray-8">Photos</h2>
+          <p class="mt-1 text-p-sm text-ink-gray-5">
+            Shown when a shopper picks this combination. The first one is the cover.
+          </p>
+          <VariantMedia class="mt-4" :variant="variant" @saved="productRequest.reload()" />
+        </section>
+
+        <section>
+          <h2 class="text-lg-semibold text-ink-gray-8">Options</h2>
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <!-- Read-only: this value is set at creation (ERPNext's variant
+                 attributes) and renaming it here has no supported endpoint —
+                 it would also silently break the option's existing route,
+                 prices and stock, all keyed off it. -->
+            <FormControl :model-value="variant.option" class="w-full" :label="product.option_attribute" disabled />
+          </div>
+        </section>
+
+        <section v-for="size in variant.sizes" :key="size.item_code">
+          <h2 class="text-lg-semibold text-ink-gray-8">Size {{ size.size }}</h2>
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormControl v-model.number="sizeDrafts[size.item_code].price" type="number" label="Price" />
+            <FormControl v-model.number="sizeDrafts[size.item_code].compareAt" type="number" label="Compare at" />
+            <FormControl :model-value="size.item_code" label="SKU" disabled />
+            <!-- No barcode field surfaced by the admin API. -->
+            <FormControl model-value="" label="Barcode" disabled />
+          </div>
+          <div class="mt-4 flex items-center justify-between rounded-4 border border-outline-gray-1 px-4 py-3">
+            <span class="text-base text-ink-gray-7">On hand: {{ size.stock }} · Committed: {{ size.committed }}</span>
+            <!-- ls_shop only exposes receiving stock in (Style Attribute
+                 Variant.receive_stock, additive) — there is no "set to X"
+                 adjustment, so this is a quantity to add on Save, not the new total. -->
+            <TextInput
+              v-model="sizeDrafts[size.item_code].receiveQty"
+              type="number"
+              size="sm"
+              class="w-28"
+              placeholder="Receive qty"
+            />
+          </div>
+        </section>
+      </div>
+    </PageBody>
+  </template>
 </template>

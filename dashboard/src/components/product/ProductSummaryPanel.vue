@@ -1,18 +1,14 @@
 <script setup>
 import { computed } from 'vue'
 import Thumb from '../Thumb.vue'
-import { money, stockTone } from '../../data/format'
+import { money, priceRange, stockTone } from '../../data/format'
 
 const props = defineProps({
   product: { type: Object, required: true },
   stats: { type: Object, required: true },
 })
 
-const priceLabel = computed(() =>
-  props.stats.priceLow === props.stats.priceHigh
-    ? money(props.stats.priceLow)
-    : `${money(props.stats.priceLow)} – ${money(props.stats.priceHigh)}`,
-)
+const priceLabel = computed(() => priceRange(props.stats.priceLow, props.stats.priceHigh))
 
 const needsAttention = computed(() => props.stats.outOfStock + props.stats.lowStock)
 </script>
@@ -72,10 +68,10 @@ const needsAttention = computed(() => props.stats.outOfStock + props.stats.lowSt
         <span v-if="stats.lowStock" class="text-ink-amber-7">{{ stats.lowStock }} running low</span>
       </p>
       <ul class="mt-3 space-y-2">
-        <li v-for="variant in stats.lowVariants" :key="variant.id" class="flex items-center gap-2.5">
-          <Thumb :emoji="variant.thumb ?? product.thumb" size="size-6" />
-          <span class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ variant.title }}</span>
-          <span class="text-base tabular-nums" :class="stockTone(variant.stock)">{{ variant.stock }}</span>
+        <li v-for="row in stats.lowVariants" :key="row.id" class="flex items-center gap-2.5">
+          <Thumb :image="row.image" size="size-6" />
+          <span class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ row.title }}</span>
+          <span class="text-base tabular-nums" :class="stockTone(row.stock)">{{ row.stock }}</span>
         </li>
       </ul>
     </section>

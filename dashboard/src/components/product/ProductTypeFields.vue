@@ -8,11 +8,19 @@ const props = defineProps({ product: { type: Object, required: true } })
 
 // The schema — not the product — decides which fields render here. Swap the
 // type and a book's ISBN gives way to an apparel product's fabric and fit.
+//
+// Confirmed in docs/comera-wiring-map.md: this schema does not exist in
+// ls_shop at all. Style Attribute Configurator carries item_template,
+// item_attribute and recommended_items — no typed per-category field list.
+// `product.type` is never set on a real product, so `type` resolves to
+// undefined and the section renders nothing rather than showing stale mock
+// fields with nowhere real to save. Flagged for the owner: build this
+// doctype/API, or drop the section from the approved layout.
 const type = computed(() => productTypes.find((t) => t.id === props.product.type))
 </script>
 
 <template>
-  <section>
+  <section v-if="type">
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-lg-semibold text-ink-gray-8">{{ type.name }} details</h2>

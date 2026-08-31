@@ -8,7 +8,7 @@ defineProps({ product: { type: Object, required: true } })
 
 <template>
   <section class="space-y-4">
-    <FormControl :model-value="product.title" label="Title" />
+    <FormControl v-model="product.title" label="Title" />
     <RichTextField
       v-model="product.description"
       label="Description"
@@ -18,11 +18,15 @@ defineProps({ product: { type: Object, required: true } })
     <div>
       <p class="mb-1.5 text-base text-ink-gray-6">Media</p>
       <div class="flex flex-wrap gap-2">
-        <Thumb :emoji="product.thumb" size="size-20" />
-        <Thumb emoji="🖼️" size="size-20" />
+        <Thumb :image="product.image" size="size-20" />
+        <!-- Item.image is a single field with no admin write path (photos live per
+             option, on Style Attribute Variant — see ProductDetail's variant matrix
+             and VariantDetail's Photos section), so adding a second template-level
+             image here has nothing to call. -->
         <button
-          class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
+          class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 opacity-50"
           aria-label="Add media"
+          disabled
         >
           <span class="lucide-plus size-5" aria-hidden="true" />
         </button>

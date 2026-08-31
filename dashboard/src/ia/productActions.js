@@ -3,15 +3,24 @@ import { dialog, toast } from 'frappe-ui'
 // Every action a merchant can take from a product page, grouped by intent.
 // The `productActions` IA axis only changes where these are rendered — the set
 // itself stays the same, so the variants stay comparable.
-export function buildProductActions(product, router) {
-  const isDraft = product.status === 'draft'
+//
+// `handlers` carries the real, wired actions ProductDetail.vue owns
+// (publish/unpublish across every option via catalog.set_product_published,
+// archive/restore via catalog.update_product). Everything else here has no
+// backend counterpart in ls_shop yet (bulk variant add/edit, a per-product
+// stock adjustment with a reason, duplicate, delete, CSV export, a saved
+// collection-rule picker, a per-product sales report) and stays a toast, the
+// same stub-and-flag treatment Products.vue already gave its own unbacked
+// actions in the prior wiring section.
+export function buildProductActions(product, router, handlers = {}) {
   const isArchived = product.status === 'archived'
+  const isPublished = product.variants.some((variant) => variant.is_published)
 
   const publish = {
     key: 'publish',
-    label: isDraft ? 'Publish to storefront' : 'Unpublish',
-    icon: isDraft ? 'lucide-globe' : 'lucide-eye-off',
-    onClick: () => toast.success(isDraft ? 'Published' : 'Hidden from the storefront'),
+    label: isPublished ? 'Unpublish' : 'Publish to storefront',
+    icon: isPublished ? 'lucide-eye-off' : 'lucide-globe',
+    onClick: handlers.onTogglePublish ?? (() => toast.success(isPublished ? 'Hidden from the storefront' : 'Published')),
   }
 
   const groups = [
@@ -86,14 +95,14 @@ export function buildProductActions(product, router) {
           label: isArchived ? 'Restore from archive' : 'Archive',
           icon: isArchived ? 'lucide-archive-restore' : 'lucide-archive',
           onClick: () =>
-            isArchived
-              ? toast.success('Restored')
+            isArchived || !handlers.onToggleArchive
+              ? (handlers.onToggleArchive ?? (() => toast.success('Restored')))()
               : dialog.confirm({
                   title: 'Archive this product?',
                   message: 'It leaves the storefront. Past orders keep their line items.',
                   theme: 'red',
                   confirmLabel: 'Archive',
-                  onConfirm: () => toast.success('Archived'),
+                  onConfirm: handlers.onToggleArchive,
                 }),
         },
         {
