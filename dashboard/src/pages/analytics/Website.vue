@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import AbandonedCarts from "@/components/analytics/AbandonedCarts.vue"
 import AnalyticsHeader from "@/components/analytics/AnalyticsHeader.vue"
-import ConversionFunnel from "@/components/analytics/ConversionFunnel.vue"
 import DeviceSplit from "@/components/analytics/DeviceSplit.vue"
 import ExternalProviderCard from "@/components/analytics/ExternalProviderCard.vue"
 import ItemAnalyticsDialog from "@/components/analytics/ItemAnalyticsDialog.vue"
@@ -9,9 +7,6 @@ import KpiTiles from "@/components/analytics/KpiTiles.vue"
 import LandingPages from "@/components/analytics/LandingPages.vue"
 import LiveViewCard from "@/components/analytics/LiveViewCard.vue"
 import ProductEngagement from "@/components/analytics/ProductEngagement.vue"
-import SalesHeatmap from "@/components/analytics/SalesHeatmap.vue"
-import SalesOverTime from "@/components/analytics/SalesOverTime.vue"
-import TopProducts from "@/components/analytics/TopProducts.vue"
 import TrackingHealthCard from "@/components/analytics/TrackingHealthCard.vue"
 import TrafficSources from "@/components/analytics/TrafficSources.vue"
 import {
@@ -21,6 +16,7 @@ import {
 	useAnalyticsRange,
 } from "@/composables/useAnalyticsRange"
 import type {
+	AnalyticsKpiKey,
 	AnalyticsOverview,
 	AnalyticsRangeParams,
 	ExternalSummaries,
@@ -47,6 +43,9 @@ onAnalyticsRefresh(() => {
 })
 
 const currency = computed(() => overview.data?.currency ?? "")
+
+// Traffic and how well it converts; the money it made is the sales tile.
+const websiteKpis: AnalyticsKpiKey[] = ["sessions", "conversion_rate"]
 
 const drilldownItemCode = ref<string | null>(null)
 const showDrilldown = ref(false)
@@ -79,30 +78,19 @@ function openProductDrilldown(itemCode: string) {
 				<KpiTiles
 					:overview="overview.data"
 					:currency="currency"
+					:keys="websiteKpis"
 					:loading="overview.loading && !overview.data"
 					:error="overview.error ? errorMessage(overview.error) : null"
 				/>
 
-				<SalesOverTime :currency="currency" />
-
-				<ConversionFunnel />
+				<TrafficSources :currency="currency" />
 
 				<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-					<TopProducts :currency="currency" @select="openProductDrilldown" />
-					<ProductEngagement @select="openProductDrilldown" />
+					<DeviceSplit />
+					<LandingPages />
 				</div>
 
-				<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-					<TrafficSources :currency="currency" />
-					<div class="space-y-4">
-						<DeviceSplit />
-						<LandingPages />
-					</div>
-				</div>
-
-				<AbandonedCarts :currency="currency" />
-
-				<SalesHeatmap />
+				<ProductEngagement @select="openProductDrilldown" />
 
 				<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 					<ExternalProviderCard

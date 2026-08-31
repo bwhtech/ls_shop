@@ -48,11 +48,16 @@ const routes = [
 	{
 		path: "/store/analytics",
 		children: [
-			{ path: "", redirect: { name: "Analytics" } },
+			{ path: "", redirect: { name: "SalesAnalytics" } },
 			{
-				path: "overview",
-				name: "Analytics",
-				component: () => import("@/pages/analytics/Overview.vue"),
+				path: "sales",
+				name: "SalesAnalytics",
+				component: () => import("@/pages/analytics/Sales.vue"),
+			},
+			{
+				path: "website",
+				name: "WebsiteAnalytics",
+				component: () => import("@/pages/analytics/Website.vue"),
 			},
 		],
 	},

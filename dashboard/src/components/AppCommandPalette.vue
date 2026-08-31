@@ -2,7 +2,7 @@
 import { openAddProduct } from "@/components/addProduct"
 import { showPalette, showShortcuts } from "@/components/commandPalette"
 import { openSettings, settingsTabs } from "@/components/settings"
-import { colorSchemeOptions, navDestinations } from "@/navigation"
+import { colorSchemeOptions, navPaletteDestinations } from "@/navigation"
 import type { OrderRow, ProductRow } from "@/types"
 import {
 	KeyboardShortcut,
@@ -43,13 +43,15 @@ function go(route: string) {
 	router.push({ name: route })
 }
 
-const destinations: PaletteItem[] = navDestinations.map((destination) => ({
-	name: destination.route,
-	title: destination.label,
-	shortcut: destination.shortcut,
-	icon: destination.icon,
-	action: () => go(destination.route),
-}))
+const destinations: PaletteItem[] = navPaletteDestinations.map(
+	(destination) => ({
+		name: destination.route,
+		title: destination.label,
+		shortcut: destination.shortcut,
+		icon: destination.icon,
+		action: () => go(destination.route),
+	}),
+)
 
 const actions: PaletteItem[] = [
 	{
@@ -165,7 +167,7 @@ function runCommand(command: CommandPaletteValue) {
 	item.action()
 }
 
-const navigationShortcuts = navDestinations.flatMap((destination) =>
+const navigationShortcuts = navPaletteDestinations.flatMap((destination) =>
 	destination.shortcut
 		? [
 				{

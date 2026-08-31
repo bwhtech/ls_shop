@@ -9,5 +9,6 @@ export type AnalyticsSection = {
 }
 
 export const analyticsSections: AnalyticsSection[] = [
-	{ label: "Overview", route: "Analytics" },
+	{ label: "Sales", route: "SalesAnalytics" },
+	{ label: "Website", route: "WebsiteAnalytics" },
 ]

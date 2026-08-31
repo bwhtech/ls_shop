@@ -7,6 +7,8 @@ import { computed } from "vue"
 const props = defineProps<{
 	overview: AnalyticsOverview | null
 	currency: string
+	/** The tiles this section owns; the whole set when a page wants every KPI. */
+	keys?: AnalyticsKpiKey[]
 	loading?: boolean
 	error?: string | null
 }>()
@@ -39,8 +41,12 @@ function tileDelta(kpi: AnalyticsKpi | undefined, kind: TileKind) {
 	return Number((((kpi.value - kpi.previous) / kpi.previous) * 100).toFixed(1))
 }
 
+const shownTiles = computed(() =>
+	props.keys ? tiles.filter((tile) => props.keys?.includes(tile.key)) : tiles,
+)
+
 const cards = computed(() =>
-	tiles.map((tile) => {
+	shownTiles.value.map((tile) => {
 		const kpi = props.overview?.kpis?.[tile.key]
 		return {
 			title: tile.title,

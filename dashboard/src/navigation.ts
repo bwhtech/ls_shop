@@ -8,6 +8,11 @@ export type NavDestination = {
 	shortcut?: KeyboardShortcutCombo
 	/** Sidebar group heading; the leading run is pinned above the first heading and has none. */
 	group?: string
+	/**
+	 * Sub-views of a section. The sidebar shows only the section — its own page carries the
+	 * sub-nav — but the palette lists each one so every view stays searchable.
+	 */
+	children?: NavDestination[]
 }
 
 export const navDestinations: NavDestination[] = [
@@ -25,8 +30,20 @@ export const navDestinations: NavDestination[] = [
 	},
 	{
 		label: "Analytics",
-		route: "Analytics",
+		route: "SalesAnalytics",
 		icon: "lucide-chart-no-axes-column",
+		children: [
+			{
+				label: "Sales analytics",
+				route: "SalesAnalytics",
+				icon: "lucide-chart-no-axes-column",
+			},
+			{
+				label: "Website analytics",
+				route: "WebsiteAnalytics",
+				icon: "lucide-globe",
+			},
+		],
 	},
 	{
 		label: "Products",
@@ -58,6 +75,11 @@ export const navDestinations: NavDestination[] = [
 		group: "Storefront",
 	},
 ]
+
+/** The palette lists leaves, not sections: a section with sub-views is reached through them. */
+export const navPaletteDestinations: NavDestination[] = navDestinations.flatMap(
+	(destination) => destination.children ?? [destination],
+)
 
 export type NavSection = {
 	/** Empty for the pinned top-level run, which carries no group heading. */
