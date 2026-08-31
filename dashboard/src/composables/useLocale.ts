@@ -5,7 +5,7 @@
  * The language cannot change without a round trip to the server, so these are read once rather
  * than kept reactive - switching language reloads the shell, the way frappe's own desk does.
  */
-function bootValue<Value>(key: string, fallback: Value): Value {
+export function bootValue<Value>(key: string, fallback: Value): Value {
 	const booted = (window as unknown as Record<string, unknown>)[key]
 	return typeof booted === typeof fallback ? (booted as Value) : fallback
 }

@@ -28,7 +28,7 @@ function selectRow(row: TRow) {
 						v-for="column in columns"
 						:key="column.key"
 						class="whitespace-nowrap px-2 py-1.5 text-p-xs font-medium text-ink-gray-5"
-						:class="column.numeric ? 'text-right' : 'text-left'"
+						:class="column.numeric ? 'text-end' : 'text-start'"
 					>
 						{{ column.label }}
 					</th>
@@ -54,8 +54,8 @@ function selectRow(row: TRow) {
 						class="px-2 py-2 text-ink-gray-8"
 						:class="
 							column.numeric
-								? 'whitespace-nowrap text-right tabular-nums'
-								: 'max-w-[16rem] truncate text-left'
+								? 'whitespace-nowrap text-end tabular-nums'
+								: 'max-w-[16rem] truncate text-start'
 						"
 					>
 						<slot :name="column.key" :row="row">

@@ -1,6 +1,8 @@
 import type { Dayjs } from "dayjs"
 import { dayjs } from "frappe-ui"
 
+import { bootValue } from "@/composables/useLocale"
+
 import type {
 	BadgeTheme,
 	BadgeVariant,
@@ -105,30 +107,47 @@ export function availabilityTheme(availability: string): BadgeTheme {
 	return themes[availability] ?? "gray"
 }
 
+/**
+ * The shell (ls_shop/www/dashboard.py) drops the site's reporting currency and its symbol on `window`,
+ * so money reads correctly on first paint - before any endpoint has answered - and no screen has to
+ * thread a symbol down from its own API for the site currency to print as a symbol.
+ */
+const reportingCurrency = bootValue("currency", "")
+const reportingCurrencySymbol = bootValue("currency_symbol", "")
+
+/**
+ * The symbol defaults from the boot channel rather than the caller, so a money surface cannot forget it.
+ * A row in some other currency than the site's keeps whatever Intl gives it - the site's symbol would be
+ * an outright lie on a foreign amount.
+ */
 export function formatMoney(
 	amount: number,
-	currency: string,
+	currency?: string,
 	compact = false,
 	symbol?: string,
 ) {
+	const currencyCode = currency || reportingCurrency
+	const currencySymbol =
+		symbol ||
+		(currencyCode === reportingCurrency ? reportingCurrencySymbol : "")
 	try {
 		const formatter = new Intl.NumberFormat(undefined, {
 			style: "currency",
-			currency,
+			currency: currencyCode,
 			currencyDisplay: "narrowSymbol",
 			notation: compact ? "compact" : "standard",
 			maximumFractionDigits: compact ? 1 : undefined,
 		})
 		// Intl has no narrow symbol for AED or SAR in a Latin locale and prints the code instead, so the
 		// site's own symbol is swapped in where Intl placed the currency.
-		if (!symbol) return formatter.format(amount)
+		if (!currencySymbol) return formatter.format(amount)
 		return formatter
 			.formatToParts(amount)
-			.map((part) => (part.type === "currency" ? symbol : part.value))
+			.map((part) => (part.type === "currency" ? currencySymbol : part.value))
 			.join("")
 	} catch {
 		// An unset or unrecognised currency code makes Intl throw; the figure still has to render.
-		return `${symbol || currency} ${amount.toFixed(2)}`
+		return `${currencySymbol || currencyCode} ${amount.toFixed(2)}`
 	}
 }
 
@@ -210,5 +229,5 @@ export function formatDateTime(value: DateInput) {
  * outside a flex box - so the value has to right-align itself or it drifts out from under its header.
  */
 export function cellAlignClass(align?: string) {
-	return align === "right" || align === "end" ? "block w-full text-right" : ""
+	return align === "right" || align === "end" ? "block w-full text-end" : ""
 }
