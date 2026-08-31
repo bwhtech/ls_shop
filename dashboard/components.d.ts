@@ -14,6 +14,7 @@ declare module 'vue' {
     AbandonedCarts: typeof import('./src/components/analytics/AbandonedCarts.vue')['default']
     AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
     AdvancedSettings: typeof import('./src/components/settings/AdvancedSettings.vue')['default']
+    AnalyticsHeader: typeof import('./src/components/analytics/AnalyticsHeader.vue')['default']
     AnalyticsPanel: typeof import('./src/components/analytics/AnalyticsPanel.vue')['default']
     AnalyticsSettings: typeof import('./src/components/settings/AnalyticsSettings.vue')['default']
     AnalyticsTable: typeof import('./src/components/analytics/AnalyticsTable.vue')['default']

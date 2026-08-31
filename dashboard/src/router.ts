@@ -47,8 +47,14 @@ const routes = [
 	},
 	{
 		path: "/store/analytics",
-		name: "Analytics",
-		component: () => import("@/pages/Analytics.vue"),
+		children: [
+			{ path: "", redirect: { name: "Analytics" } },
+			{
+				path: "overview",
+				name: "Analytics",
+				component: () => import("@/pages/analytics/Overview.vue"),
+			},
+		],
 	},
 	{
 		path: "/storefront/navigation",

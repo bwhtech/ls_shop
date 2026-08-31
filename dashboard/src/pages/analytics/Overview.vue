@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AbandonedCarts from "@/components/analytics/AbandonedCarts.vue"
+import AnalyticsHeader from "@/components/analytics/AnalyticsHeader.vue"
 import ConversionFunnel from "@/components/analytics/ConversionFunnel.vue"
 import DeviceSplit from "@/components/analytics/DeviceSplit.vue"
 import ExternalProviderCard from "@/components/analytics/ExternalProviderCard.vue"
@@ -25,14 +26,7 @@ import type {
 	ExternalSummaries,
 } from "@/types"
 import { errorMessage } from "@/utils/errors"
-import {
-	Button,
-	PageHeader,
-	PageHeaderTitle,
-	ScrollArea,
-	TabButtons,
-	useCall,
-} from "frappe-ui"
+import { Button, ScrollArea, TabButtons, useCall } from "frappe-ui"
 import { computed, ref } from "vue"
 
 const { preset, rangeParams } = useAnalyticsRange()
@@ -65,9 +59,8 @@ function openProductDrilldown(itemCode: string) {
 
 <template>
 	<div class="flex h-full flex-col bg-surface-base">
-		<PageHeader>
-			<PageHeaderTitle>Analytics</PageHeaderTitle>
-			<div class="flex items-center gap-2">
+		<AnalyticsHeader>
+			<template #actions>
 				<TabButtons v-model="preset" :options="analyticsRangeOptions" />
 				<Button
 					variant="ghost"
@@ -76,8 +69,8 @@ function openProductDrilldown(itemCode: string) {
 					:loading="overview.loading"
 					@click="refreshAnalytics"
 				/>
-			</div>
-		</PageHeader>
+			</template>
+		</AnalyticsHeader>
 
 		<ScrollArea class="min-h-0 flex-1" viewport-class="pb-40">
 			<div class="mx-auto max-w-6xl space-y-4 px-3 pt-5 sm:px-5">
