@@ -54,6 +54,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SalesHeatmap: typeof import('./src/components/analytics/SalesHeatmap.vue')['default']
     SalesOverTime: typeof import('./src/components/analytics/SalesOverTime.vue')['default']
+    ScrollFade: typeof import('./src/components/ScrollFade.vue')['default']
     SettingsAttach: typeof import('./src/components/settings/SettingsAttach.vue')['default']
     SettingsField: typeof import('./src/components/settings/SettingsField.vue')['default']
     SettingsLinkField: typeof import('./src/components/settings/SettingsLinkField.vue')['default']
