@@ -27,6 +27,15 @@ const excluded = ref<string[]>([])
 const price = ref("")
 const salePrice = ref("")
 const reviewing = ref(false)
+const collectionOpen = ref(false)
+const optionsOpen = ref(false)
+const sizesOpen = ref(false)
+
+// reka guards only Escape by topmost layer, so one outside click dismisses the
+// popover and the dialog both; the dialog yields while a popover owns that click.
+const dropdownOpen = computed(
+	() => collectionOpen.value || optionsOpen.value || sizesOpen.value,
+)
 
 type OptionSizes = { option: string; sizes: string[] }[]
 
@@ -126,7 +135,7 @@ function submit() {
 </script>
 
 <template>
-	<Dialog v-model:open="open" title="Add product">
+	<Dialog v-model:open="open" title="Add product" :dismissible="!dropdownOpen">
 		<template #default>
 			<div class="space-y-4">
 				<FormControl
@@ -135,9 +144,14 @@ function submit() {
 					required
 					placeholder="Merino Wool Jacket"
 				/>
-				<CollectionCombobox v-model="collection" required />
+				<CollectionCombobox
+					v-model="collection"
+					v-model:open="collectionOpen"
+					required
+				/>
 				<AttributeMultiSelect
 					v-model="options"
+					v-model:open="optionsOpen"
 					attribute="Colour"
 					label="Colours"
 					placeholder="Pick or type a colour"
@@ -145,6 +159,7 @@ function submit() {
 				/>
 				<AttributeMultiSelect
 					v-model="sizes"
+					v-model:open="sizesOpen"
 					attribute="Size"
 					label="Sizes"
 					placeholder="Pick or type a size"

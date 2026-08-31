@@ -7,10 +7,14 @@ const props = defineProps<{ required?: boolean }>()
 
 const collection = defineModel<string>({ required: true })
 
-const { open, query, results } = useLinkSearch<string>(
+/** Surfaced so the host dialog can stand down from outside-dismissal while this popover owns the click. */
+const open = defineModel<boolean>("open", { default: false })
+
+const { query, results } = useLinkSearch<string>(
 	"/api/v2/method/ls_shop.api.admin.catalog.get_collections",
 	() => ({}),
 	() => collection.value,
+	open,
 )
 
 const options = computed(() => results.data ?? [])

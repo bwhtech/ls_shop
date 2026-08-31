@@ -12,6 +12,9 @@ const props = defineProps<{
 
 const selected = defineModel<string[]>({ required: true })
 
+/** Surfaced so the host dialog can stand down from outside-dismissal while this popover owns the click. */
+const open = defineModel<boolean>("open", { default: false })
+
 const values = useCall<string[], { attribute: string }>({
 	url: "/api/v2/method/ls_shop.api.admin.catalog.get_attribute_values",
 	params: () => ({ attribute: props.attribute }),
@@ -53,6 +56,7 @@ function add(query: string, setQuery: (value: string) => void) {
 <template>
 	<MultiSelect
 		v-model="selected"
+		v-model:open="open"
 		:label="props.label"
 		:placeholder="props.placeholder"
 		:description="props.description"
