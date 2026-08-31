@@ -4,6 +4,7 @@
 import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe import _
+from frappe.query_builder.functions import Count
 from frappe.utils import add_days, get_url, nowdate
 from frappe.utils.data import cint, cstr, flt
 
@@ -383,6 +384,98 @@ def get_collections(search_text: str | None = None):
 
 
 @frappe.whitelist()
+def list_collections(search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH):
+	"""The Collections screen: one row per collection, with a real (not derived) product count.
+
+	The owner never sees "Item Group" — Collections are the leaf Item Groups a product can actually
+	be filed under. The tree's structural parents (e.g. "All Item Groups", "Ecommerce Website") are
+	excluded by nested-set shape (lft/rgt), not by name, so a new structural node never leaks in.
+	ls_shop has no smart-collection rule engine (confirmed in the wiring map), so every row reads
+	rule "manual" and condition "—" — true today, not a fabricated field.
+	"""
+	frappe.has_permission("Item Group", ptype="read", throw=True)
+
+	start = cint(start)
+	page_length = cint(page_length) or PAGE_LENGTH
+
+	item_group = frappe.qb.DocType("Item Group")
+	filters = item_group.rgt == item_group.lft + 1
+	if search:
+		filters = filters & item_group.name.like(f"%{cstr(search)}%")
+
+	total = (
+		frappe.qb.from_(item_group).select(Count(item_group.name)).where(filters)
+	).run()[0][0]
+
+	names = (
+		frappe.qb.from_(item_group)
+		.select(item_group.name)
+		.where(filters)
+		.orderby(item_group.name)
+		.offset(start)
+		.limit(page_length)
+	).run(pluck=True)
+
+	counts = get_collection_product_counts(names)
+
+	return {
+		"collections": [
+			{"name": name, "rule": "manual", "condition": "—", "count": counts.get(name, 0)} for name in names
+		],
+		"total": total,
+	}
+
+
+def get_collection_product_counts(collection_names):
+	"""How many items sit in each collection, in one grouped query regardless of how many collections."""
+	if not collection_names:
+		return {}
+
+	item = frappe.qb.DocType("Item")
+	rows = (
+		frappe.qb.from_(item)
+		.select(item.item_group, Count(item.name).as_("count"))
+		.where(item.item_group.isin(collection_names))
+		.groupby(item.item_group)
+	).run(as_dict=True)
+
+	return {row.item_group: row.count for row in rows}
+
+
+@frappe.whitelist(methods=["POST"])
+def create_collection(title: str):
+	"""A new collection, filed as a leaf under the same parent every other collection already uses."""
+	frappe.has_permission("Item Group", ptype="create", throw=True)
+
+	title = cstr(title).strip()
+	if not title:
+		frappe.throw(_("Enter a collection name"))
+	if frappe.db.exists("Item Group", title):
+		frappe.throw(_("Collection {0} already exists.").format(title))
+
+	item_group = frappe.qb.DocType("Item Group")
+	parent = (
+		frappe.qb.from_(item_group)
+		.select(item_group.parent_item_group)
+		.where(item_group.rgt == item_group.lft + 1)
+		.limit(1)
+	).run()
+	# A brand-new store with zero collections yet has no leaf to copy a parent from — file
+	# straight under the tree root instead.
+	parent_item_group = parent[0][0] if parent else frappe.db.get_value("Item Group", {"parent_item_group": ""})
+
+	collection = frappe.new_doc("Item Group")
+	collection.item_group_name = title
+	collection.parent_item_group = parent_item_group
+	# custom_displayname is a site customization (mandatory, shopper-facing) — every existing
+	# collection just mirrors its name into it, so a new one does too.
+	collection.custom_displayname = title
+	collection.insert()
+
+	return {"name": collection.name}
+
+
+@frappe.whitelist()
 def get_attribute_values(attribute: str):
 	"""The colours and sizes this store already uses, so the create form suggests instead of retypes."""
 	frappe.has_permission("Item Attribute", doc=attribute, ptype="read", throw=True)
@@ -393,6 +486,151 @@ def get_attribute_values(attribute: str):
 		order_by="idx asc",
 		pluck="attribute_value",
 	)
+
+
+@frappe.whitelist()
+def get_attributes():
+	"""The Attributes screen: every Item Attribute with its values and a live usage count.
+
+	Two queries total, however many attributes exist — one for the value rows, one grouped
+	query for usage — never one query per attribute (the wiring map's stated N+1 trap).
+	"""
+	frappe.has_permission("Item Attribute", ptype="read", throw=True)
+
+	attribute_names = frappe.get_all("Item Attribute", pluck="name", order_by="name asc")
+	if not attribute_names:
+		return []
+
+	value_rows = frappe.get_all(
+		"Item Attribute Value",
+		filters={"parent": ["in", attribute_names], "parenttype": "Item Attribute"},
+		fields=["parent", "attribute_value", "abbr"],
+		order_by="parent asc, idx asc",
+	)
+	values_by_attribute = {}
+	for row in value_rows:
+		values_by_attribute.setdefault(row.parent, []).append(row.attribute_value)
+
+	usage_by_attribute = get_attribute_usage_counts(attribute_names)
+
+	return [
+		{
+			"name": name,
+			"values": values_by_attribute.get(name, []),
+			"used_by": usage_by_attribute.get(name, 0),
+		}
+		for name in attribute_names
+	]
+
+
+def get_attribute_usage_counts(attribute_names):
+	"""Distinct product templates using each attribute, in one grouped query — not one per attribute."""
+	item_variant_attribute = frappe.qb.DocType("Item Variant Attribute")
+	item = frappe.qb.DocType("Item")
+
+	rows = (
+		frappe.qb.from_(item_variant_attribute)
+		.join(item)
+		.on(item.name == item_variant_attribute.parent)
+		.select(item_variant_attribute.attribute, Count(item.variant_of).distinct().as_("used_by"))
+		.where(item_variant_attribute.attribute.isin(attribute_names))
+		.where(item.variant_of.isnotnull())
+		.groupby(item_variant_attribute.attribute)
+	).run(as_dict=True)
+
+	return {row.attribute: row.used_by for row in rows}
+
+
+def check_abbreviations_are_distinct(attribute_doc, abbreviation: str, skip_row_name: str | None = None):
+	"""Refuse a colliding abbreviation up front.
+
+	Two values sharing an abbreviation generate the same item code, and the second variant
+	insert then dies with a DuplicateEntryError naming a code nobody typed — the failure surfaces
+	at variant-generation time, far from the attribute edit that actually caused it. Comparison is
+	case-insensitive because ERPNext's own uniqueness check (Item Attribute.validate_duplication) is.
+	"""
+	taken = {
+		cstr(row.abbr).casefold()
+		for row in attribute_doc.item_attribute_values
+		if row.name != skip_row_name
+	}
+	if cstr(abbreviation).casefold() in taken:
+		frappe.throw(
+			_("Abbreviation {0} is already used by another value on {1}.").format(
+				abbreviation, attribute_doc.name
+			)
+		)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_attribute(name: str, values: list | str | None = None):
+	"""A new attribute, with as many starting values as the owner typed, comma separated.
+
+	Abbreviations are always auto-generated here (make_unique_abbreviation), so within one
+	fresh attribute a collision cannot occur by construction — the guard matters once values
+	get added to an attribute one at a time, which add_attribute_value below covers.
+	"""
+	frappe.has_permission("Item Attribute", ptype="create", throw=True)
+
+	name = cstr(name).strip()
+	if not name:
+		frappe.throw(_("Enter an attribute name"))
+
+	attribute = frappe.new_doc("Item Attribute")
+	attribute.attribute_name = name
+
+	taken = set()
+	seen = set()
+	for raw_value in cstr(values or "").split(","):
+		value = raw_value.strip()
+		if not value or value.casefold() in seen:
+			continue
+		seen.add(value.casefold())
+		abbreviation = make_unique_abbreviation(value, taken)
+		taken.add(abbreviation.casefold())
+		attribute.append("item_attribute_values", {"attribute_value": value, "abbr": abbreviation})
+
+	attribute.insert()
+
+	return {"name": attribute.name}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_attribute_value(attribute: str, value: str, abbreviation: str | None = None):
+	"""Add one value to an existing attribute.
+
+	An explicit abbreviation is validated against every abbreviation the attribute already
+	carries and refused on collision (see check_abbreviations_are_distinct); omit it and one is
+	auto-generated the same way create_attribute/create_product already do, so it cannot collide.
+
+	Renaming or deleting the "Size" attribute is a separate, more dangerous edit (generate_variants
+	lowercases the attribute name into a "Color Size Item" fieldname) — this endpoint only appends
+	a value, so that trap does not apply here; a future rename/delete endpoint must guard it.
+	"""
+	frappe.has_permission("Item Attribute", doc=attribute, ptype="write", throw=True)
+
+	value = cstr(value).strip()
+	if not value:
+		frappe.throw(_("Enter a value"))
+
+	attribute_doc = frappe.get_doc("Item Attribute", attribute)
+	if any(row.attribute_value.casefold() == value.casefold() for row in attribute_doc.item_attribute_values):
+		frappe.throw(_("{0} already has a value called {1}.").format(attribute, value))
+
+	if abbreviation:
+		abbreviation = cstr(abbreviation).strip().upper()
+		check_abbreviations_are_distinct(attribute_doc, abbreviation)
+	else:
+		taken = {cstr(row.abbr).casefold() for row in attribute_doc.item_attribute_values}
+		abbreviation = make_unique_abbreviation(value, taken)
+
+	attribute_doc.append("item_attribute_values", {"attribute_value": value, "abbr": abbreviation})
+	attribute_doc.save()
+
+	return {
+		"name": attribute_doc.name,
+		"values": [row.attribute_value for row in attribute_doc.item_attribute_values],
+	}
 
 
 @frappe.whitelist(methods=["POST"])
