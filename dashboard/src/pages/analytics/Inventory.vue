@@ -2,13 +2,19 @@
 import ErrorState from "@/components/ErrorState.vue"
 import ListPager from "@/components/ListPager.vue"
 import ListSkeleton from "@/components/ListSkeleton.vue"
+import AnalyticsHeader from "@/components/analytics/AnalyticsHeader.vue"
+import StockMovement from "@/components/analytics/StockMovement.vue"
+import {
+	analyticsRangeOptions,
+	refreshAnalytics,
+	useAnalyticsRange,
+} from "@/composables/useAnalyticsRange"
 import { usePagedList } from "@/composables/usePagedList"
 import type { InventoryRow } from "@/types"
 import { errorMessage } from "@/utils/errors"
 import { availabilityTheme, cellAlignClass } from "@/utils/format"
 import {
 	Badge,
-	Breadcrumbs,
 	Button,
 	FormControl,
 	TabButtons,
@@ -18,6 +24,8 @@ import {
 } from "frappe-ui"
 import { ListView } from "frappe-ui/experimental"
 import { computed, ref } from "vue"
+
+const { preset } = useAnalyticsRange()
 
 const availability = ref("low")
 const receiveQuantities = ref<Record<string, string>>({})
@@ -73,6 +81,11 @@ const pendingReceipt = computed(() =>
 )
 const pendingCount = computed(() => Object.keys(pendingReceipt.value).length)
 
+function refreshInventory() {
+	refreshAnalytics()
+	reload()
+}
+
 const listOptions = computed(() => ({
 	selectable: false,
 	showTooltip: false,
@@ -95,11 +108,22 @@ const columns = [
 
 <template>
 	<div class="flex h-full flex-col bg-surface-base">
-		<header
-			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
-		>
-			<Breadcrumbs :items="[{ label: 'Inventory', route: { name: 'Inventory' } }]" />
-		</header>
+		<AnalyticsHeader>
+			<template #actions>
+				<TabButtons v-model="preset" :options="analyticsRangeOptions" />
+				<Button
+					variant="ghost"
+					icon-left="lucide-refresh-cw"
+					label="Refresh"
+					:loading="inventory.loading"
+					@click="refreshInventory"
+				/>
+			</template>
+		</AnalyticsHeader>
+
+		<div class="px-3 pt-4 sm:px-5">
+			<StockMovement />
+		</div>
 
 		<div class="flex items-center gap-3 px-3 py-3 sm:px-5">
 			<TabButtons v-model="availability" :options="tabs" />

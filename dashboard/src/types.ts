@@ -238,6 +238,15 @@ export type AnalyticsOverview = {
 	kpis: Record<AnalyticsKpiKey, AnalyticsKpi>
 }
 
+export type StockMovement = {
+	/** Null when no shop warehouse is set, which is the one case with nothing to report. */
+	warehouse: string | null
+	labels: string[]
+	units_in: number[]
+	units_out: number[]
+	on_hand: number[]
+}
+
 export type SalesTimeseries = {
 	labels: string[]
 	sales: number[]

@@ -98,8 +98,12 @@ def describe_availability(quantity):
 	return "In stock"
 
 
+def get_ecommerce_warehouse():
+	return frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
+
+
 def get_stock_levels(item_codes):
-	warehouse = frappe.get_cached_value("Lifestyle Settings", "Lifestyle Settings", "ecommerce_warehouse")
+	warehouse = get_ecommerce_warehouse()
 	if not warehouse:
 		# ponytail: stock reads as zero until the shop warehouse is set, revisit for multi-warehouse
 		return {}

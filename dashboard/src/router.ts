@@ -26,11 +26,6 @@ const routes = [
 		],
 	},
 	{
-		path: "/store/inventory",
-		name: "Inventory",
-		component: () => import("@/pages/Inventory.vue"),
-	},
-	{
 		path: "/store/orders",
 		children: [
 			{
@@ -58,6 +53,11 @@ const routes = [
 				path: "website",
 				name: "WebsiteAnalytics",
 				component: () => import("@/pages/analytics/Website.vue"),
+			},
+			{
+				path: "inventory",
+				name: "InventoryAnalytics",
+				component: () => import("@/pages/analytics/Inventory.vue"),
 			},
 		],
 	},

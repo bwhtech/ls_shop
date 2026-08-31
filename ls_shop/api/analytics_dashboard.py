@@ -15,6 +15,7 @@ from frappe.utils.data import (
 )
 
 from ls_shop.analytics import facebook, ga4
+from ls_shop.api.admin.inventory import get_ecommerce_warehouse
 from ls_shop.api.admin.orders import get_reporting_currency, is_webshop_order
 
 KNOWN_PROVIDER_ERRORS = {
@@ -732,4 +733,61 @@ def get_item_analytics(item_code: str, from_date: str, to_date: str):
 			{"order": row[0], "date": str(row[1]), "qty": cint(row[2]), "amount": flt(row[3])}
 			for row in recent_orders
 		],
+	}
+
+
+@frappe.whitelist()
+def get_stock_movement(from_date, to_date):
+	"""How stock moved through the shop warehouse each day, and the level it left behind."""
+	frappe.only_for("System Manager")
+	warehouse = get_ecommerce_warehouse()
+	start, end = get_window(from_date, to_date)
+	days = get_days(start, end)
+	if not warehouse:
+		return {"warehouse": None, "labels": days, "units_in": [], "units_out": [], "on_hand": []}
+
+	stock_ledger = frappe.qb.DocType("Stock Ledger Entry")
+	incoming = Sum(Case().when(stock_ledger.actual_qty > 0, stock_ledger.actual_qty).else_(0))
+	outgoing = Sum(Case().when(stock_ledger.actual_qty < 0, -stock_ledger.actual_qty).else_(0))
+	movement = (
+		frappe.qb.from_(stock_ledger)
+		.select(stock_ledger.posting_date, incoming.as_("units_in"), outgoing.as_("units_out"))
+		.where(stock_ledger.warehouse == warehouse)
+		.where(stock_ledger.is_cancelled == 0)
+		.where(stock_ledger.posting_date >= start)
+		.where(stock_ledger.posting_date < end)
+		.groupby(stock_ledger.posting_date)
+	).run(as_dict=True)
+
+	by_day = {str(row.posting_date): row for row in movement}
+	units_in = [flt(by_day[day].units_in) if day in by_day else 0.0 for day in days]
+	units_out = [flt(by_day[day].units_out) if day in by_day else 0.0 for day in days]
+
+	# Bin only knows today, so the level on each past day is walked back from it through the ledger.
+	bin_table = frappe.qb.DocType("Bin")
+	on_hand_now = (
+		frappe.qb.from_(bin_table).select(Sum(bin_table.actual_qty)).where(bin_table.warehouse == warehouse)
+	).run()
+	closing = flt(on_hand_now[0][0]) if on_hand_now else 0.0
+
+	since_window = (
+		frappe.qb.from_(stock_ledger)
+		.select(Sum(stock_ledger.actual_qty))
+		.where(stock_ledger.warehouse == warehouse)
+		.where(stock_ledger.is_cancelled == 0)
+		.where(stock_ledger.posting_date >= end)
+	).run()
+	closing -= flt(since_window[0][0]) if since_window else 0.0
+
+	on_hand = []
+	for index in reversed(range(len(days))):
+		on_hand.insert(0, closing)
+		closing -= units_in[index] - units_out[index]
+
+	return {
+		"warehouse": warehouse,
+		"labels": days,
+		"units_in": units_in,
+		"units_out": units_out,
+		"on_hand": on_hand,
 	}

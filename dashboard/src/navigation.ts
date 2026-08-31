@@ -43,6 +43,13 @@ export const navDestinations: NavDestination[] = [
 				route: "WebsiteAnalytics",
 				icon: "lucide-globe",
 			},
+			{
+				label: "Inventory analytics",
+				route: "InventoryAnalytics",
+				icon: "lucide-boxes",
+				// Not Mod+Shift+I: the browser's own devtools shortcut swallows it before the app ever sees it.
+				shortcut: "Mod+Shift+U",
+			},
 		],
 	},
 	{
@@ -50,14 +57,6 @@ export const navDestinations: NavDestination[] = [
 		route: "Products",
 		icon: "lucide-package",
 		shortcut: "Mod+Shift+P",
-		group: "Catalog",
-	},
-	{
-		label: "Inventory",
-		route: "Inventory",
-		icon: "lucide-boxes",
-		// Not Mod+Shift+I: the browser's own devtools shortcut swallows it before the app ever sees it.
-		shortcut: "Mod+Shift+U",
 		group: "Catalog",
 	},
 	{

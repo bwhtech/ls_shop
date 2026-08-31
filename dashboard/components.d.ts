@@ -62,6 +62,7 @@ declare module 'vue' {
     SettingsSaveButton: typeof import('./src/components/settings/SettingsSaveButton.vue')['default']
     SettingsSecretField: typeof import('./src/components/settings/SettingsSecretField.vue')['default']
     ShippingSettings: typeof import('./src/components/settings/ShippingSettings.vue')['default']
+    StockMovement: typeof import('./src/components/analytics/StockMovement.vue')['default']
     StoreSettings: typeof import('./src/components/settings/StoreSettings.vue')['default']
     TopProducts: typeof import('./src/components/analytics/TopProducts.vue')['default']
     TrackingHealthCard: typeof import('./src/components/analytics/TrackingHealthCard.vue')['default']

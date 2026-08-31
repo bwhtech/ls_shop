@@ -142,7 +142,7 @@ function formatStat(stat: Overview["stats"][number]) {
 							<Button
 								variant="ghost"
 								label="View all"
-								@click="$router.push({ name: 'Inventory' })"
+								@click="$router.push({ name: 'InventoryAnalytics' })"
 							/>
 						</div>
 						<div v-if="runningLow.length" class="divide-y divide-outline-gray-1">

@@ -11,4 +11,5 @@ export type AnalyticsSection = {
 export const analyticsSections: AnalyticsSection[] = [
 	{ label: "Sales", route: "SalesAnalytics" },
 	{ label: "Website", route: "WebsiteAnalytics" },
+	{ label: "Inventory", route: "InventoryAnalytics" },
 ]
