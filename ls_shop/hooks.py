@@ -26,8 +26,8 @@ website_redirects = [
 # website_path_resolver = "ls_shop.utils.resolve_bilingual_path"
 
 website_route_rules = [
-	# SPA client-side routing: every /dashboard deep link resolves to the same shell so a reload does not 404.
-	{"from_route": "/dashboard/<path:app_path>", "to_route": "/dashboard"},
+	# SPA client-side routing: every /commera deep link resolves to the same shell so a reload does not 404.
+	{"from_route": "/commera/<path:app_path>", "to_route": "/commera"},
 	# ------------
 	# English Routes
 	# ------------

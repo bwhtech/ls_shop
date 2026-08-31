@@ -1,143 +1,178 @@
-<script setup lang="ts">
-import ErrorState from "@/components/ErrorState.vue"
-import ListPager from "@/components/ListPager.vue"
-import ListSkeleton from "@/components/ListSkeleton.vue"
-import OrderStateBadge from "@/components/OrderStateBadge.vue"
-import { usePagedList } from "@/composables/usePagedList"
-import type { OrderRow } from "@/types"
-import { errorMessage } from "@/utils/errors"
-import { cellAlignClass, formatDate, formatMoney } from "@/utils/format"
-import { Breadcrumbs, FormControl, TabButtons } from "frappe-ui"
-import { ListView } from "frappe-ui/experimental"
-import { computed, ref } from "vue"
+<script setup>
+import { computed, ref, watch } from 'vue'
+import { Button, TabButtons, TextInput, toast } from 'frappe-ui'
+import { List, ListCell, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow, ListRows } from 'frappe-ui/list'
+import AppPageHeader from '../components/AppPageHeader.vue'
+import PageBody from '../components/PageBody.vue'
+import ListPagination from '../components/ListPagination.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import Thumb from '../components/Thumb.vue'
+import EmptyState from '../components/EmptyState.vue'
+import BulkBar from '../components/BulkBar.vue'
+import { orders } from '../data/mock'
+import { money, shortDate } from '../data/format'
+import { ia } from '../ia/store'
 
-const status = ref("open")
-
-const statusTabs = [
-	{ label: "To fulfil", value: "open" },
-	{ label: "Fulfilled", value: "fulfilled" },
-	{ label: "Cancelled", value: "cancelled" },
-	{ label: "All", value: "" },
+const TABS = [
+  { label: 'All', value: 'all' },
+  { label: 'Unfulfilled', value: 'unfulfilled' },
+  { label: 'Unpaid', value: 'unpaid' },
+  { label: 'Open', value: 'open' },
+  { label: 'Closed', value: 'closed' },
 ]
 
-const PAGE_LENGTH = 20
+const tab = ref('all')
+const query = ref('')
+const selecting = ref(false)
+const selection = ref([])
 
-const {
-	search,
-	request: orders,
-	rows: loadedOrders,
-	total,
-	hasMore,
-	loadMore,
-	reload,
-	getEmptyState,
-} = usePagedList<{ orders: OrderRow[]; total: number }, OrderRow>(
-	"/api/v2/method/ls_shop.api.admin.orders.get_orders",
-	PAGE_LENGTH,
-	(data) => data.orders,
-	() => ({ status: status.value }),
-)
+function endSelecting() {
+  selecting.value = false
+  selection.value = []
+}
+
+const sort = ref({ key: 'date', direction: 'desc' })
+
+const MATCHERS = {
+  all: () => true,
+  unfulfilled: (o) => o.fulfillment === 'unfulfilled',
+  unpaid: (o) => o.payment === 'pending',
+  open: (o) => !['delivered', 'cancelled'].includes(o.fulfillment),
+  closed: (o) => ['delivered', 'cancelled'].includes(o.fulfillment),
+}
+
+const page = ref(1)
+const pageSize = ref(20)
+
+const matches = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  const filtered = orders.filter(
+    (o) =>
+      MATCHERS[tab.value](o) &&
+      (!q || o.id.toLowerCase().includes(q) || o.customer.toLowerCase().includes(q)),
+  )
+  const { key, direction } = sort.value
+  const dir = direction === 'asc' ? 1 : -1
+  return [...filtered].sort((a, b) => (a[key] > b[key] ? dir : a[key] < b[key] ? -dir : 0))
+})
+
+// A filter or a sort changes what page one is, so it sends you back to it.
+watch([query, tab, sort], () => (page.value = 1))
 
 const rows = computed(() =>
-	loadedOrders.value.map((order) => ({
-		...order,
-		items: `${order.item_count}`,
-		placed_on: formatDate(order.placed_on),
-		amount: formatMoney(order.total, order.currency),
-	})),
+  matches.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
 )
 
-const columns = [
-	{ label: "Order", key: "name", width: 1.6 },
-	{ label: "Customer", key: "customer", width: 2 },
-	{ label: "Placed", key: "placed_on", width: 1.2 },
-	{ label: "Items", key: "items", width: 0.7, align: "right" },
-	{ label: "Total", key: "amount", width: 1.3, align: "right" },
-	{ label: "Status", key: "state", width: 1.8 },
-]
+function toggleSort(key) {
+  sort.value =
+    sort.value.key === key
+      ? { key, direction: sort.value.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: 'asc' }
+}
 
-const listOptions = computed(() => ({
-	getRowRoute: (row: OrderRow) => ({
-		name: "Order",
-		params: { name: row.name },
-	}),
-	selectable: false,
-	showTooltip: false,
-	resizeColumn: true,
-	emptyState: getEmptyState({
-		title: "No orders here",
-		description: "Orders placed in your store will show up here.",
-	}),
-}))
+const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
+
+function markFulfilled() {
+  toast.success(`${selection.value.length} order(s) marked fulfilled`)
+  endSelecting()
+}
 </script>
 
 <template>
-	<div class="flex h-full flex-col bg-surface-base">
-		<header
-			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
-		>
-			<Breadcrumbs :items="[{ label: 'Orders', route: { name: 'Orders' } }]" />
-		</header>
+  <AppPageHeader title="Orders">
+    <template #actions>
+      <Button label="Export" icon-left="lucide-download" />
+      <Button label="Create order" icon-left="lucide-plus" variant="solid" theme="gray" />
+    </template>
+  </AppPageHeader>
 
-		<div class="flex items-center gap-3 px-3 py-3 sm:px-5">
-			<TabButtons v-model="status" :options="statusTabs" />
-			<FormControl
-				v-model="search"
-				type="text"
-				placeholder="Search orders"
-				class="w-56"
-			/>
-		</div>
+  <PageBody>
+    <div class="flex flex-wrap items-center gap-2">
+      <TabButtons v-model="tab" size="sm" :options="TABS" />
+      <TextInput
+        v-model="query"
+        class="ml-auto w-56"
+        placeholder="Search orders"
+        icon-left="lucide-search"
+      />
+      <Button
+        :label="selecting ? 'Cancel selection' : 'Select'"
+        icon-left="lucide-list-checks"
+        :variant="selecting ? 'solid' : 'subtle'"
+        theme="gray"
+        @click="selecting ? endSelecting() : (selecting = true)"
+      />
+    </div>
 
-		<ListSkeleton
-			v-if="orders.loading && !orders.data"
-			class="px-3 sm:px-5"
-			:columns="columns"
-		/>
+    <BulkBar v-if="selecting" :count="selection.length" noun="order" @done="endSelecting">
+      <Button label="Mark fulfilled" @click="markFulfilled" />
+      <Button label="Print packing slips" />
+    </BulkBar>
 
-		<ErrorState
-			v-else-if="orders.error"
-			class="min-h-0 flex-1"
-			title="Could not load your orders"
-			:message="errorMessage(orders.error)"
-			@retry="reload"
-		/>
+    <div class="mt-3 overflow-x-auto">
+      <List
+      v-model:selection="selection"
+      class="min-w-[54rem]"
+      :selectable="selecting"
+      :row-height="ia.density"
+      :columns="['1fr', '7rem', '9rem', '9rem', '6rem', '7rem']"
+    >
+      <ListHeader>
+        <ListHeaderCellSort :direction="directionFor('customer')" @click="toggleSort('customer')">
+          Order
+        </ListHeaderCellSort>
+        <ListHeaderCellSort :direction="directionFor('date')" @click="toggleSort('date')">
+          Date
+        </ListHeaderCellSort>
+        <ListHeaderCell>Payment</ListHeaderCell>
+        <ListHeaderCell>Fulfilment</ListHeaderCell>
+        <ListHeaderCell>Items</ListHeaderCell>
+        <ListHeaderCellSort align="end" :direction="directionFor('total')" @click="toggleSort('total')">
+          Total
+        </ListHeaderCellSort>
+      </ListHeader>
 
-		<ListView
-			v-else
-			class="min-h-0 flex-1 px-3 sm:px-5"
-			row-key="name"
-			:columns="columns"
-			:rows="rows"
-			:options="listOptions"
-		>
-			<template #cell="{ item, row, column }">
-				<OrderStateBadge
-					v-if="column.key === 'state'"
-					:state="row.state"
-				/>
-				<span
-					v-else-if="column.key === 'name'"
-					class="truncate text-base text-ink-gray-9"
-					>{{ row.name }}</span
-				>
-				<span
-					v-else
-					class="truncate text-base text-ink-gray-7"
-					:class="cellAlignClass(column.align)"
-					>{{ item }}</span
-				>
-			</template>
-		</ListView>
+      <ListRows :items="rows" row-key="id" v-slot="{ item }">
+        <ListRow :to="`/orders/${item.slug}`" :value="item.id">
+          <ListCell>
+            <div class="flex min-w-0 items-center gap-2.5">
+              <Thumb :emoji="item.items[0].thumb" />
+              <div class="min-w-0">
+                <p class="truncate text-base text-ink-gray-8">{{ item.customer }}</p>
+                <p class="truncate text-sm text-ink-gray-4 tabular-nums">{{ item.id }}</p>
+              </div>
+            </div>
+          </ListCell>
+          <ListCell>
+            <span class="text-base text-ink-gray-5">{{ shortDate(item.date) }}</span>
+          </ListCell>
+          <ListCell><StatusBadge :status="item.payment" /></ListCell>
+          <ListCell><StatusBadge :status="item.fulfillment" /></ListCell>
+          <ListCell>
+            <span class="text-base text-ink-gray-7 tabular-nums">{{ item.items.length }}</span>
+          </ListCell>
+          <ListCell>
+            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">
+              {{ money(item.total) }}
+            </span>
+          </ListCell>
+        </ListRow>
+      </ListRows>
+    </List>
+    </div>
 
-		<ListPager
-			v-if="orders.data && rows.length"
-			:loaded="rows.length"
-			:total="total"
-			noun="orders"
-			:has-more="hasMore"
-			:loading="orders.loading"
-			@load-more="loadMore"
-		/>
-	</div>
+    <ListPagination
+      v-if="matches.length"
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="matches.length"
+    />
+
+    <EmptyState
+      v-if="!rows.length"
+      icon="lucide-shopping-bag"
+      title="No orders here"
+      description="Try a different filter or search term."
+    />
+  </PageBody>
 </template>

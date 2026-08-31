@@ -1,5 +1,5 @@
-# merchant-dash is a vendored frontend prototype, kept byte-for-byte as authored.
-exclude: '^merchant-dash/'
+# dashboard/ is the Commera frontend, kept byte-for-byte as authored (two-space, single-quote).
+exclude: '^dashboard/'
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -39,12 +39,4 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
-        files: ^(ls_shop/.*\.py|dashboard/src/.*\.(vue|ts|js))$
-
-      - id: dashboard-typecheck
-        name: "Run vue-tsc typecheck"
-        entry: bash -c 'cd dashboard && npm run --silent typecheck'
-        language: system
-        pass_filenames: false
-        stages: [pre-push]
-        files: ^dashboard/src/.*\.(vue|ts)$
+        files: ^ls_shop/.*\.py$

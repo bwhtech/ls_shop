@@ -1,12 +1,12 @@
-<script setup lang="ts">
-import { FrappeUIProvider } from "frappe-ui"
-import AppShell from "./layouts/AppShell.vue"
+<script setup>
+import { FrappeUIProvider } from 'frappe-ui'
+import AppShell from './components/AppShell.vue'
 </script>
 
 <template>
-	<FrappeUIProvider>
-		<AppShell>
-			<router-view />
-		</AppShell>
-	</FrappeUIProvider>
+  <FrappeUIProvider>
+    <AppShell>
+      <router-view />
+    </AppShell>
+  </FrappeUIProvider>
 </template>

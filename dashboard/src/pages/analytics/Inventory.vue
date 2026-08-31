@@ -1,214 +1,102 @@
-<script setup lang="ts">
-import ErrorState from "@/components/ErrorState.vue"
-import ListPager from "@/components/ListPager.vue"
-import ListSkeleton from "@/components/ListSkeleton.vue"
-import AnalyticsHeader from "@/components/analytics/AnalyticsHeader.vue"
-import StockMovement from "@/components/analytics/StockMovement.vue"
+<script setup>
+import { computed, ref } from 'vue'
+import { Badge, Button } from 'frappe-ui'
+import { BarChart, LineChart } from 'frappe-ui/charts'
+import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
+import ReportHeader from '../../components/ReportHeader.vue'
+import ReportStats from '../../components/ReportStats.vue'
+import PageBody from '../../components/PageBody.vue'
 import {
-	analyticsRangeOptions,
-	refreshAnalytics,
-	useAnalyticsRange,
-} from "@/composables/useAnalyticsRange"
-import { usePagedList } from "@/composables/usePagedList"
-import type { InventoryRow } from "@/types"
-import { errorMessage } from "@/utils/errors"
-import { availabilityTheme, cellAlignClass } from "@/utils/format"
-import {
-	Badge,
-	Button,
-	FormControl,
-	TabButtons,
-	TextInput,
-	toast,
-	useCall,
-} from "frappe-ui"
-import { ListView } from "frappe-ui/experimental"
-import { computed, ref } from "vue"
+  coverByProduct,
+  deadStock,
+  sellThrough,
+  stockValue,
+  stockValueByMonth,
+  unitsOnHand,
+} from '../../data/analytics'
+import { compactMoney, money } from '../../data/format'
+import { ia } from '../../ia/store'
 
-const { preset } = useAnalyticsRange()
+const range = ref('Last 12 months')
+const compare = ref(true)
 
-const availability = ref("low")
-const receiveQuantities = ref<Record<string, string>>({})
+const dead = computed(() => deadStock.reduce((sum, row) => sum + row.value, 0))
 
-const tabs = [
-	{ label: "Running low", value: "low" },
-	{ label: "Out of stock", value: "out" },
-	{ label: "All", value: "" },
-]
-
-const PAGE_LENGTH = 50
-
-const {
-	search,
-	request: inventory,
-	rows,
-	total,
-	hasMore,
-	loadMore,
-	reload,
-	getEmptyState,
-} = usePagedList<
-	{ rows: InventoryRow[]; total: number; low_stock_threshold: number },
-	InventoryRow
->(
-	"/api/v2/method/ls_shop.api.admin.inventory.get_inventory",
-	PAGE_LENGTH,
-	(data) => data.rows,
-	() => ({ availability: availability.value }),
-)
-
-const receiveStock = useCall<
-	unknown,
-	{ received_quantities: Record<string, string> }
->({
-	url: "/api/v2/method/ls_shop.api.admin.inventory.receive_stock",
-	method: "POST",
-	immediate: false,
-	onSuccess: () => {
-		toast.success("Stock received")
-		receiveQuantities.value = {}
-		reload()
-	},
-	onError: (error: Error) => toast.error(errorMessage(error)),
-})
-
-const pendingReceipt = computed(() =>
-	Object.fromEntries(
-		Object.entries(receiveQuantities.value).filter(
-			([, quantity]) => Number(quantity) > 0,
-		),
-	),
-)
-const pendingCount = computed(() => Object.keys(pendingReceipt.value).length)
-
-function refreshInventory() {
-	refreshAnalytics()
-	reload()
-}
-
-const listOptions = computed(() => ({
-	selectable: false,
-	showTooltip: false,
-	resizeColumn: true,
-	emptyState: getEmptyState({
-		title: "Nothing running low",
-		description: "Every size has healthy stock.",
-	}),
-}))
-
-const columns = [
-	{ label: "Product", key: "product", width: 2.2 },
-	{ label: "Variant", key: "option", width: 1.2 },
-	{ label: "Size", key: "size", width: 0.7 },
-	{ label: "In stock", key: "stock", width: 0.8, align: "right" },
-	{ label: "Availability", key: "availability", width: 1.2 },
-	{ label: "Receive", key: "receive", width: 1, align: "right" },
-]
+const stats = computed(() => [
+  { label: 'Stock value', value: compactMoney(stockValue), delta: '+2.2%', up: true },
+  { label: 'Units on hand', value: unitsOnHand.toLocaleString('en-IN'), delta: '+2.6%', up: true },
+  { label: 'Days of cover', value: '38', delta: '-4 days', up: true },
+  { label: 'Capital in dead stock', value: compactMoney(dead.value), delta: '+11.0%', up: false },
+])
 </script>
 
 <template>
-	<div class="flex h-full flex-col bg-surface-base">
-		<AnalyticsHeader>
-			<template #actions>
-				<TabButtons v-model="preset" :options="analyticsRangeOptions" />
-				<Button
-					variant="ghost"
-					icon-left="lucide-refresh-cw"
-					label="Refresh"
-					:loading="inventory.loading"
-					@click="refreshInventory"
-				/>
-			</template>
-		</AnalyticsHeader>
+  <ReportHeader title="Inventory" v-model:range="range" v-model:compare="compare" />
 
-		<div class="px-3 pt-4 sm:px-5">
-			<StockMovement />
-		</div>
+  <PageBody width="narrow">
+    <div>
+      <h1 class="text-2xl text-ink-gray-9">Inventory</h1>
+      <p class="mt-1 text-p-base text-ink-gray-6">
+        How much capital the shelves are holding, and how fast it turns. {{ range }}.
+      </p>
+    </div>
 
-		<div class="flex items-center gap-3 px-3 py-3 sm:px-5">
-			<TabButtons v-model="availability" :options="tabs" />
-			<FormControl
-				v-model="search"
-				type="text"
-				placeholder="Search products"
-				class="w-56"
-			/>
-		</div>
+    <ReportStats class="mt-5" :stats="stats" :compare="compare" />
 
-		<ListSkeleton
-			v-if="inventory.loading && !inventory.data"
-			class="px-3 sm:px-5"
-			:columns="columns"
-		/>
+    <section class="mt-6 rounded-5 border border-outline-gray-1 p-4">
+      <h2 class="text-lg-semibold text-ink-gray-8">Stock value over time</h2>
+      <div class="h-72">
+        <LineChart :data="stockValueByMonth" x="month" :y="['value']" />
+      </div>
+    </section>
 
-		<ErrorState
-			v-else-if="inventory.error"
-			class="min-h-0 flex-1"
-			title="Could not load your stock"
-			:message="errorMessage(inventory.error)"
-			@retry="reload"
-		/>
+    <div class="mt-6 grid gap-6 lg:grid-cols-2">
+      <section class="rounded-5 border border-outline-gray-1 p-4">
+        <h2 class="text-lg-semibold text-ink-gray-8">Sell-through rate</h2>
+        <div class="h-64">
+          <BarChart :data="sellThrough" x="product" :y="['rate']" />
+        </div>
+      </section>
+      <section class="rounded-5 border border-outline-gray-1 p-4">
+        <h2 class="text-lg-semibold text-ink-gray-8">Days of cover</h2>
+        <div class="h-64">
+          <BarChart :data="coverByProduct" x="product" :y="['days']" />
+        </div>
+      </section>
+    </div>
 
-		<ListView
-			v-else
-			class="min-h-0 flex-1 px-3 sm:px-5"
-			row-key="item_code"
-			:columns="columns"
-			:rows="rows"
-			:options="listOptions"
-		>
-			<template #cell="{ item, row, column }">
-				<Badge
-					v-if="column.key === 'availability'"
-					variant="subtle"
-					:theme="availabilityTheme(row.availability)"
-					:label="row.availability"
-				/>
-				<TextInput
-					v-else-if="column.key === 'receive'"
-					class="ms-auto w-20 [&_[data-slot=control]]:text-end"
-					type="number"
-					placeholder="0"
-					:aria-label="`Receive stock for ${row.product} ${row.size}`"
-					:model-value="receiveQuantities[row.item_code] ?? ''"
-					@click.stop
-					@update:model-value="receiveQuantities[row.item_code] = $event"
-				/>
-				<span
-					v-else
-					class="truncate text-base text-ink-gray-7"
-					:class="cellAlignClass(column.align)"
-					>{{ item }}</span
-				>
-			</template>
-		</ListView>
-
-		<ListPager
-			v-if="inventory.data && rows.length"
-			:loaded="rows.length"
-			:total="total"
-			noun="sizes"
-			:has-more="hasMore"
-			:loading="inventory.loading"
-			@load-more="loadMore"
-		/>
-
-		<div
-			v-if="pendingCount"
-			class="flex items-center gap-2 border-t border-outline-gray-1 px-3 py-3 sm:px-5"
-		>
-			<span class="me-auto text-sm text-ink-gray-5">
-				Receiving {{ pendingCount }} {{ pendingCount === 1 ? "size" : "sizes" }}
-			</span>
-			<Button label="Discard" @click="receiveQuantities = {}" />
-			<Button
-				variant="solid"
-				theme="gray"
-				icon-left="lucide-package-plus"
-				:loading="receiveStock.loading"
-				label="Receive stock"
-				@click="receiveStock.submit({ received_quantities: pendingReceipt })"
-			/>
-		</div>
-	</div>
+    <section class="mt-6 rounded-5 border border-outline-gray-1">
+      <div class="flex items-center justify-between px-4 py-3">
+        <div>
+          <h2 class="text-lg-semibold text-ink-gray-8">Dead stock</h2>
+          <p class="mt-1 text-sm text-ink-gray-5">Nothing sold in the last 30 days.</p>
+        </div>
+        <Button label="Open inventory" icon-right="lucide-arrow-right" route="/inventory" />
+      </div>
+      <div class="overflow-x-auto px-2 pb-2">
+        <List
+          class="min-w-[46rem]"
+          :columns="['minmax(0,1fr)', '10rem', '6rem', '8rem', '8rem']"
+          :row-height="Math.max(ia.density, 44)"
+        >
+          <ListHeader>
+            <ListHeaderCell>Product</ListHeaderCell>
+            <ListHeaderCell>Variant</ListHeaderCell>
+            <ListHeaderCell>On hand</ListHeaderCell>
+            <ListHeaderCell>Last sold</ListHeaderCell>
+            <ListHeaderCell>Tied-up value</ListHeaderCell>
+          </ListHeader>
+          <ListRows :items="deadStock" row-key="sku" v-slot="{ item }">
+            <ListRow :value="item.sku">
+              <ListCell><span class="truncate text-base text-ink-gray-8">{{ item.product }}</span></ListCell>
+              <ListCell><span class="truncate text-base text-ink-gray-6">{{ item.variant }}</span></ListCell>
+              <ListCell><span class="text-base text-ink-gray-6 tabular-nums">{{ item.stock }}</span></ListCell>
+              <ListCell><Badge :label="`${item.lastSold} days ago`" theme="orange" variant="subtle" /></ListCell>
+              <ListCell><span class="text-base text-ink-gray-7 tabular-nums">{{ money(item.value) }}</span></ListCell>
+            </ListRow>
+          </ListRows>
+        </List>
+      </div>
+    </section>
+  </PageBody>
 </template>

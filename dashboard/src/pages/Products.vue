@@ -1,177 +1,190 @@
-<script setup lang="ts">
-import AddProductDialog from "@/components/AddProductDialog.vue"
-import ErrorState from "@/components/ErrorState.vue"
-import ListPager from "@/components/ListPager.vue"
-import ListSkeleton from "@/components/ListSkeleton.vue"
-import { showAddProduct } from "@/components/addProduct"
-import { usePagedList } from "@/composables/usePagedList"
-import type { ProductRow } from "@/types"
-import { errorMessage } from "@/utils/errors"
-import { cellAlignClass, formatRowPrice, publishStatus } from "@/utils/format"
-import { Badge, Breadcrumbs, Button, FormControl } from "frappe-ui"
-import { ListView } from "frappe-ui/experimental"
-import { computed } from "vue"
-import { useRouter } from "vue-router"
+<script setup>
+import { computed, ref, watch } from 'vue'
+import { Button, Dropdown, Select, TabButtons, TextInput, toast } from 'frappe-ui'
+import { List, ListCell, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow, ListRows } from 'frappe-ui/list'
+import AppPageHeader from '../components/AppPageHeader.vue'
+import PageBody from '../components/PageBody.vue'
+import ListPagination from '../components/ListPagination.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import Thumb from '../components/Thumb.vue'
+import EmptyState from '../components/EmptyState.vue'
+import BulkBar from '../components/BulkBar.vue'
+import { productTypes, products } from '../data/mock'
+import { money, shortDate, stockTone } from '../data/format'
+import { ia } from '../ia/store'
+import { openImport } from '../data/importFlow'
 
-const router = useRouter()
-
-const PAGE_LENGTH = 20
-
-const {
-	search,
-	request: products,
-	rows: loadedProducts,
-	total,
-	hasMore,
-	loadMore,
-	reload,
-	getEmptyState,
-} = usePagedList<
-	{ products: ProductRow[]; total: number; currency: string },
-	ProductRow
->(
-	"/api/v2/method/ls_shop.api.admin.catalog.get_products",
-	PAGE_LENGTH,
-	(data) => data.products,
-)
-
-const currency = computed(() => products.data?.currency ?? "")
-
-const rows = computed(() =>
-	loadedProducts.value.map((product) => ({
-		...product,
-		price: formatRowPrice(product, currency.value),
-		status: publishStatus(product.published_count, product.variant_count),
-	})),
-)
-
-const columns = [
-	{ label: "Product", key: "title", width: 3 },
-	{ label: "Collection", key: "collection", width: 1.5 },
-	{ label: "Variants", key: "variant_count", width: 0.7, align: "right" },
-	{ label: "Price", key: "price", width: 1.2, align: "right" },
-	{ label: "Stock", key: "stock", width: 0.8, align: "right" },
-	{ label: "Status", key: "status", width: 1.3 },
+const STATUS_TABS = [
+  { label: 'All', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Draft', value: 'draft' },
+  { label: 'Archived', value: 'archived' },
 ]
 
-const listOptions = computed(() => ({
-	getRowRoute: (row: ProductRow) => ({
-		name: "Product",
-		params: { name: row.name },
-	}),
-	selectable: false,
-	showTooltip: false,
-	resizeColumn: true,
-	emptyState: getEmptyState({
-		title: "No products yet",
-		description: "Add your first product to start selling.",
-		button: {
-			label: "Add product",
-			// Subtle, not solid: a second solid gray button inverts to near-white in dark mode.
-			variant: "subtle",
-			theme: "gray",
-			onClick: () => {
-				showAddProduct.value = true
-			},
-		},
-	}),
-}))
+const typeOptions = [
+  { label: 'All types', value: 'all' },
+  ...productTypes.map((t) => ({ label: t.name, value: t.id })),
+]
+
+const status = ref('all')
+const type = ref('all')
+const query = ref('')
+const selecting = ref(false)
+const selection = ref([])
+
+function endSelecting() {
+  selecting.value = false
+  selection.value = []
+}
+
+const sort = ref({ key: 'updated', direction: 'desc' })
+
+const page = ref(1)
+const pageSize = ref(20)
+
+const matches = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  const filtered = products.filter(
+    (p) =>
+      (status.value === 'all' || p.status === status.value) &&
+      (type.value === 'all' || p.type === type.value) &&
+      (!q || p.title.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)),
+  )
+  const { key, direction } = sort.value
+  const dir = direction === 'asc' ? 1 : -1
+  return [...filtered].sort((a, b) => (a[key] > b[key] ? dir : a[key] < b[key] ? -dir : 0))
+})
+
+// A filter or a sort changes what page one is, so it sends you back to it.
+watch([query, status, type, sort], () => (page.value = 1))
+
+const rows = computed(() =>
+  matches.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+)
+
+const typeName = (id) => productTypes.find((t) => t.id === id)?.name ?? id
+
+function toggleSort(key) {
+  sort.value =
+    sort.value.key === key
+      ? { key, direction: sort.value.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: 'asc' }
+}
+
+const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
+
+const addOptions = [
+  { label: 'Add product', icon: 'lucide-plus', onClick: () => toast.info('Product form — pick a type first') },
+  { label: 'Import from CSV', icon: 'lucide-upload', onClick: openImport },
+  { label: 'Add product type', icon: 'lucide-shapes', route: '/product-types' },
+]
 </script>
 
 <template>
-	<div class="flex h-full flex-col bg-surface-base">
-		<header
-			class="flex min-h-12 items-center justify-between border-b border-outline-gray-1 px-3 sm:px-5"
-		>
-			<Breadcrumbs :items="[{ label: 'Products', route: { name: 'Products' } }]" />
-			<Button
-				variant="solid"
-				theme="gray"
-				icon-left="lucide-plus"
-				label="Add product"
-				@click="showAddProduct = true"
-			/>
-		</header>
+  <AppPageHeader title="Products">
+    <template #actions>
+      <Button label="Import" icon-left="lucide-upload" @click="openImport" />
+      <Dropdown :options="addOptions">
+        <Button label="Add product" icon-right="lucide-chevron-down" variant="solid" theme="gray" />
+      </Dropdown>
+    </template>
+  </AppPageHeader>
 
-		<div class="px-3 py-3 sm:px-5">
-			<FormControl
-				v-model="search"
-				type="text"
-				placeholder="Search products"
-				class="w-56"
-			/>
-		</div>
+  <PageBody>
+    <div class="flex flex-wrap items-center gap-2">
+      <TabButtons v-model="status" size="sm" :options="STATUS_TABS" />
+      <Select v-model="type" :options="typeOptions" />
+      <TextInput
+        v-model="query"
+        class="ml-auto w-56"
+        placeholder="Search products"
+        icon-left="lucide-search"
+      />
+      <Button
+        :label="selecting ? 'Cancel selection' : 'Select'"
+        icon-left="lucide-list-checks"
+        :variant="selecting ? 'solid' : 'subtle'"
+        theme="gray"
+        @click="selecting ? endSelecting() : (selecting = true)"
+      />
+    </div>
 
-		<ListSkeleton
-			v-if="products.loading && !products.data"
-			class="px-3 sm:px-5"
-			:columns="columns"
-		/>
+    <BulkBar v-if="selecting" :count="selection.length" noun="product" @done="endSelecting">
+      <Button label="Edit prices" route="/pricing" />
+      <Button label="Add to collection" />
+      <Button label="Archive" theme="red" variant="subtle" />
+    </BulkBar>
 
-		<ErrorState
-			v-else-if="products.error"
-			class="min-h-0 flex-1"
-			title="Could not load your products"
-			:message="errorMessage(products.error)"
-			@retry="reload"
-		/>
+    <div class="mt-3 overflow-x-auto">
+      <List
+      v-model:selection="selection"
+      class="min-w-[54rem]"
+      :selectable="selecting"
+      :row-height="ia.density"
+      :columns="['1fr', '7rem', '8rem', '8rem', '7rem', '6rem']"
+    >
+      <ListHeader>
+        <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
+          Product
+        </ListHeaderCellSort>
+        <ListHeaderCell>Status</ListHeaderCell>
+        <ListHeaderCell>Type</ListHeaderCell>
+        <ListHeaderCellSort align="end" :direction="directionFor('stock')" @click="toggleSort('stock')">
+          Inventory
+        </ListHeaderCellSort>
+        <ListHeaderCellSort align="end" :direction="directionFor('price')" @click="toggleSort('price')">
+          Price
+        </ListHeaderCellSort>
+        <ListHeaderCellSort align="end" :direction="directionFor('updated')" @click="toggleSort('updated')">
+          Updated
+        </ListHeaderCellSort>
+      </ListHeader>
 
-		<ListView
-			v-else
-			class="min-h-0 flex-1 px-3 sm:px-5"
-			row-key="name"
-			:columns="columns"
-			:rows="rows"
-			:options="listOptions"
-		>
-			<!-- The #cell slot replaces ListView's default rendering for every column, a column's own prefix included. -->
-			<template #cell="{ item, row, column }">
-				<div v-if="column.key === 'title'" class="flex min-w-0 items-center gap-2.5">
-					<img
-						v-if="row.image"
-						:src="row.image"
-						alt=""
-						class="size-6 shrink-0 rounded-4 object-cover"
-					/>
-					<div
-						v-else
-						class="grid size-6 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-2xs text-ink-gray-4"
-					>
-						{{ row.title.slice(0, 1) }}
-					</div>
-					<span class="truncate text-base text-ink-gray-9">{{ row.title }}</span>
-				</div>
+      <ListRows :items="rows" row-key="id" v-slot="{ item }">
+        <ListRow :to="`/products/${item.id}`" :value="item.id">
+          <ListCell>
+            <div class="flex min-w-0 items-center gap-2.5">
+              <Thumb :emoji="item.thumb" />
+              <div class="min-w-0">
+                <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
+                <p class="truncate text-sm text-ink-gray-5">
+                  {{ item.sku }}<span v-if="item.hasVariants"> · {{ item.variants.length }} variants</span>
+                </p>
+              </div>
+            </div>
+          </ListCell>
+          <ListCell><StatusBadge :status="item.status" /></ListCell>
+          <ListCell><span class="text-base text-ink-gray-7">{{ typeName(item.type) }}</span></ListCell>
+          <ListCell>
+            <span class="w-full text-right text-base tabular-nums" :class="stockTone(item.stock)">
+              {{ item.stock }} in stock
+            </span>
+          </ListCell>
+          <ListCell>
+            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">{{ money(item.price) }}</span>
+          </ListCell>
+          <ListCell>
+            <span class="w-full text-right text-base text-ink-gray-5">{{ shortDate(item.updated) }}</span>
+          </ListCell>
+        </ListRow>
+      </ListRows>
+    </List>
+    </div>
 
-				<Badge
-					v-else-if="column.key === 'status'"
-					variant="subtle"
-					:theme="row.status.theme"
-					:label="row.status.label"
-				/>
+    <ListPagination
+      v-if="matches.length"
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="matches.length"
+    />
 
-				<span
-					v-else
-					class="truncate text-base text-ink-gray-7"
-					:class="cellAlignClass(column.align)"
-					>{{ item }}</span
-				>
-			</template>
-		</ListView>
-
-		<ListPager
-			v-if="products.data && rows.length"
-			:loaded="rows.length"
-			:total="total"
-			noun="products"
-			:has-more="hasMore"
-			:loading="products.loading"
-			@load-more="loadMore"
-		/>
-
-		<AddProductDialog
-			v-model:open="showAddProduct"
-			:currency="currency"
-			@created="(name) => router.push({ name: 'Product', params: { name } })"
-		/>
-	</div>
+    <EmptyState
+      v-if="!rows.length"
+      icon="lucide-package"
+      title="No products match"
+      description="Change the filters, or import a catalogue to get started."
+    >
+      <Button label="Import CSV" icon-left="lucide-upload" variant="solid" theme="gray" class="mt-2" @click="openImport" />
+    </EmptyState>
+  </PageBody>
 </template>
