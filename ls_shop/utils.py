@@ -464,7 +464,8 @@ def get_available_stocks(item_codes, warehouse):
 
 def get_discount_percent(default_price, sale_price):
 	"""Calculate the discount percentage."""
-	if not default_price or not sale_price:
+	# A missing sale price is "not on sale", not "100% off" — only a real row may discount to zero.
+	if not default_price or sale_price is None or sale_price >= default_price:
 		return 0
 	return ((default_price - sale_price) / default_price) * 100
 

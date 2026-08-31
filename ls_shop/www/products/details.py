@@ -2,7 +2,7 @@ import frappe
 
 from ls_shop import seo
 from ls_shop.product_detail import get_product_detail
-from ls_shop.utils import get_available_stock, get_discount_percent, get_product_list
+from ls_shop.utils import get_available_stock, get_product_list
 
 
 def get_context(context):
@@ -38,11 +38,11 @@ def get_context(context):
 	context.selected_size = detail["selected_size"]
 	context.size_selected = size_selected
 	context.selected_item = selected_item
-	context.selected_price = detail["sale_price"]
+	context.selected_price = detail["selected_price"]
 	context.default_price = detail["default_price"]
 	context.recommended_items = get_recommended_products(product_variant)
 	context.other_variants = get_other_variants(product_variant)
-	context.discount_percent = get_discount_percent(detail["default_price"], detail["sale_price"])
+	context.discount_percent = detail["discount_percent"]
 	context.size_chart = get_size_chart(product.brand, product_variant.item_group)
 	context.item_qty = get_available_stock(product.item_code, detail["warehouse"])
 	context.breadcrumbs = [
@@ -55,7 +55,7 @@ def get_context(context):
 
 def add_seo(context, detail):
 	product_variant = detail["product_variant"]
-	price = detail["sale_price"] or detail["default_price"]
+	price = detail["selected_price"]
 	availability = "InStock" if detail["in_stock"] else "OutOfStock"
 
 	context.seo = seo.build_product_seo(

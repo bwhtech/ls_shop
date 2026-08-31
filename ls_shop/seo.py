@@ -211,7 +211,7 @@ def generate_product_json_ld(variant: str | int):
 		product_variant,
 		detail["product"],
 		images=detail["images"],
-		price=detail["sale_price"] or detail["default_price"],
+		price=detail["selected_price"],
 		availability="InStock" if detail["in_stock"] else "OutOfStock",
 	)
 	return frappe.as_json(schema, indent=2)
