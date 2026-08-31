@@ -13,7 +13,13 @@ PAGE_LENGTH = 20
 
 
 @frappe.whitelist()
-def get_products(search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH):
+def get_products(
+	search: str | None = None,
+	collection: str | None = None,
+	disabled: int | None = None,
+	start: int = 0,
+	page_length: int = PAGE_LENGTH,
+):
 	"""One call, one complete Products screen.
 
 	Every lookup is batched across the page, so adding a column never costs a query per row.
@@ -40,12 +46,16 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 	item_filters = {"name": ["in", list(set(templates_by_configurator.values()))]}
 	if search:
 		item_filters["item_name"] = ["like", f"%{search}%"]
+	if collection:
+		item_filters["item_group"] = collection
+	if disabled is not None:
+		item_filters["disabled"] = cint(disabled)
 
 	total = frappe.db.count("Item", item_filters)
 	templates = frappe.get_all(
 		"Item",
 		filters=item_filters,
-		fields=["name", "item_name", "image", "item_group", "disabled"],
+		fields=["name", "item_name", "image", "item_group", "disabled", "modified"],
 		order_by="modified desc",
 		start=start,
 		page_length=page_length,
@@ -124,6 +134,7 @@ def get_products(search: str | None = None, start: int = 0, page_length: int = P
 				),
 				"collection": template.item_group,
 				"disabled": bool(template.disabled),
+				"updated": template.modified,
 				"variant_count": len(template_variants),
 				"published_count": sum(1 for row in template_variants if row.is_published),
 				"price_from": min(rates) if rates else None,

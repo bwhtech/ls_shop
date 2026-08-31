@@ -9,8 +9,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { productTypes, products } from '../data/mock'
-import { money, shortDate, stockTone } from '../data/format'
+import { useAdminRead, useAdminAction } from '../data/api'
+import { priceRange, shortDate, stockTone } from '../data/format'
 import { ia } from '../ia/store'
 import { openImport } from '../data/importFlow'
 
@@ -21,13 +21,8 @@ const STATUS_TABS = [
   { label: 'Archived', value: 'archived' },
 ]
 
-const typeOptions = [
-  { label: 'All types', value: 'all' },
-  ...productTypes.map((t) => ({ label: t.name, value: t.id })),
-]
-
 const status = ref('all')
-const type = ref('all')
+const collection = ref('all')
 const query = ref('')
 const selecting = ref(false)
 const selection = ref([])
@@ -38,31 +33,58 @@ function endSelecting() {
 }
 
 const sort = ref({ key: 'updated', direction: 'desc' })
-
 const page = ref(1)
 const pageSize = ref(20)
 
-const matches = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  const filtered = products.filter(
-    (p) =>
-      (status.value === 'all' || p.status === status.value) &&
-      (type.value === 'all' || p.type === type.value) &&
-      (!q || p.title.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)),
-  )
-  const { key, direction } = sort.value
-  const dir = direction === 'asc' ? 1 : -1
-  return [...filtered].sort((a, b) => (a[key] > b[key] ? dir : a[key] < b[key] ? -dir : 0))
+const collectionsRequest = useAdminRead('catalog.get_collections')
+const collectionOptions = computed(() => [
+  { label: 'All collections', value: 'all' },
+  ...(collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
+])
+
+// Item only carries a disabled flag — there is no "draft" state in the catalog,
+// so the tab stays for parity with the approved design but always reads empty.
+const disabledFilter = computed(() => {
+  if (status.value === 'active') return 0
+  if (status.value === 'archived') return 1
+  return undefined
 })
 
-// A filter or a sort changes what page one is, so it sends you back to it.
-watch([query, status, type, sort], () => (page.value = 1))
+const productsRequest = useAdminRead('catalog.get_products', {
+  params: () => ({
+    search: query.value || undefined,
+    collection: collection.value !== 'all' ? collection.value : undefined,
+    disabled: disabledFilter.value,
+    start: (page.value - 1) * pageSize.value,
+    page_length: pageSize.value,
+  }),
+  refetch: true,
+})
 
-const rows = computed(() =>
-  matches.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
-)
+// A filter changes what page one is, so it sends you back to it.
+watch([query, status, collection], () => (page.value = 1))
 
-const typeName = (id) => productTypes.find((t) => t.id === id)?.name ?? id
+const total = computed(() => (status.value === 'draft' ? 0 : productsRequest.data?.total ?? 0))
+
+// The endpoint always orders by last-modified — the toggle re-sorts the
+// loaded page itself, which is all a merchant is looking at when they click a header.
+const rows = computed(() => {
+  if (status.value === 'draft') return []
+  const products = productsRequest.data?.products ?? []
+  const { key, direction } = sort.value
+  const dir = direction === 'asc' ? 1 : -1
+  const valueFor = (row) => {
+    if (key === 'price') return row.price_from ?? 0
+    if (key === 'updated') return row.updated
+    if (key === 'title') return row.title
+    return row.stock
+  }
+  return [...products].sort((a, b) => {
+    const av = valueFor(a)
+    const bv = valueFor(b)
+    return av > bv ? dir : av < bv ? -dir : 0
+  })
+})
 
 function toggleSort(key) {
   sort.value =
@@ -74,10 +96,26 @@ function toggleSort(key) {
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
 
 const addOptions = [
-  { label: 'Add product', icon: 'lucide-plus', onClick: () => toast.info('Product form — pick a type first') },
+  { label: 'Add product', icon: 'lucide-plus', onClick: () => toast.info('Add product form is coming soon') },
   { label: 'Import from CSV', icon: 'lucide-upload', onClick: openImport },
-  { label: 'Add product type', icon: 'lucide-shapes', route: '/product-types' },
 ]
+
+const archiveAction = useAdminAction('catalog.update_product')
+
+async function archiveSelected() {
+  const ids = [...selection.value]
+  if (!ids.length) return
+
+  for (const id of ids) {
+    await archiveAction.submit({ item_template: id, disabled: 1 })
+    // A failure already toasted inside useAdminAction — stop rather than archive the rest silently.
+    if (archiveAction.error) return
+  }
+
+  toast.success(`${ids.length} product${ids.length > 1 ? 's' : ''} archived`)
+  endSelecting()
+  productsRequest.reload()
+}
 </script>
 
 <template>
@@ -93,7 +131,7 @@ const addOptions = [
   <PageBody>
     <div class="flex flex-wrap items-center gap-2">
       <TabButtons v-model="status" size="sm" :options="STATUS_TABS" />
-      <Select v-model="type" :options="typeOptions" />
+      <Select v-model="collection" :options="collectionOptions" />
       <TextInput
         v-model="query"
         class="ml-auto w-56"
@@ -110,12 +148,19 @@ const addOptions = [
     </div>
 
     <BulkBar v-if="selecting" :count="selection.length" noun="product" @done="endSelecting">
-      <Button label="Edit prices" route="/pricing" />
       <Button label="Add to collection" />
-      <Button label="Archive" theme="red" variant="subtle" />
+      <Button
+        label="Archive"
+        theme="red"
+        variant="subtle"
+        :loading="archiveAction.loading"
+        @click="archiveSelected"
+      />
     </BulkBar>
 
-    <div class="mt-3 overflow-x-auto">
+    <p v-if="productsRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading products…</p>
+
+    <div v-else class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[54rem]"
@@ -128,7 +173,7 @@ const addOptions = [
           Product
         </ListHeaderCellSort>
         <ListHeaderCell>Status</ListHeaderCell>
-        <ListHeaderCell>Type</ListHeaderCell>
+        <ListHeaderCell>Collection</ListHeaderCell>
         <ListHeaderCellSort align="end" :direction="directionFor('stock')" @click="toggleSort('stock')">
           Inventory
         </ListHeaderCellSort>
@@ -140,28 +185,30 @@ const addOptions = [
         </ListHeaderCellSort>
       </ListHeader>
 
-      <ListRows :items="rows" row-key="id" v-slot="{ item }">
-        <ListRow :to="`/products/${item.id}`" :value="item.id">
+      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+        <ListRow :to="`/products/${item.name}`" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
-              <Thumb :emoji="item.thumb" />
+              <Thumb :image="item.image" />
               <div class="min-w-0">
                 <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
                 <p class="truncate text-sm text-ink-gray-5">
-                  {{ item.sku }}<span v-if="item.hasVariants"> · {{ item.variants.length }} variants</span>
+                  {{ item.name }}<span v-if="item.variant_count"> · {{ item.variant_count }} variants</span>
                 </p>
               </div>
             </div>
           </ListCell>
-          <ListCell><StatusBadge :status="item.status" /></ListCell>
-          <ListCell><span class="text-base text-ink-gray-7">{{ typeName(item.type) }}</span></ListCell>
+          <ListCell><StatusBadge :status="item.disabled ? 'archived' : 'active'" /></ListCell>
+          <ListCell><span class="text-base text-ink-gray-7">{{ item.collection ?? '—' }}</span></ListCell>
           <ListCell>
             <span class="w-full text-right text-base tabular-nums" :class="stockTone(item.stock)">
               {{ item.stock }} in stock
             </span>
           </ListCell>
           <ListCell>
-            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">{{ money(item.price) }}</span>
+            <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">
+              {{ priceRange(item.price_from, item.price_to) }}
+            </span>
           </ListCell>
           <ListCell>
             <span class="w-full text-right text-base text-ink-gray-5">{{ shortDate(item.updated) }}</span>
@@ -172,14 +219,14 @@ const addOptions = [
     </div>
 
     <ListPagination
-      v-if="matches.length"
+      v-if="total"
       v-model:page="page"
       v-model:page-size="pageSize"
-      :total="matches.length"
+      :total="total"
     />
 
     <EmptyState
-      v-if="!rows.length"
+      v-if="!productsRequest.loading && !rows.length"
       icon="lucide-package"
       title="No products match"
       description="Change the filters, or import a catalogue to get started."
