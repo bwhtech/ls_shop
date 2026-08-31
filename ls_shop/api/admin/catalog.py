@@ -229,6 +229,109 @@ def get_size_stock(item_codes):
 
 
 @frappe.whitelist()
+def get_pricing_rows(
+	search: str | None = None,
+	collection: str | None = None,
+	start: int = 0,
+	page_length: int = PAGE_LENGTH,
+):
+	"""One row per sellable option (Style Attribute Variant) - the unit Pricing.vue prices.
+
+	Reuses get_products()'s batched joins but at variant grain, carrying each variant's own
+	default_rate/sale_rate instead of a template-wide price_from/price_to range.
+	"""
+	frappe.has_permission("Item", ptype="read", throw=True)
+
+	from ls_shop.api.admin.orders import get_reporting_currency
+
+	currency = get_reporting_currency()
+
+	start = cint(start)
+	page_length = cint(page_length) or PAGE_LENGTH
+
+	configurators = frappe.get_all("Style Attribute Configurator", fields=["name", "item_template"])
+	if not configurators:
+		return {"rows": [], "total": 0, "currency": currency}
+	templates_by_configurator = {row.name: row.item_template for row in configurators}
+
+	item_filters = {"name": ["in", list(set(templates_by_configurator.values()))]}
+	if search:
+		item_filters["item_name"] = ["like", f"%{search}%"]
+	if collection:
+		item_filters["item_group"] = collection
+
+	templates = frappe.get_all("Item", filters=item_filters, fields=["name", "item_name"])
+	if not templates:
+		return {"rows": [], "total": 0, "currency": currency}
+	title_by_template = {row.name: row.item_name for row in templates}
+	template_names = set(title_by_template)
+	page_configurators = [
+		name for name, template in templates_by_configurator.items() if template in template_names
+	]
+
+	variant_filters = {"configurator": ["in", page_configurators]}
+	total = frappe.db.count("Style Attribute Variant", variant_filters)
+	variants = frappe.get_all(
+		"Style Attribute Variant",
+		filters=variant_filters,
+		fields=["name", "configurator", "attribute_value", "display_name"],
+		order_by="modified desc",
+		start=start,
+		page_length=page_length,
+	)
+	if not variants:
+		return {"rows": [], "total": total, "currency": currency}
+
+	variant_names = [row.name for row in variants]
+	sizes = frappe.get_all(
+		"Color Size Item",
+		filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+		fields=["parent", "size", "item_code"],
+		order_by="idx asc",
+	)
+
+	# The first size (by idx) stands in for the whole variant - the same "one price for what is
+	# really N size-level prices" convention VariantEditor.vue's matrix editor already uses.
+	first_size_by_variant = {}
+	size_count_by_variant = {}
+	for row in sizes:
+		size_count_by_variant[row.parent] = size_count_by_variant.get(row.parent, 0) + 1
+		first_size_by_variant.setdefault(row.parent, row)
+
+	item_codes = [row.item_code for row in first_size_by_variant.values() if row.item_code]
+	prices_by_item_code = get_size_prices(item_codes)
+
+	first_image_by_variant = {}
+	for row in frappe.get_all(
+		"Website Slideshow Item",
+		filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+		fields=["parent", "image"],
+		order_by="idx asc",
+	):
+		first_image_by_variant.setdefault(row.parent, row.image)
+
+	rows = []
+	for row in variants:
+		template = templates_by_configurator.get(row.configurator)
+		size = first_size_by_variant.get(row.name)
+		price = prices_by_item_code.get(cstr(size.item_code), {}) if size else {}
+		rows.append(
+			{
+				"name": row.name,
+				"title": title_by_template.get(template, template),
+				"subtitle": row.attribute_value or row.display_name,
+				"sku": size.item_code if size else None,
+				"image": first_image_by_variant.get(row.name),
+				"default_rate": price.get("default_rate"),
+				"sale_rate": price.get("sale_rate"),
+				"size_count": size_count_by_variant.get(row.name, 0),
+			}
+		)
+
+	return {"rows": rows, "total": total, "currency": currency}
+
+
+@frappe.whitelist()
 def get_product(item_template: str):
 	"""Everything one product's edit screen needs, in one call."""
 	frappe.has_permission("Item", doc=item_template, ptype="read", throw=True)

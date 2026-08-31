@@ -85,3 +85,24 @@ material/fit for a shirt). Three realistic ways to close this, not picked betwee
 - **Drop the screen.** If the owner never actually needs typed per-category fields — Pixio Retail's
   81 seeded items don't use any — this is the lowest-risk option: remove Product Types from the nav
   rather than carry a half-built concept indefinitely.
+
+## Pricing: cost and margin — needs a product decision
+
+`Pricing.vue`'s Margin column (section 4, `inventory`/`adjustments`/`pricing`) is now inert by design —
+confirmed again that ls_shop has no cost, margin, or profit field anywhere in the data model. The
+mock's 55%-assumed-COGS margin was always a pure client-side fabrication, never a stored value.
+Nothing here picks a source; these are the realistic options:
+
+- **`Bin.valuation_rate`** — already computed by ERPNext from every stock receipt's landed cost, so
+  it needs no new field or data entry. But it moves with the moving-average valuation method and can
+  be zero or stale for an item that has never had a costed receipt (allow-zero-valuation receipts,
+  used by `receive_stock` when no rate is given, leave it at 0) — margin would silently read as 100%
+  for exactly the items an owner is least likely to have priced carefully.
+- **`Item.last_purchase_rate`** — a single number per item, simple to read and explain to a
+  merchant. But it is only ever set by a Purchase Order/Receipt, which this dashboard's own
+  `receive_stock` flow does not create — so for most of this store's stock it would simply be unset,
+  same blind spot as valuation_rate from a different angle.
+- **A new explicit cost field on the variant or its sizes.** The only option that is actually true to
+  what the owner paid rather than an ERPNext side-effect, and the only one that works uniformly
+  whether stock arrived through a Purchase Order, a manual receipt, or a future channel. Costs the
+  most: new field, migration, and a data-entry step nothing else in the app currently asks for.

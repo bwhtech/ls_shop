@@ -1,0 +1,2 @@
+import{b as t,c as a,n as i,t as r}from"./index-DVHHYANZ.js";const n=["src"],o={__name:"Thumb",props:{emoji:{type:String,default:"📦"},image:{type:String,default:null},size:{type:String,default:"size-8"}},setup(e){return(s,c)=>e.image?(t(),a("img",{key:0,src:e.image,class:i(["shrink-0 rounded-4 bg-surface-gray-2 object-cover",e.size]),alt:""},null,10,n)):(t(),a("div",{key:1,class:i(["grid shrink-0 place-content-center rounded-4 bg-surface-gray-2 text-ink-gray-7",e.size]),"aria-hidden":"true"},r(e.emoji),3))}};export{o as _};
+//# sourceMappingURL=Thumb-DqNHmyX1.js.map
