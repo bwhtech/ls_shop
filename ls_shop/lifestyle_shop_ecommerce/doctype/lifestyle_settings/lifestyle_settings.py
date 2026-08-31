@@ -222,15 +222,26 @@ class LifestyleSettings(Document):
 
 	@frappe.whitelist()
 	def install_demo_data(self):
-		"""Seed the Pixio demo storefront.
+		"""Seed the Pixio demo storefront in the store's own currency.
 		Not install_demo_data: its price lists are hardcoded USD, which blocks every Sales Invoice on a non-USD company.
 		"""
-		from ls_shop.install_pixio_demo import install_pixio_demo
+		from ls_shop.install_pixio_demo import (
+			CURRENCY_PROFILES,
+			DEFAULT_CURRENCY,
+			get_company_currency,
+			install_pixio_demo,
+		)
+
+		# A store already trading in a supported currency keeps it; anything else gets the default.
+		currency = get_company_currency()
+		if currency not in CURRENCY_PROFILES:
+			currency = DEFAULT_CURRENCY
 
 		frappe.enqueue(
 			install_pixio_demo,
 			queue="long",
 			timeout=3000,
+			currency=currency,
 		)
 
 		return "Demo data installation has been queued. This may take a few minutes. Check the background jobs for progress."

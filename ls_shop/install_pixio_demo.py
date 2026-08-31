@@ -1,7 +1,11 @@
-"""One-shot seeder for a Pixio storefront demo site. install_demo_data.create_price_lists is skipped:
-it hardcodes USD, which blocks every Sales Invoice on a site whose company is not USD."""
+"""One-shot seeder for a Pixio storefront demo site, in whatever currency it is handed.
+
+install_demo_data.create_price_lists is skipped: it hardcodes USD, which blocks every Sales Invoice
+on a site whose company is not USD."""
 
 import frappe
+from frappe.permissions import add_permission, update_permission_property
+from frappe.utils.data import flt
 
 from ls_shop.install_analytics_demo_data import install_analytics_demo_data
 from ls_shop.install_demo_data import (
@@ -15,21 +19,46 @@ from ls_shop.install_fashion_demo_data import (
 	IMAGE_ROOT,
 	install_fashion_demo_data,
 )
-from ls_shop.install_pixio_theme_data import PRODUCTS_URL, install_pixio_theme_data
+from ls_shop.install_pixio_theme_data import HERO_SLIDES, PRODUCTS_URL, install_pixio_theme_data
 
 THEME = "Pixio Theme"
 DEMO_SIZES = DEFAULT_SIZES
 SALE_PRICE_LIST = "Sale Price List"
 SHIPPING_RULE = "Standard Shipping"
+COD_CHARGE_ACCOUNT = "Cash on Delivery Charges"
+SHOPPER_ROLE = "Customer"
 
-# Rupee-scale money; install_demo_data's own numbers read as dollars and free-ship every demo cart.
-FREE_SHIPPING_ABOVE = 999
-FLAT_SHIPPING_CHARGE = 99
-COD_CHARGE = 49
-COD_CHARGE_APPLICABLE_BELOW = 999
+DEFAULT_CURRENCY = "SAR"
 
-# Rates are recomputed from FASHION_PRODUCTS, never scaled in place — a re-run would compound.
-RUPEE_MULTIPLIER = 50
+# One store, one currency: a demo site whose company, receivable account and price lists disagree
+# cannot submit a single Sales Invoice, so every money number the seeder writes comes from here.
+# FASHION_PRODUCTS carries dollar-scale numbers, so price_multiplier restates them locally and
+# price_rounding lands them on a retail-looking figure. Rates are recomputed from FASHION_PRODUCTS
+# on every run, never scaled in place — scaling in place would compound on a re-run.
+CURRENCY_PROFILES = {
+	"SAR": {
+		"country": "Saudi Arabia",
+		"symbol": "ر.س",
+		"price_multiplier": 3.75,
+		"price_rounding": 10,
+		"free_shipping_above": 299,
+		"flat_shipping_charge": 25,
+		"cod_charge": 15,
+		"cod_charge_applicable_below": 299,
+		"contact_phone": "+966 55 123 4567",
+	},
+	"INR": {
+		"country": "India",
+		"symbol": "₹",
+		"price_multiplier": 50,
+		"price_rounding": 100,
+		"free_shipping_above": 999,
+		"flat_shipping_charge": 99,
+		"cod_charge": 49,
+		"cod_charge_applicable_below": 999,
+		"contact_phone": "+91 98765 43210",
+	},
+}
 
 DEFAULT_HOMEPAGE_IMAGES = "/assets/ls_shop/images/homepage/demo"
 DEFAULT_HERO_BANNERS = ("hero-1.webp", "hero-2.webp", "hero-3.webp", "hero-4.webp")
@@ -40,7 +69,6 @@ STORE_COPY = {
 	"store_name": "Pixio",
 	"brand_logo": f"{IMAGE_ROOT}/logo.svg",
 	"footer_logo": f"{IMAGE_ROOT}/logo-white.svg",
-	"contact_phone": "+91 98765 43210",
 	"contact_email": "hello@pixio.demo",
 	"working_hours": "Mon - Sat, 10:00 - 19:00",
 	"newsletter_title": "Sign Up For Newsletter",
@@ -86,33 +114,52 @@ FOOTER_SECTIONS = (
 )
 
 
-def install_pixio_demo():
-	"""Seed a demo storefront end to end. Safe to re-run."""
-	configure_site_defaults()
-	save_sale_price_list()
+def install_pixio_demo(currency=DEFAULT_CURRENCY):
+	"""Seed a demo storefront end to end in `currency`. Safe to re-run."""
+	profile = get_currency_profile(currency)
+
+	configure_site_defaults(currency, profile)
+	align_store_currency(currency)
+	save_sale_price_list(currency)
 	create_item_attributes()
 	normalise_size_attribute()
-	save_shipping_rule()
+	save_shipping_rule(profile)
 
 	configure_lifestyle_settings()
-	apply_store_copy()
+	apply_store_copy(profile)
 
 	activate_pixio_theme()
 	install_fashion_demo_data()
-	apply_rupee_prices()
+	apply_catalogue_prices(profile)
 	install_pixio_theme_data()
-	apply_rupee_hero_prices()
+	apply_hero_prices(profile)
 
 	save_default_homepage()
 	save_footer_sections()
 	save_mode_of_payment_accounts()
+	allow_shoppers_to_select_accounts()
 
 	seed_storefront_analytics()
+	# The catalogue and the analytics orders above were written against whatever currency the price
+	# lists carried at insert time, so the store is only consistent once it is swept again.
+	align_store_currency(currency)
 
 	# nosemgrep: manual commit required, this runs outside a request
 	frappe.db.commit()
 	frappe.clear_cache()
-	print("✅ Pixio demo seeded")
+	print(f"✅ Pixio demo seeded in {currency}")
+
+
+def get_currency_profile(currency):
+	profile = CURRENCY_PROFILES.get(currency)
+	if not profile:
+		frappe.throw(
+			frappe._("No demo currency profile for {0}. Known: {1}.").format(
+				currency, ", ".join(sorted(CURRENCY_PROFILES))
+			)
+		)
+
+	return profile
 
 
 def seed_storefront_analytics():
@@ -121,13 +168,18 @@ def seed_storefront_analytics():
 	install_analytics_demo_data()
 
 
-def configure_site_defaults():
-	"""The three site-level settings that silently break a paid checkout later."""
+def configure_site_defaults(currency, profile):
+	"""The site-level settings that silently break a paid checkout later."""
 	# A blank System Settings.language crashes money_in_words (num2words(lang=None)) on every invoice;
 	# a Contact whose email_id is not an address is rejected by the gateways.
 	frappe.db.set_single_value("System Settings", "language", "en")
-	frappe.db.set_single_value("System Settings", "country", "India")
-	frappe.db.set_default("currency", "INR")
+	frappe.db.set_single_value("System Settings", "country", profile["country"])
+	frappe.db.set_default("currency", currency)
+	# A second, separate currency surface: utils.get_currency_symbol reads Global Defaults, not this default.
+	frappe.db.set_single_value("Global Defaults", "default_currency", currency)
+	frappe.db.set_single_value("Global Defaults", "country", profile["country"])
+	# Frappe ships most currencies disabled, and a disabled one cannot be picked on any document.
+	frappe.db.set_value("Currency", currency, "enabled", 1)
 
 	contact = frappe.db.get_value("Contact", {"user": "Administrator"})
 	if contact:
@@ -136,17 +188,43 @@ def configure_site_defaults():
 		)
 
 
-def save_sale_price_list():
+def align_store_currency(currency):
+	"""Put the company, its accounts and every price its catalogue carries into one currency."""
+	# The three-way mismatch this undoes (system INR, company SAR, price list USD) throws
+	# "Party Account ... currency and document currency should be same" on every Sales Invoice.
+	company = get_company()
+	frappe.db.set_value("Company", company, "default_currency", currency)
+
+	# ponytail: written straight to the table because ERPNext refuses a currency change once a
+	# company has transactions — safe on a seeded demo, revisit if this is ever run on a live store.
+	account = frappe.qb.DocType("Account")
+	frappe.qb.update(account).set(account.account_currency, currency).where(
+		(account.company == company) & (account.account_currency != currency)
+	).run()
+
+	price_list = frappe.qb.DocType("Price List")
+	frappe.qb.update(price_list).set(price_list.currency, currency).where(
+		price_list.currency != currency
+	).run()
+
+	# Item Price copies its currency from the price list at insert time and never re-reads it.
+	item_price = frappe.qb.DocType("Item Price")
+	frappe.qb.update(item_price).set(item_price.currency, currency).where(
+		item_price.currency != currency
+	).run()
+
+
+def save_sale_price_list(currency):
 	"""Built here rather than through install_demo_data.create_price_lists, which pins USD."""
 	if frappe.db.exists("Price List", SALE_PRICE_LIST):
-		frappe.db.set_value("Price List", SALE_PRICE_LIST, "currency", get_company_currency())
+		frappe.db.set_value("Price List", SALE_PRICE_LIST, "currency", currency)
 		return
 
 	frappe.get_doc(
 		{
 			"doctype": "Price List",
 			"price_list_name": SALE_PRICE_LIST,
-			"currency": get_company_currency(),
+			"currency": currency,
 			"enabled": 1,
 			"buying": 0,
 			"selling": 1,
@@ -174,53 +252,63 @@ def normalise_size_attribute():
 	attribute.save(ignore_permissions=True)
 
 
-def save_shipping_rule():
-	if frappe.db.exists("Shipping Rule", SHIPPING_RULE):
-		return
-
+def save_shipping_rule(profile):
+	"""Rebuild the rule's brackets every run, so a currency switch rescales the shipping charge too."""
 	company = get_company()
-	account = get_freight_account()
-	cost_center = frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name")
-
-	frappe.get_doc(
+	rule = (
+		frappe.get_doc("Shipping Rule", SHIPPING_RULE)
+		if frappe.db.exists("Shipping Rule", SHIPPING_RULE)
+		else frappe.new_doc("Shipping Rule")
+	)
+	rule.update(
 		{
-			"doctype": "Shipping Rule",
 			"label": SHIPPING_RULE,
 			"shipping_rule_type": "Selling",
 			"calculate_based_on": "Net Total",
 			"company": company,
-			"account": account,
-			"cost_center": cost_center,
-			"conditions": [
-				{"from_value": 0, "to_value": FREE_SHIPPING_ABOVE, "shipping_amount": FLAT_SHIPPING_CHARGE},
-				{"from_value": FREE_SHIPPING_ABOVE, "to_value": 9999999, "shipping_amount": 0},
-			],
+			"account": get_freight_account(),
+			"cost_center": frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name"),
 		}
-	).insert(ignore_permissions=True)
+	)
+	rule.conditions = []
+	rule.append(
+		"conditions",
+		{
+			"from_value": 0,
+			"to_value": profile["free_shipping_above"],
+			"shipping_amount": profile["flat_shipping_charge"],
+		},
+	)
+	rule.append(
+		"conditions",
+		{"from_value": profile["free_shipping_above"], "to_value": 9999999, "shipping_amount": 0},
+	)
+	rule.save(ignore_permissions=True)
 
 
-def apply_store_copy():
-	"""Rupee-scale COD thresholds and the storefront's own name, over what configure_lifestyle_settings left."""
+def apply_store_copy(profile):
+	"""Local COD thresholds and the storefront's own name, over what configure_lifestyle_settings left."""
 	settings = frappe.get_doc("Lifestyle Settings")
 	settings.cod_enabled = 1
-	settings.cod_charge = COD_CHARGE
-	settings.cod_charge_applicable_below = COD_CHARGE_APPLICABLE_BELOW
+	settings.cod_charge = profile["cod_charge"]
+	settings.cod_charge_applicable_below = profile["cod_charge_applicable_below"]
 	settings.ecommerce_warehouse = ensure_warehouse_exists()
 	# Without this, set_cod_charges throws "Please select a valid account for cod charges".
-	settings.charge_account_head = get_freight_account()
+	settings.charge_account_head = ensure_cod_charge_account()
 
+	settings.contact_phone = profile["contact_phone"]
 	for fieldname, value in STORE_COPY.items():
 		settings.set(fieldname, value)
 
 	settings.save(ignore_permissions=True)
 
 
-def apply_rupee_prices():
-	"""Restate every catalogue price at rupee scale, rounded to a plausible retail number."""
+def apply_catalogue_prices(profile):
+	"""Restate every catalogue price at the store's own scale, rounded to a plausible retail number."""
 	for product in FASHION_PRODUCTS:
 		rates = {
-			"Standard Selling": to_rupees(product["base_price"]),
-			SALE_PRICE_LIST: to_rupees(product["sale_price"]),
+			"Standard Selling": to_local_price(product["base_price"], profile),
+			SALE_PRICE_LIST: to_local_price(product["sale_price"], profile),
 		}
 		for price_list, rate in rates.items():
 			for name in frappe.get_all(
@@ -231,21 +319,22 @@ def apply_rupee_prices():
 				frappe.db.set_value("Item Price", name, "price_list_rate", rate)
 
 
-def to_rupees(amount):
-	"""Dollar-scale amount as a rupee price ending in 99, the shape a shopper expects."""
-	return round(amount * RUPEE_MULTIPLIER / 100) * 100 - 1
+def to_local_price(amount, profile):
+	"""Dollar-scale amount as a local price ending in 9, the shape a shopper expects."""
+	step = profile["price_rounding"]
+	return round(flt(amount) * profile["price_multiplier"] / step) * step - 1
 
 
-def apply_rupee_hero_prices():
-	"""Restate the hero slides' dollar copy at the catalogue's rupee scale."""
+def apply_hero_prices(profile):
+	"""Restate the hero slides' dollar copy at the catalogue's local scale."""
+	# Read back from HERO_SLIDES, never from the subheading a previous run wrote: re-parsing that
+	# compounds the scaling, and a symbol carrying a "." of its own corrupts the number outright.
 	settings = frappe.get_doc("Pixio Theme Settings")
-	for slide in settings.hero_slides:
-		amount = "".join(
-			character for character in (slide.subheading or "") if character.isdigit() or character == "."
-		)
-		if not amount:
+	for slide, source in zip(settings.hero_slides, HERO_SLIDES, strict=False):
+		amount = source["subheading"].lstrip("$")
+		if not amount.replace(".", "").isdigit():
 			continue
-		slide.subheading = f"₹{to_rupees(float(amount)):,}"
+		slide.subheading = f"{profile['symbol']}{to_local_price(amount, profile):,}"
 
 	settings.save(ignore_permissions=True)
 
@@ -346,6 +435,46 @@ def save_mode_of_payment_accounts():
 		mode.save(ignore_permissions=True)
 
 
+def ensure_cod_charge_account():
+	"""COD bills to an account of its own, never the shipping rule's."""
+	# ERPNext's shipping rule rewrites any tax row carrying the rule's account head, so a COD charge
+	# sharing it comes out silently restated as the shipping amount.
+	company = get_company()
+	abbr = frappe.db.get_value("Company", company, "abbr")
+	account_name = f"{COD_CHARGE_ACCOUNT} - {abbr}"
+	if frappe.db.exists("Account", account_name):
+		return account_name
+
+	freight_account = get_freight_account()
+	frappe.get_doc(
+		{
+			"doctype": "Account",
+			"account_name": COD_CHARGE_ACCOUNT,
+			"company": company,
+			"parent_account": frappe.db.get_value("Account", freight_account, "parent_account"),
+			"account_type": "Chargeable",
+			"root_type": "Expense",
+			"is_group": 0,
+		}
+	).insert(ignore_permissions=True)
+
+	return account_name
+
+
+def allow_shoppers_to_select_accounts():
+	"""A storefront cart cannot be saved by its own shopper without this."""
+	# ERPNext v17's get_party_account permission-checks the receivable account while the Quotation is
+	# saved under the shopper's session, so a Customer with no Account perm at all fails every cart.
+	# ponytail: select-only, granted as demo site data — the product fix (issue #60) belongs in the
+	# checkout API, which should write the cart through system_user_session as place_order already does.
+	if frappe.db.exists("Custom DocPerm", {"parent": "Account", "role": SHOPPER_ROLE, "permlevel": 0}):
+		return
+
+	add_permission("Account", SHOPPER_ROLE, 0)
+	update_permission_property("Account", SHOPPER_ROLE, 0, "read", 0)
+	update_permission_property("Account", SHOPPER_ROLE, 0, "select", 1)
+
+
 def get_freight_account():
 	company = get_company()
 	abbr = frappe.db.get_value("Company", company, "abbr")
@@ -362,4 +491,4 @@ def get_company():
 
 
 def get_company_currency():
-	return frappe.db.get_value("Company", get_company(), "default_currency") or "INR"
+	return frappe.db.get_value("Company", get_company(), "default_currency") or DEFAULT_CURRENCY
