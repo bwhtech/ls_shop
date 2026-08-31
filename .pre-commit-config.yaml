@@ -1,3 +1,6 @@
+# merchant-dash is a vendored frontend prototype, kept byte-for-byte as authored.
+exclude: '^merchant-dash/'
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.1

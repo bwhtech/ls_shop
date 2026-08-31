@@ -1,0 +1,138 @@
+import { dialog, toast } from 'frappe-ui'
+
+// Every action a merchant can take from a product page, grouped by intent.
+// The `productActions` IA axis only changes where these are rendered — the set
+// itself stays the same, so the variants stay comparable.
+export function buildProductActions(product, router) {
+  const isDraft = product.status === 'draft'
+  const isArchived = product.status === 'archived'
+
+  const publish = {
+    key: 'publish',
+    label: isDraft ? 'Publish to storefront' : 'Unpublish',
+    icon: isDraft ? 'lucide-globe' : 'lucide-eye-off',
+    onClick: () => toast.success(isDraft ? 'Published' : 'Hidden from the storefront'),
+  }
+
+  const groups = [
+    {
+      id: 'storefront',
+      label: 'Storefront',
+      items: [
+        publish,
+        { key: 'preview', label: 'Preview on storefront', icon: 'lucide-external-link', onClick: () => toast.info('Opens the live product page') },
+        { key: 'link', label: 'Copy product link', icon: 'lucide-link', onClick: () => toast.success('Link copied') },
+        { key: 'seo', label: 'Edit SEO listing', icon: 'lucide-search', onClick: () => toast.info('Jumps to the storefront section') },
+      ],
+    },
+    {
+      id: 'catalogue',
+      label: 'Catalogue',
+      items: [
+        { key: 'option', label: product.hasVariants ? 'Add an option' : 'Split into variants', icon: 'lucide-git-branch', onClick: () => toast.info('Options regenerate the variant matrix') },
+        { key: 'bulk', label: 'Bulk edit variants', icon: 'lucide-table-2', onClick: () => toast.info('Select variants to bulk edit') },
+        { key: 'type', label: 'Change product type', icon: 'lucide-shapes', onClick: () => router.push('/product-types') },
+        { key: 'collection', label: 'Add to collection', icon: 'lucide-layers', onClick: () => toast.info('Pick a collection') },
+      ],
+    },
+    {
+      id: 'inventory',
+      label: 'Inventory',
+      items: [
+        {
+          key: 'adjust',
+          label: 'Adjust stock',
+          icon: 'lucide-package-plus',
+          onClick: () =>
+            dialog.prompt({
+              title: 'Adjust stock',
+              message: `Recorded as an adjustment against ${product.title}.`,
+              fields: [
+                { name: 'qty', label: 'Change', required: true, description: 'Use a minus sign to remove stock.' },
+                { name: 'reason', label: 'Reason', type: 'select', options: ['Received', 'Damaged', 'Stock count', 'Theft'] },
+              ],
+              onConfirm: ({ values }) => toast.success(`Stock adjusted by ${values.qty}`),
+            }),
+        },
+        { key: 'transfer', label: 'Transfer between locations', icon: 'lucide-arrow-left-right', onClick: () => toast.info('Pick a source and destination') },
+        { key: 'barcode', label: 'Print barcode labels', icon: 'lucide-printer', onClick: () => toast.info('Sent to the label printer') },
+        { key: 'restock', label: 'Set a restock alert', icon: 'lucide-bell', onClick: () => toast.success('You will be told below 5 units') },
+      ],
+    },
+    {
+      id: 'pricing',
+      label: 'Pricing',
+      items: [
+        { key: 'price', label: 'Bulk edit prices across products', icon: 'lucide-indian-rupee', onClick: () => router.push('/pricing') },
+        { key: 'discount', label: 'Apply a discount', icon: 'lucide-percent', onClick: () => toast.info('Creates a price rule for this product') },
+      ],
+    },
+    {
+      id: 'insight',
+      label: 'Reporting',
+      items: [
+        { key: 'sales', label: 'View sales report', icon: 'lucide-chart-line', onClick: () => toast.info('30-day report for this product') },
+        { key: 'orders', label: 'Orders with this product', icon: 'lucide-shopping-bag', onClick: () => router.push('/orders') },
+      ],
+    },
+    {
+      id: 'manage',
+      label: 'Manage',
+      items: [
+        { key: 'duplicate', label: 'Duplicate', icon: 'lucide-copy', onClick: () => toast.success('Duplicated as a draft') },
+        { key: 'export', label: 'Export as CSV', icon: 'lucide-download', onClick: () => toast.success('Export queued') },
+        {
+          key: 'archive',
+          label: isArchived ? 'Restore from archive' : 'Archive',
+          icon: isArchived ? 'lucide-archive-restore' : 'lucide-archive',
+          onClick: () =>
+            isArchived
+              ? toast.success('Restored')
+              : dialog.confirm({
+                  title: 'Archive this product?',
+                  message: 'It leaves the storefront. Past orders keep their line items.',
+                  theme: 'red',
+                  confirmLabel: 'Archive',
+                  onConfirm: () => toast.success('Archived'),
+                }),
+        },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: 'lucide-trash-2',
+          theme: 'red',
+          onClick: () =>
+            dialog.confirm({
+              title: `Delete ${product.title}?`,
+              message: 'This cannot be undone, and it removes the product from every collection.',
+              theme: 'red',
+              confirmLabel: 'Delete',
+              onConfirm: () => {
+                toast.success('Deleted')
+                router.push('/products')
+              },
+            }),
+        },
+      ],
+    },
+  ]
+
+  // The handful worth surfacing without opening a menu.
+  const quick = [
+    publish,
+    groups[2].items[0], // Adjust stock
+    groups[3].items[0], // Edit prices
+    groups[1].items[0], // Add an option / Split into variants
+    groups[5].items[0], // Duplicate
+  ]
+
+  return { groups, quick }
+}
+
+// Dropdown wants a flat list with `group` separators, not our nested shape.
+export function asDropdownOptions(groups) {
+  return groups.map((group) => ({
+    group: group.label,
+    options: group.items.map(({ label, icon, onClick, theme }) => ({ label, icon, onClick, theme })),
+  }))
+}
