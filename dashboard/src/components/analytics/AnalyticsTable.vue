@@ -1,4 +1,5 @@
 <script setup lang="ts" generic="TRow extends Record<string, unknown>">
+import ScrollFade from "@/components/ScrollFade.vue"
 import type { AnalyticsTableColumn } from "./columns"
 
 withDefaults(
@@ -19,7 +20,7 @@ function selectRow(row: TRow) {
 </script>
 
 <template>
-	<div class="-mx-1 overflow-x-auto">
+	<ScrollFade orientation="horizontal" class="-mx-1">
 		<table class="w-full min-w-max border-collapse text-base">
 			<thead>
 				<tr class="border-b border-outline-gray-1">
@@ -64,5 +65,5 @@ function selectRow(row: TRow) {
 				</tr>
 			</tbody>
 		</table>
-	</div>
+	</ScrollFade>
 </template>
