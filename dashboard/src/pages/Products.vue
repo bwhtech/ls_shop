@@ -170,6 +170,7 @@ const listOptions = computed(() => ({
 
 		<AddProductDialog
 			v-model:open="showAddProduct"
+			:currency="currency"
 			@created="(name) => router.push({ name: 'Product', params: { name } })"
 		/>
 	</div>

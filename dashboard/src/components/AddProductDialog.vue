@@ -3,7 +3,8 @@ import AttributeMultiSelect from "@/components/AttributeMultiSelect.vue"
 import CollectionCombobox from "@/components/CollectionCombobox.vue"
 import OptionSizeGrid from "@/components/OptionSizeGrid.vue"
 import { errorMessage } from "@/utils/errors"
-import { buildOptionSizes } from "@/utils/optionSizes"
+import { formatMoney } from "@/utils/format"
+import { buildOptionSizes, pairKey } from "@/utils/optionSizes"
 import {
 	Button,
 	Dialog,
@@ -14,6 +15,7 @@ import {
 } from "frappe-ui"
 import { computed, ref } from "vue"
 
+const props = defineProps<{ currency: string }>()
 const emit = defineEmits<{ created: [name: string] }>()
 const open = defineModel<boolean>("open", { required: true })
 
@@ -24,6 +26,7 @@ const sizes = ref<string[]>([])
 const excluded = ref<string[]>([])
 const price = ref("")
 const salePrice = ref("")
+const reviewing = ref(false)
 
 type OptionSizes = { option: string; sizes: string[] }[]
 
@@ -59,6 +62,29 @@ const variantCount = computed(() =>
 	optionSizes.value.reduce((total, row) => total + row.sizes.length, 0),
 )
 
+/** Every variant carries the same pair of rates, so the price is resolved once rather than per row. */
+const priceLabel = computed(() => {
+	const rate = Number.parseFloat(price.value)
+	const saleRate = Number.parseFloat(salePrice.value)
+	if (saleRate > 0)
+		return {
+			amount: formatMoney(saleRate, props.currency),
+			was: rate > saleRate ? formatMoney(rate, props.currency) : "",
+		}
+	if (rate > 0) return { amount: formatMoney(rate, props.currency), was: "" }
+	return { amount: "No price", was: "" }
+})
+
+const variants = computed(() =>
+	optionSizes.value.flatMap((row) =>
+		row.sizes.map((size) => ({
+			key: pairKey(row.option, size),
+			option: row.option,
+			size,
+		})),
+	),
+)
+
 const emptyOption = computed(
 	() => optionSizes.value.find((row) => !row.sizes.length)?.option,
 )
@@ -76,6 +102,7 @@ const canSubmit = computed(
 )
 
 function reset() {
+	reviewing.value = false
 	title.value = ""
 	collection.value = ""
 	options.value = []
@@ -133,20 +160,58 @@ function submit() {
 					<FormControl v-model="price" type="number" label="Price" />
 					<FormControl v-model="salePrice" type="number" label="Sale price" />
 				</div>
-				<p v-if="variantCount" class="text-sm text-ink-gray-5">
+				<div v-if="reviewing && variantCount" class="space-y-2">
+					<p class="text-sm text-ink-gray-5">
+						{{ variantCount }} {{ variantCount === 1 ? "variant" : "variants" }} will be
+						created
+					</p>
+					<ul
+						class="max-h-48 divide-y divide-outline-gray-1 overflow-y-auto rounded-4 border border-outline-gray-1"
+					>
+						<li
+							v-for="variant in variants"
+							:key="variant.key"
+							class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+						>
+							<span class="truncate text-ink-gray-8">
+								{{ variant.option }} · {{ variant.size }}
+							</span>
+							<span class="flex shrink-0 items-baseline gap-2">
+								<span v-if="priceLabel.was" class="text-xs text-ink-gray-4 line-through">
+									{{ priceLabel.was }}
+								</span>
+								<span class="text-ink-gray-7">{{ priceLabel.amount }}</span>
+							</span>
+						</li>
+					</ul>
+				</div>
+				<p v-else-if="variantCount" class="text-sm text-ink-gray-5">
 					{{ options.length }} {{ options.length === 1 ? "colour" : "colours" }} ·
 					{{ variantCount }} {{ variantCount === 1 ? "size" : "sizes" }} will be created
 				</p>
 				<ErrorMessage :message="gridError || createProduct.error?.message" />
+				<div v-if="reviewing" class="flex gap-3">
+					<Button class="flex-1" label="Back" @click="reviewing = false" />
+					<Button
+						class="flex-1"
+						variant="solid"
+						theme="gray"
+						icon-left="lucide-plus"
+						:loading="createProduct.loading"
+						:disabled="!canSubmit"
+						:label="`Create ${variantCount} ${variantCount === 1 ? 'variant' : 'variants'}`"
+						@click="submit"
+					/>
+				</div>
 				<Button
+					v-else
 					class="w-full"
 					variant="solid"
 					theme="gray"
-					icon-left="lucide-plus"
-					:loading="createProduct.loading"
+					icon-left="lucide-list-checks"
 					:disabled="!canSubmit"
-					label="Create product"
-					@click="submit"
+					label="Review variants"
+					@click="reviewing = true"
 				/>
 			</div>
 		</template>
