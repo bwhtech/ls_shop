@@ -3,6 +3,7 @@
 
 import frappe
 from frappe import _
+from frappe.utils.jinja_globals import is_rtl
 
 no_cache = 1
 
@@ -23,6 +24,10 @@ def get_context(context):
 			# formats ride along on the shell instead of costing every screen an extra round trip.
 			"date_format": frappe.db.get_default("date_format") or "yyyy-mm-dd",
 			"time_format": frappe.db.get_default("time_format") or "HH:mm:ss",
+			# The session language decides which way the whole shell reads, so the direction is
+			# resolved by the framework here rather than guessed from a hardcoded default client-side.
+			"lang": frappe.local.lang or "en",
+			"is_rtl": is_rtl(),
 		}
 	)
 	frappe.db.commit()  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit

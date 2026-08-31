@@ -259,7 +259,7 @@ useKeyboardShortcut([
 				>
 					<template #prefix>
 						<span
-							:class="[item.icon, 'mr-2 size-4 shrink-0 text-ink-gray-6']"
+							:class="[item.icon, 'me-2 size-4 shrink-0 text-ink-gray-6']"
 							aria-hidden="true"
 						/>
 					</template>

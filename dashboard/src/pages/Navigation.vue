@@ -290,7 +290,7 @@ const menuActions = computed(() => [
 							<button
 								v-if="isMenuNode(node)"
 								type="button"
-								class="min-w-0 flex-1 truncate text-left text-base"
+								class="min-w-0 flex-1 truncate text-start text-base"
 								:class="[
 									node.visible ? 'text-ink-gray-8' : 'text-ink-gray-4',
 									selectedName === node.name ? 'font-medium' : '',
@@ -304,7 +304,7 @@ const menuActions = computed(() => [
 						<template #item-suffix="{ node }">
 							<div v-if="isMenuNode(node)" class="flex items-center gap-2">
 								<Badge v-if="!node.visible" variant="subtle" theme="amber" label="Hidden" />
-								<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">
+								<span class="w-16 shrink-0 text-end text-sm text-ink-gray-5">
 									{{ groupCount(node) }}
 								</span>
 								<span @click.stop>

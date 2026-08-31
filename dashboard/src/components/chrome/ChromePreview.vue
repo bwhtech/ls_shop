@@ -8,6 +8,8 @@ import {
 import { Button, TabButtons } from "frappe-ui"
 import { computed, ref } from "vue"
 
+import { useLocale } from "@/composables/useLocale"
+
 const props = defineProps<{
 	token: number
 	path: string
@@ -24,9 +26,15 @@ const LANGUAGES = [
 	{ label: "العربية", value: "ar" },
 ]
 
-// ponytail: the storefront's audience is Arabic, so the preview opens RTL; key it off a
-// storefront default-language field once Lifestyle Settings carries one.
-const language = ref("ar")
+const { language: sessionLanguage } = useLocale()
+
+// The preview opens in the language the session is actually in - the storefront renders its own
+// direction from that - falling back to English for a language the storefront chrome cannot preview.
+const language = ref(
+	LANGUAGES.some((option) => option.value === sessionLanguage)
+		? sessionLanguage
+		: "en",
+)
 const reloadToken = ref(0)
 
 const stage = ref<HTMLElement | null>(null)
@@ -159,7 +167,7 @@ const source = computed(
 					:key="language"
 					:src="source"
 					:title="title"
-					class="origin-top-left border-0"
+					class="origin-top-left border-0 rtl:origin-top-right"
 					:style="{
 						width: `${FRAME_WIDTH}px`,
 						height: `${frameHeight}px`,

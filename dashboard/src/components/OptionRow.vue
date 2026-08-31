@@ -155,7 +155,7 @@ function confirmRemoveImage(fileUrl: string) {
 		<div class="flex items-center gap-4 py-2.5">
 			<button
 				type="button"
-				class="flex min-w-0 flex-1 items-center gap-3 text-left"
+				class="flex min-w-0 flex-1 items-center gap-3 text-start"
 				:aria-expanded="expanded"
 				@click="expanded = !expanded"
 			>
@@ -186,8 +186,8 @@ function confirmRemoveImage(fileUrl: string) {
 				</div>
 			</button>
 
-			<div class="w-24 shrink-0 text-right text-base text-ink-gray-7">{{ priceLabel }}</div>
-			<div class="w-20 shrink-0 text-right text-base text-ink-gray-7">{{ stockTotal }}</div>
+			<div class="w-24 shrink-0 text-end text-base text-ink-gray-7">{{ priceLabel }}</div>
+			<div class="w-20 shrink-0 text-end text-base text-ink-gray-7">{{ stockTotal }}</div>
 			<div class="w-16 shrink-0">
 				<Tooltip :text="blockerText" :disabled="canPublish">
 					<div class="flex justify-end">
@@ -201,7 +201,7 @@ function confirmRemoveImage(fileUrl: string) {
 			</div>
 		</div>
 
-		<div v-if="expanded" class="space-y-5 pb-5 pl-12 pr-4">
+		<div v-if="expanded" class="space-y-5 pb-5 ps-12 pe-4">
 			<div>
 				<h4 class="text-sm text-ink-gray-5">Photos</h4>
 				<div class="mt-2 flex flex-wrap items-center gap-2">
@@ -212,7 +212,7 @@ function confirmRemoveImage(fileUrl: string) {
 							class="size-20 rounded-4 border border-outline-gray-1 object-cover"
 						/>
 						<Button
-							class="absolute -right-1.5 -top-1.5 hidden rounded-full group-hover:inline-flex"
+							class="absolute -end-1.5 -top-1.5 hidden rounded-full group-hover:inline-flex"
 							variant="subtle"
 							size="xs"
 							icon="lucide-x"
@@ -260,7 +260,7 @@ function confirmRemoveImage(fileUrl: string) {
 							<ListCell class="justify-end">
 								<!-- The browser's own text-align on <input> beats the wrapper's, so it has to reach the control slot. -->
 								<TextInput
-									class="w-24 [&_[data-slot=control]]:text-right"
+									class="w-24 [&_[data-slot=control]]:text-end"
 									type="number"
 									:aria-label="`Price for size ${size.size}`"
 									:model-value="rateFor(size)"
@@ -272,7 +272,7 @@ function confirmRemoveImage(fileUrl: string) {
 							</ListCell>
 							<ListCell class="justify-end">
 								<TextInput
-									class="w-20 [&_[data-slot=control]]:text-right"
+									class="w-20 [&_[data-slot=control]]:text-end"
 									type="number"
 									placeholder="0"
 									:aria-label="`Add stock for size ${size.size}`"

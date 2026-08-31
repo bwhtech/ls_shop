@@ -2,8 +2,12 @@ import { FrappeUI } from "frappe-ui"
 import { createApp } from "vue"
 
 import App from "./App.vue"
+import { applyDocumentDirection } from "./composables/useLocale"
 import "./index.css"
 import router from "./router"
+
+// Ahead of mount: a shell that painted LTR first would visibly snap around on an Arabic session.
+applyDocumentDirection()
 
 const app = createApp(App)
 

@@ -442,7 +442,7 @@ function linkActions(
 								>
 									<button
 										type="button"
-										class="min-w-0 flex-1 text-left"
+										class="min-w-0 flex-1 text-start"
 										@click="openLinkDialog(section, link)"
 									>
 										<span

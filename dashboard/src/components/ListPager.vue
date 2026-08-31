@@ -21,7 +21,7 @@ const emit = defineEmits<{ loadMore: [] }>()
 		</span>
 		<Button
 			v-if="hasMore"
-			class="ml-auto"
+			class="ms-auto"
 			:loading="loading"
 			label="Load more"
 			@click="emit('loadMore')"

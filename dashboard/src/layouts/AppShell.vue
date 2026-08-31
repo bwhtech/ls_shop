@@ -105,7 +105,7 @@ const menuItems = computed(() => [
 						icon-left="lucide-search"
 						@click="showPalette = true"
 					>
-						<span class="flex-1 text-left">Search</span>
+						<span class="flex-1 text-start">Search</span>
 						<template #suffix>
 							<KeyboardShortcut combo="Mod+K" bg />
 						</template>

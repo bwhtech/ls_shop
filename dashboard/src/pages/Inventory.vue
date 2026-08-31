@@ -142,7 +142,7 @@ const columns = [
 				/>
 				<TextInput
 					v-else-if="column.key === 'receive'"
-					class="ms-auto w-20 [&_[data-slot=control]]:text-right"
+					class="ms-auto w-20 [&_[data-slot=control]]:text-end"
 					type="number"
 					placeholder="0"
 					:aria-label="`Receive stock for ${row.product} ${row.size}`"
@@ -173,7 +173,7 @@ const columns = [
 			v-if="pendingCount"
 			class="flex items-center gap-2 border-t border-outline-gray-1 px-3 py-3 sm:px-5"
 		>
-			<span class="mr-auto text-sm text-ink-gray-5">
+			<span class="me-auto text-sm text-ink-gray-5">
 				Receiving {{ pendingCount }} {{ pendingCount === 1 ? "size" : "sizes" }}
 			</span>
 			<Button label="Discard" @click="receiveQuantities = {}" />

@@ -143,7 +143,7 @@ async function copyWebhookUrl() {
 				<div v-if="props.integration.webhook_url" class="space-y-1.5">
 					<div class="text-base text-ink-gray-7">Webhook URL</div>
 					<div
-						class="flex items-center gap-2 rounded-4 border border-outline-gray-2 bg-surface-gray-1 py-1.5 pl-3 pr-1.5"
+						class="flex items-center gap-2 rounded-4 border border-outline-gray-2 bg-surface-gray-1 py-1.5 ps-3 pe-1.5"
 					>
 						<span class="min-w-0 flex-1 truncate text-p-sm text-ink-gray-7">
 							{{ props.integration.webhook_url }}

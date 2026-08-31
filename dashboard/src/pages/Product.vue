@@ -193,9 +193,9 @@ function saveDetails() {
 
 				<div class="mt-1 flex items-center gap-4 border-b border-outline-gray-1 pb-1.5">
 					<span class="flex-1 text-sm text-ink-gray-5">Variant</span>
-					<span class="w-24 shrink-0 text-right text-sm text-ink-gray-5">Price</span>
-					<span class="w-20 shrink-0 text-right text-sm text-ink-gray-5">Stock</span>
-					<span class="w-16 shrink-0 text-right text-sm text-ink-gray-5">Live</span>
+					<span class="w-24 shrink-0 text-end text-sm text-ink-gray-5">Price</span>
+					<span class="w-20 shrink-0 text-end text-sm text-ink-gray-5">Stock</span>
+					<span class="w-16 shrink-0 text-end text-sm text-ink-gray-5">Live</span>
 				</div>
 
 				<div class="divide-y divide-outline-gray-1">

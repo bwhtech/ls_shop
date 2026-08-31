@@ -39,11 +39,11 @@ function toggle(
 			Untick any size you do not carry in a colour.
 		</p>
 		<div class="overflow-x-auto rounded-4 border border-outline-gray-1">
-			<table class="w-full min-w-max border-collapse text-left">
+			<table class="w-full min-w-max border-collapse text-start">
 				<thead>
 					<tr>
 						<th
-							class="sticky left-0 z-10 bg-surface-base px-3 py-2 text-xs font-medium text-ink-gray-5"
+							class="sticky start-0 z-10 bg-surface-base px-3 py-2 text-xs font-medium text-ink-gray-5"
 						>
 							Colour
 						</th>
@@ -63,7 +63,7 @@ function toggle(
 						class="border-t border-outline-gray-1"
 					>
 						<th
-							class="sticky left-0 z-10 max-w-40 truncate bg-surface-base px-3 py-2 text-sm font-normal"
+							class="sticky start-0 z-10 max-w-40 truncate bg-surface-base px-3 py-2 text-sm font-normal"
 							:class="emptyOptions.has(option) ? 'text-ink-red-5' : 'text-ink-gray-8'"
 						>
 							{{ option }}
