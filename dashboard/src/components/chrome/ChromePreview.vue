@@ -95,6 +95,8 @@ function startResize(event: PointerEvent) {
 	resizing.value = true
 	resizeOrigin = event.clientY
 	resizeBaseHeight = stageHeight.value
+	// Without capture the preview iframe swallows every pointermove the moment the cursor crosses into it.
+	;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 
 useEventListener(window, "pointermove", (event: PointerEvent) => {
@@ -125,21 +127,28 @@ const source = computed(
 
 <template>
 	<div
-		class="shrink-0 border-t border-outline-gray-1 bg-surface-gray-1"
+		class="relative shrink-0 border-t border-outline-gray-1 bg-surface-gray-1"
 		:class="resizing && 'select-none'"
 	>
+		<div
+			v-if="!collapsed"
+			role="separator"
+			aria-orientation="horizontal"
+			tabindex="0"
+			:aria-label="`Resize ${title.toLowerCase()}`"
+			class="group absolute inset-x-0 top-0 z-10 flex h-2 -translate-y-1/2 cursor-ns-resize touch-none items-center justify-center focus:outline-none"
+			@pointerdown="startResize"
+			@keydown.up.prevent="resizeTo(stageHeight + RESIZE_STEP)"
+			@keydown.down.prevent="resizeTo(stageHeight - RESIZE_STEP)"
+		>
+			<div
+				class="h-1 w-10 rounded-full bg-surface-gray-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+				:class="resizing && 'opacity-100'"
+			/>
+		</div>
+
 		<div class="flex min-h-11 items-center justify-between gap-2 px-3 sm:px-5">
 			<div class="flex items-center gap-2">
-				<Button
-					v-if="!collapsed"
-					variant="ghost"
-					icon="lucide-grip-horizontal"
-					class="cursor-ns-resize"
-					:aria-label="`Resize ${title.toLowerCase()}`"
-					@pointerdown="startResize"
-					@keydown.up.prevent="resizeTo(stageHeight + RESIZE_STEP)"
-					@keydown.down.prevent="resizeTo(stageHeight - RESIZE_STEP)"
-				/>
 				<Button
 					variant="ghost"
 					:icon-left="collapsed ? 'lucide-chevron-up' : 'lucide-chevron-down'"
@@ -168,6 +177,7 @@ const source = computed(
 					:src="source"
 					:title="title"
 					class="origin-top-left border-0 rtl:origin-top-right"
+					:class="resizing && 'pointer-events-none'"
 					:style="{
 						width: `${FRAME_WIDTH}px`,
 						height: `${frameHeight}px`,
