@@ -103,18 +103,35 @@ def get_orders(
 		filters = [["docstatus", "<", 2], ["status", "=", "Completed"]]
 	elif status == "cancelled":
 		filters = [["docstatus", "=", 2]]
+	elif status == "unfulfilled":
+		filters = get_unfulfilled_order_filters()
+	elif status == "unpaid":
+		filters = get_unpaid_order_filters()
+	elif status == "closed":
+		filters = get_closed_order_filters()
 	else:
 		filters = [["docstatus", "<", 2]]
-	if search:
-		filters.append(["name", "like", f"%{search}%"])
 
-	total = frappe.db.count("Sales Order", filters)
+	# Or-ed against the tab filters above, not appended to them: a plain append would AND the two
+	# name matches together and a customer-name hit would never surface a hit on the order name.
+	or_filters = (
+		[["name", "like", f"%{search}%"], ["customer_name", "like", f"%{search}%"]] if search else None
+	)
+
+	if or_filters:
+		# frappe.db.count takes no or_filters, so the same filter pair is counted by fetching just
+		# the name column for every match — one query either way, just without a page_length cap.
+		total = len(frappe.get_all("Sales Order", filters=filters, or_filters=or_filters, pluck="name"))
+	else:
+		total = frappe.db.count("Sales Order", filters)
 	orders = frappe.get_all(
 		"Sales Order",
 		filters=filters,
+		or_filters=or_filters,
 		fields=[
 			"name",
 			"customer",
+			"customer_name",
 			"transaction_date",
 			"status",
 			"grand_total",
@@ -140,15 +157,17 @@ def get_orders(
 		item_counts[row.parent] = item_counts.get(row.parent, 0) + flt(row.qty)
 
 	lifecycles = read_order_lifecycles(order_names)
+	paid_orders = read_paid_orders(order_names)
 
 	return {
 		"orders": [
 			{
 				"name": row.name,
-				"customer": row.customer,
+				"customer": row.customer_name or row.customer,
 				"placed_on": row.transaction_date,
 				"status": row.status,
 				"state": describe_state(row, lifecycles.get(cstr(row.name))),
+				"payment_state": describe_payment_state(row, paid_orders),
 				"total": flt(row.grand_total),
 				"currency": row.currency,
 				"item_count": item_counts.get(row.name, 0),
@@ -158,6 +177,94 @@ def get_orders(
 		],
 		"total": total,
 	}
+
+
+def get_unfulfilled_order_filters() -> list:
+	"""Nothing has shipped yet — a confirmation-pending COD draft belongs here too, since delivery
+	can only start once an order is submitted, so its per_delivered is 0 the same way."""
+	return [["docstatus", "<", 2], ["per_delivered", "=", 0]]
+
+
+def get_closed_order_filters() -> list:
+	"""Cancelled or fully delivered: the two ways an order stops needing the owner's attention. A
+	plain filter list can only AND, so this is built as the complement of "still needs work"
+	instead of an OR — and as a `not in` subquery rather than `in`: frappe.get_all's query builder
+	hangs on an `in` filter whose value is a QueryBuilder object, `not in` does not."""
+	sales_order = frappe.qb.DocType("Sales Order")
+	still_open = (
+		frappe.qb.from_(sales_order)
+		.select(sales_order.name)
+		.where(sales_order.docstatus < 2)
+		.where(sales_order.status != "Completed")
+		.where(sales_order.per_delivered < 100)
+	)
+	return [["name", "not in", still_open]]
+
+
+def build_paid_orders_query(order_names: list | None = None):
+	"""Sales Orders with at least one submitted, captured payment (a 'Receive' Payment Entry) — the
+	only unambiguous 'paid' signal this data model carries. Refund nuance (paid vs refunded vs
+	partly refunded) is resolved separately, per order, on the order detail screen — see
+	describe_payment. `order_names=None` scopes across every order, for the "unpaid" tab filter;
+	passing a page's worth of names scopes it to a single batched read instead.
+
+	A payment's Payment Entry Reference points at the Sales Invoice raised for the order, never at
+	the order itself — ls_shop's own checkout (payments.create_sales_invoice) always books payment
+	against the invoice it just raised, not the order, and ERPNext's get_payment_entry doesn't
+	back-reference the order either. So this walks Sales Invoice Item.sales_order — the field
+	ERPNext's own make_sales_invoice mapper stamps on every line — to get from order to invoice."""
+	sales_invoice_item = frappe.qb.DocType("Sales Invoice Item")
+	sales_invoice = frappe.qb.DocType("Sales Invoice")
+	payment_entry_reference = frappe.qb.DocType("Payment Entry Reference")
+	payment_entry = frappe.qb.DocType("Payment Entry")
+	query = (
+		frappe.qb.from_(sales_invoice_item)
+		.join(sales_invoice)
+		.on(sales_invoice_item.parent == sales_invoice.name)
+		.join(payment_entry_reference)
+		.on(
+			(payment_entry_reference.reference_doctype == "Sales Invoice")
+			& (payment_entry_reference.reference_name == sales_invoice.name)
+		)
+		.join(payment_entry)
+		.on(payment_entry_reference.parent == payment_entry.name)
+		.select(sales_invoice_item.sales_order.as_("order_name"))
+		.distinct()
+		.where(sales_invoice.docstatus == 1)
+		.where(payment_entry.docstatus == 1)
+		.where(payment_entry.payment_type == "Receive")
+	)
+	if order_names is not None:
+		query = query.where(sales_invoice_item.sales_order.isin(order_names))
+	return query
+
+
+def get_unpaid_order_filters() -> list:
+	"""A COD order is settled in cash at the door, outside this paperwork — see the module's COD
+	domain note — so only a non-COD order missing its captured payment counts as unpaid here."""
+	return [
+		["docstatus", "<", 2],
+		["custom_ecommerce_payment_mode", "!=", "COD"],
+		["name", "not in", build_paid_orders_query()],
+	]
+
+
+def read_paid_orders(order_names: list) -> set:
+	"""One batched query for a whole page of orders, not one per row."""
+	if not order_names:
+		return set()
+	rows = build_paid_orders_query(order_names).run(as_dict=True)
+	return {cstr(row.order_name) for row in rows}
+
+
+def describe_payment_state(order, paid_orders: set) -> dict:
+	"""The Orders list's payment badge: paid vs pending only. Refund nuance needs per-order Payment
+	Entry matching (see describe_payment) that isn't worth batching for a list column."""
+	if order.custom_ecommerce_payment_mode == "COD":
+		return {"key": "pending", "label": _("Cash on delivery")}
+	if cstr(order.name) in paid_orders:
+		return {"key": "paid", "label": _("Paid")}
+	return {"key": "pending", "label": _("Payment pending")}
 
 
 def get_open_order_filters() -> list:
@@ -488,6 +595,7 @@ def get_order(sales_order: str):
 		[
 			"name",
 			"customer",
+			"customer_name",
 			"contact_email",
 			"contact_phone",
 			"transaction_date",
@@ -532,10 +640,12 @@ def get_order(sales_order: str):
 	lifecycle = read_order_lifecycles([order.name]).get(cstr(order.name), frappe._dict())
 	state = describe_state(order, lifecycle)
 	charges = get_order_charges(order)
+	payment_state = describe_payment(order)
 
 	return {
 		"name": order.name,
-		"customer": order.customer,
+		"customer": order.customer_name or order.customer,
+		"customer_id": order.customer,
 		"email": order.contact_email,
 		"phone": order.contact_phone,
 		"placed_on": order.transaction_date,
@@ -551,7 +661,11 @@ def get_order(sales_order: str):
 		"total_taxes_and_charges": flt(order.total_taxes_and_charges),
 		"grand_total": flt(order.grand_total),
 		"payment_mode": order.custom_ecommerce_payment_mode,
+		"payment_state": payment_state,
 		"shipping_address": get_address_lines(order.address_display),
+		"tags": frappe.get_all(
+			"Tag Link", filters={"document_type": "Sales Order", "document_name": order.name}, pluck="tag"
+		),
 		"can_fulfil": can_fulfil_order(order, state),
 		"items": [
 			{
@@ -568,6 +682,89 @@ def get_order(sales_order: str):
 		],
 		"deliveries": lifecycle.get("delivery_notes") or [],
 	}
+
+
+def read_payment_totals(order_name: str) -> tuple[float, float]:
+	"""What this order has actually received and had refunded, read straight off its own Payment
+	Entries. Walks Sales Invoice Item.sales_order the same way build_paid_orders_query does — a
+	payment's Payment Entry Reference points at the invoice raised for the order, never at the
+	order itself (see that function's note)."""
+	sales_invoice_item = frappe.qb.DocType("Sales Invoice Item")
+	sales_invoice = frappe.qb.DocType("Sales Invoice")
+	payment_entry_reference = frappe.qb.DocType("Payment Entry Reference")
+	payment_entry = frappe.qb.DocType("Payment Entry")
+	receive_entries = (
+		frappe.qb.from_(sales_invoice_item)
+		.join(sales_invoice)
+		.on(sales_invoice_item.parent == sales_invoice.name)
+		.join(payment_entry_reference)
+		.on(
+			(payment_entry_reference.reference_doctype == "Sales Invoice")
+			& (payment_entry_reference.reference_name == sales_invoice.name)
+		)
+		.join(payment_entry)
+		.on(payment_entry_reference.parent == payment_entry.name)
+		.select(
+			payment_entry.name,
+			payment_entry.paid_amount,
+			payment_entry.reference_no,
+			payment_entry.party,
+			payment_entry.party_type,
+			payment_entry.company,
+		)
+		.distinct()
+		.where(sales_invoice_item.sales_order == order_name)
+		.where(sales_invoice.docstatus == 1)
+		.where(payment_entry.docstatus == 1)
+		.where(payment_entry.payment_type == "Receive")
+	).run(as_dict=True)
+
+	received = sum(flt(row.paid_amount) for row in receive_entries)
+	if not receive_entries:
+		return received, 0.0
+
+	# Refunds carry no Payment Entry Reference of their own (make_refund_payment_entry doesn't add
+	# one) — they're matched back to the receipt by reference_no/party/company, same as
+	# ls_shop.api.orders.get_refund_status does for a single order.
+	refunded = 0.0
+	for row in receive_entries:
+		refunded += sum(
+			flt(match.paid_amount)
+			for match in frappe.get_all(
+				"Payment Entry",
+				filters={
+					"payment_type": "Pay",
+					"docstatus": 1,
+					"reference_no": row.reference_no,
+					"party_type": row.party_type,
+					"party": row.party,
+					"company": row.company,
+				},
+				fields=["paid_amount"],
+			)
+		)
+	return received, refunded
+
+
+def describe_payment(order) -> dict:
+	"""paid | pending | refunded | partially_refunded for one order — the order detail screen's
+	richer equivalent of describe_payment_state's list-only paid/pending. See
+	ls_shop/api/admin/orders.py's build_paid_orders_query for why this can't reuse
+	ls_shop.api.orders.get_refund_status directly: that reports only a can_refund boolean and, as
+	of this writing, its own Payment Entry Reference lookup is keyed on "Sales Order" — which never
+	matches, since a captured payment's reference always points at the Sales Invoice instead (see
+	docs/commera-open-questions.md, "Refund — a pre-existing lookup bug blocks it")."""
+	if order.custom_ecommerce_payment_mode == "COD":
+		return {"key": "pending", "label": _("Cash on delivery")}
+
+	received, refunded = read_payment_totals(order.name)
+	if not received:
+		return {"key": "pending", "label": _("Payment pending")}
+	if refunded >= received:
+		return {"key": "refunded", "label": _("Refunded")}
+	if refunded > 0:
+		return {"key": "partially_refunded", "label": _("Partly refunded")}
+	return {"key": "paid", "label": _("Paid")}
 
 
 def can_fulfil_order(order, state) -> bool:

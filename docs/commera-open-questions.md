@@ -106,3 +106,44 @@ Nothing here picks a source; these are the realistic options:
   what the owner paid rather than an ERPNext side-effect, and the only one that works uniformly
   whether stock arrived through a Purchase Order, a manual receipt, or a future channel. Costs the
   most: new field, migration, and a data-entry step nothing else in the app currently asks for.
+
+## Order Detail — Refund and Cancel order
+
+`OrderDetail.vue`'s "Refund" and "Cancel order" actions (moreActions dropdown) stay inert. Neither
+is a missing-endpoint problem exactly — the storefront already has real machinery
+(`ls_shop.api.orders.get_refund_status` / `make_refund_payment_entry` / `cancel_order`) — but
+neither is safe to point the admin dashboard at as-is:
+
+**Refund — blocked by a pre-existing lookup bug, not a product decision.** `get_refund_status` and
+`make_refund_payment_entry` find an order's payment via `Payment Entry Reference` filtered on
+`reference_doctype = "Sales Order"`. In this codebase a captured payment's Payment Entry Reference
+always points at the *Sales Invoice* raised for the order instead (`payments.create_sales_invoice`
+→ `get_payment_entry("Sales Invoice", ...)`; verified by building a real prepaid order, invoice and
+payment end to end against a scratch record and reading the resulting `Payment Entry Reference` row —
+`reference_doctype` was `"Sales Invoice"`, never `"Sales Order"`). So `get_refund_status` reports
+`can_refund: False` for every order, paid or not — refunded or never-paid look identical to it. This
+is a real bug in shared storefront code (`ls_shop/api/orders.py`), out of this section's two-screen
+scope to fix, and wiring the admin Refund button to it now would look live but silently do nothing.
+`ls_shop/api/admin/orders.py`'s own `describe_payment` (used for the payment badge) reads the correct
+Sales Invoice-linked path instead, so the badge is trustworthy even though the action isn't yet.
+Once `get_refund_status`/`make_refund_payment_entry` are fixed to walk `Sales Invoice Item.sales_order`
+the same way, an admin `refund_order` wrapper (permission-gated on `Sales Order` write, since that
+helper's storefront caller is owner-scoped) is a same-day addition — the plumbing was written and
+verified during this section, then pulled because it could not be shipped working.
+
+**Cancel order — genuinely a product decision, not wired.** `ls_shop.api.orders.cancel_order` is
+owner-scoped (`validate_can_cancel` throws unless `order.owner == frappe.session.user`) — it is the
+storefront's "the shopper cancelled their own order" flow, not an admin action, and it is silent
+about whether staff-initiated cancellation should behave identically. Three ways to close this:
+
+- **Reuse `cancel_order`'s body, swap the ownership gate for a permission check.** Cheapest, and
+  keeps its accounting behaviour (auto-refund for non-COD, cancel-the-draft-then-cancel for a
+  confirmation-pending COD order) — but that behaviour was designed for a shopper acting on their own
+  order, not for a merchant working a support case, and inherits the Refund bug above for any
+  non-COD order.
+- **A separate, admin-only cancel with a mandatory reason and no automatic refund.** Matches how a
+  merchant actually cancels an order in practice (there is usually a conversation with the customer
+  first) and avoids money movement inside a single click — but it is new flow, not reused, and still
+  needs the Refund bug fixed before "cancel now, refund later" is a complete story.
+- **Leave cancellation to the ERP Desk.** "View in ERP" already exists on this screen. Lowest-risk,
+  but it sends the owner out of the tool this section is meant to keep them inside.

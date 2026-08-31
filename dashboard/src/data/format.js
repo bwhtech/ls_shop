@@ -81,14 +81,22 @@ const THEMES = {
   fulfilled: 'green',
   active: 'green',
   published: 'green',
+  paid: 'green',
   pending: 'orange',
   partial: 'orange',
   partially_refunded: 'orange',
+  to_fulfil: 'orange',
+  delivery_note_drafted: 'orange',
+  packed: 'orange',
+  partly_fulfilled: 'orange',
+  shipped: 'blue',
   unfulfilled: 'red',
   cancelled: 'red',
   refunded: 'gray',
   draft: 'gray',
   archived: 'gray',
+  confirmation_pending: 'gray',
+  returned: 'gray',
 }
 
 export const statusTheme = (key) => THEMES[key] ?? 'gray'

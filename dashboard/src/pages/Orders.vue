@@ -6,10 +6,9 @@ import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
 import ListPagination from '../components/ListPagination.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import Thumb from '../components/Thumb.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BulkBar from '../components/BulkBar.vue'
-import { orders } from '../data/mock'
+import { useAdminRead, useAdminAction } from '../data/api'
 import { money, shortDate } from '../data/format'
 import { ia } from '../ia/store'
 
@@ -32,36 +31,41 @@ function endSelecting() {
 }
 
 const sort = ref({ key: 'date', direction: 'desc' })
-
-const MATCHERS = {
-  all: () => true,
-  unfulfilled: (o) => o.fulfillment === 'unfulfilled',
-  unpaid: (o) => o.payment === 'pending',
-  open: (o) => !['delivered', 'cancelled'].includes(o.fulfillment),
-  closed: (o) => ['delivered', 'cancelled'].includes(o.fulfillment),
-}
-
 const page = ref(1)
 const pageSize = ref(20)
 
-const matches = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  const filtered = orders.filter(
-    (o) =>
-      MATCHERS[tab.value](o) &&
-      (!q || o.id.toLowerCase().includes(q) || o.customer.toLowerCase().includes(q)),
-  )
-  const { key, direction } = sort.value
-  const dir = direction === 'asc' ? 1 : -1
-  return [...filtered].sort((a, b) => (a[key] > b[key] ? dir : a[key] < b[key] ? -dir : 0))
+const ordersRequest = useAdminRead('orders.get_orders', {
+  params: () => ({
+    status: tab.value === 'all' ? undefined : tab.value,
+    search: query.value || undefined,
+    start: (page.value - 1) * pageSize.value,
+    page_length: pageSize.value,
+  }),
+  refetch: true,
 })
 
-// A filter or a sort changes what page one is, so it sends you back to it.
-watch([query, tab, sort], () => (page.value = 1))
+// A filter changes what page one is, so it sends you back to it.
+watch([query, tab], () => (page.value = 1))
 
-const rows = computed(() =>
-  matches.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
-)
+const total = computed(() => ordersRequest.data?.total ?? 0)
+
+// The endpoint orders by newest first — the header toggle re-sorts the loaded
+// page itself, same convention Products.vue's list uses.
+const rows = computed(() => {
+  const orders = ordersRequest.data?.orders ?? []
+  const { key, direction } = sort.value
+  const dir = direction === 'asc' ? 1 : -1
+  const valueFor = (row) => {
+    if (key === 'total') return row.total
+    if (key === 'date') return row.placed_on
+    return row.customer
+  }
+  return [...orders].sort((a, b) => {
+    const av = valueFor(a)
+    const bv = valueFor(b)
+    return av > bv ? dir : av < bv ? -dir : 0
+  })
+})
 
 function toggleSort(key) {
   sort.value =
@@ -72,17 +76,41 @@ function toggleSort(key) {
 
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
 
-function markFulfilled() {
-  toast.success(`${selection.value.length} order(s) marked fulfilled`)
+const fulfilAction = useAdminAction('orders.fulfil_order')
+
+// There is no bulk-fulfil endpoint (fulfil_order ships one order at a time) — same
+// sequential-loop shape Products.vue's bulk archive already uses for the same reason.
+async function markFulfilled() {
+  const names = [...selection.value]
+  if (!names.length) return
+
+  for (const name of names) {
+    await fulfilAction.submit({ sales_order: name })
+    // A failure already toasted inside useAdminAction — stop rather than fulfil the rest silently.
+    if (fulfilAction.error) return
+  }
+
+  toast.success(`${names.length} order(s) marked fulfilled`)
   endSelecting()
+  ordersRequest.reload()
 }
 </script>
 
 <template>
   <AppPageHeader title="Orders">
     <template #actions>
-      <Button label="Export" icon-left="lucide-download" />
-      <Button label="Create order" icon-left="lucide-plus" variant="solid" theme="gray" />
+      <!-- Export and packing slip printing have no backend concept in ls_shop — kept as
+           inert affordances in this frozen layout rather than wired to nothing. -->
+      <Button label="Export" icon-left="lucide-download" @click="() => toast.info('Export is coming soon')" />
+      <!-- Staff placing an order on a shopper's behalf isn't a supported flow in ls_shop (see the
+           order-ownership rule in ls_shop/utils.py) — kept inert rather than pointed at nothing. -->
+      <Button
+        label="Create order"
+        icon-left="lucide-plus"
+        variant="solid"
+        theme="gray"
+        @click="() => toast.info('Creating an order from the dashboard isn\'t supported yet')"
+      />
     </template>
   </AppPageHeader>
 
@@ -106,10 +134,12 @@ function markFulfilled() {
 
     <BulkBar v-if="selecting" :count="selection.length" noun="order" @done="endSelecting">
       <Button label="Mark fulfilled" @click="markFulfilled" />
-      <Button label="Print packing slips" />
+      <Button label="Print packing slips" @click="() => toast.info('Printing is coming soon')" />
     </BulkBar>
 
-    <div class="mt-3 overflow-x-auto">
+    <p v-if="ordersRequest.loading" class="mt-3 text-sm text-ink-gray-5">Loading orders…</p>
+
+    <div v-else class="mt-3 overflow-x-auto">
       <List
       v-model:selection="selection"
       class="min-w-[54rem]"
@@ -132,24 +162,25 @@ function markFulfilled() {
         </ListHeaderCellSort>
       </ListHeader>
 
-      <ListRows :items="rows" row-key="id" v-slot="{ item }">
-        <ListRow :to="`/orders/${item.slug}`" :value="item.id">
+      <ListRows :items="rows" row-key="name" v-slot="{ item }">
+        <ListRow :to="`/orders/${item.name}`" :value="item.name">
           <ListCell>
-            <div class="flex min-w-0 items-center gap-2.5">
-              <Thumb :emoji="item.items[0].thumb" />
-              <div class="min-w-0">
-                <p class="truncate text-base text-ink-gray-8">{{ item.customer }}</p>
-                <p class="truncate text-sm text-ink-gray-4 tabular-nums">{{ item.id }}</p>
-              </div>
+            <div class="min-w-0">
+              <p class="truncate text-base text-ink-gray-8">{{ item.customer }}</p>
+              <p class="truncate text-sm text-ink-gray-4 tabular-nums">{{ item.name }}</p>
             </div>
           </ListCell>
           <ListCell>
-            <span class="text-base text-ink-gray-5">{{ shortDate(item.date) }}</span>
+            <span class="text-base text-ink-gray-5">{{ shortDate(item.placed_on) }}</span>
           </ListCell>
-          <ListCell><StatusBadge :status="item.payment" /></ListCell>
-          <ListCell><StatusBadge :status="item.fulfillment" /></ListCell>
           <ListCell>
-            <span class="text-base text-ink-gray-7 tabular-nums">{{ item.items.length }}</span>
+            <StatusBadge :status="item.payment_state.key" :label="item.payment_state.label" />
+          </ListCell>
+          <ListCell>
+            <StatusBadge :status="item.state.key" :label="item.state.label" />
+          </ListCell>
+          <ListCell>
+            <span class="text-base text-ink-gray-7 tabular-nums">{{ item.item_count }}</span>
           </ListCell>
           <ListCell>
             <span class="w-full text-right text-base text-ink-gray-8 tabular-nums">
@@ -162,14 +193,14 @@ function markFulfilled() {
     </div>
 
     <ListPagination
-      v-if="matches.length"
+      v-if="total"
       v-model:page="page"
       v-model:page-size="pageSize"
-      :total="matches.length"
+      :total="total"
     />
 
     <EmptyState
-      v-if="!rows.length"
+      v-if="!ordersRequest.loading && !rows.length"
       icon="lucide-shopping-bag"
       title="No orders here"
       description="Try a different filter or search term."
