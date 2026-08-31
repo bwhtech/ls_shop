@@ -3,7 +3,11 @@ import AppCommandPalette from "@/components/AppCommandPalette.vue"
 import { showPalette, showShortcuts } from "@/components/commandPalette"
 import { openSettings } from "@/components/settings"
 import AppSettingsDialog from "@/components/settings/AppSettingsDialog.vue"
-import { colorSchemeOptions, navSections } from "@/navigation"
+import {
+	type NavDestination,
+	colorSchemeOptions,
+	navSections,
+} from "@/navigation"
 import {
 	Button,
 	type ColorScheme,
@@ -18,6 +22,7 @@ import {
 	useColorScheme,
 } from "frappe-ui"
 import { computed, h } from "vue"
+import { useRoute, useRouter } from "vue-router"
 
 const store = useCall<Record<string, string>>({
 	url: "/api/v2/method/ls_shop.api.admin.settings.get_store_settings",
@@ -26,6 +31,19 @@ const store = useCall<Record<string, string>>({
 const storeName = computed(() => store.data?.store_name || "Your store")
 
 const { colorScheme, setColorScheme } = useColorScheme()
+
+const router = useRouter()
+const currentRoute = useRoute()
+
+// SidebarItem's own inference matches the route name exactly, which drops the
+// highlight on detail pages. Detail routes are nested under their section, so
+// the shared matched record keeps the section lit while drilled in.
+function isDestinationActive(destination: NavDestination) {
+	const sectionRecord = router.resolve({ name: destination.route }).matched[0]
+	return currentRoute.matched.some(
+		(record) => record.path === sectionRecord?.path,
+	)
+}
 
 function themeCheckmark(theme: ColorScheme) {
 	if (colorScheme.value !== theme) return null
@@ -92,6 +110,7 @@ const menuItems = computed(() => [
 									:to="{ name: destination.route }"
 									:icon="destination.icon"
 									:label="destination.label"
+									:active="isDestinationActive(destination)"
 								/>
 							</div>
 						</div>

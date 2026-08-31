@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
 
+// Detail pages are nested under their list route — with no component on the parent
+// the child renders alone, but `route.matched` still carries the section record so
+// the sidebar can keep that section highlighted while you are drilled into a detail.
 const routes = [
 	{ path: "/", redirect: "/store/home" },
 	{
@@ -9,13 +12,18 @@ const routes = [
 	},
 	{
 		path: "/store/products",
-		name: "Products",
-		component: () => import("@/pages/Products.vue"),
-	},
-	{
-		path: "/store/products/:name",
-		name: "Product",
-		component: () => import("@/pages/Product.vue"),
+		children: [
+			{
+				path: "",
+				name: "Products",
+				component: () => import("@/pages/Products.vue"),
+			},
+			{
+				path: ":name",
+				name: "Product",
+				component: () => import("@/pages/Product.vue"),
+			},
+		],
 	},
 	{
 		path: "/store/inventory",
@@ -24,13 +32,18 @@ const routes = [
 	},
 	{
 		path: "/store/orders",
-		name: "Orders",
-		component: () => import("@/pages/Orders.vue"),
-	},
-	{
-		path: "/store/orders/:name",
-		name: "Order",
-		component: () => import("@/pages/Order.vue"),
+		children: [
+			{
+				path: "",
+				name: "Orders",
+				component: () => import("@/pages/Orders.vue"),
+			},
+			{
+				path: ":name",
+				name: "Order",
+				component: () => import("@/pages/Order.vue"),
+			},
+		],
 	},
 	{
 		path: "/store/analytics",
