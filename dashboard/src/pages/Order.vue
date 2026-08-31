@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ErrorState from "@/components/ErrorState.vue"
 import OrderStateBadge from "@/components/OrderStateBadge.vue"
+import ScrollFade from "@/components/ScrollFade.vue"
 import AnalyticsPanel from "@/components/analytics/AnalyticsPanel.vue"
 import OrderProgress from "@/components/orders/OrderProgress.vue"
 import type { OrderProgressStep } from "@/components/orders/types"
@@ -135,71 +136,75 @@ function confirmFulfil() {
 
 				<section class="mt-6">
 					<h2 class="text-md text-ink-gray-9">Items</h2>
-					<List
-						class="mt-2 border-b border-outline-gray-1"
-						:columns="['minmax(0,1fr)', '4rem', '5rem', '6rem', '6rem']"
-					>
-						<ListHeader>
-							<ListHeaderCell>Product</ListHeaderCell>
-							<ListHeaderCell class="justify-end">Qty</ListHeaderCell>
-							<ListHeaderCell class="justify-end">Shipped</ListHeaderCell>
-							<ListHeaderCell class="justify-end">Rate</ListHeaderCell>
-							<ListHeaderCell class="justify-end">Amount</ListHeaderCell>
-						</ListHeader>
-						<ListRows
-							:items="order.data.items"
-							row-key="item_code"
-							v-slot="{ item }"
+					<!-- The recipe's mobile answer is to hide the numeric cells, but every column
+					here is money or fulfilment the shop owner needs; scroll them instead. -->
+					<ScrollFade orientation="horizontal" class="mt-2">
+						<List
+							class="min-w-[36rem] border-b border-outline-gray-1"
+							:columns="['minmax(8rem,1fr)', '4rem', '5rem', '6rem', '6rem']"
 						>
-							<ListRow class="py-2.5">
-								<ListCell>
-									<div class="flex min-w-0 items-center gap-2.5">
-										<img
-											v-if="item.image"
-											:src="item.image"
-											alt=""
-											class="size-8 shrink-0 rounded-4 object-cover"
-										/>
-										<div
-											v-else
-											class="grid size-8 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-xs text-ink-gray-4"
+							<ListHeader>
+								<ListHeaderCell>Product</ListHeaderCell>
+								<ListHeaderCell class="justify-end">Qty</ListHeaderCell>
+								<ListHeaderCell class="justify-end">Shipped</ListHeaderCell>
+								<ListHeaderCell class="justify-end">Rate</ListHeaderCell>
+								<ListHeaderCell class="justify-end">Amount</ListHeaderCell>
+							</ListHeader>
+							<ListRows
+								:items="order.data.items"
+								row-key="item_code"
+								v-slot="{ item }"
+							>
+								<ListRow class="py-2.5">
+									<ListCell>
+										<div class="flex min-w-0 items-center gap-2.5">
+											<img
+												v-if="item.image"
+												:src="item.image"
+												alt=""
+												class="size-8 shrink-0 rounded-4 object-cover"
+											/>
+											<div
+												v-else
+												class="grid size-8 shrink-0 place-items-center rounded-4 bg-surface-gray-2 text-xs text-ink-gray-4"
+											>
+												{{ item.title.slice(0, 1) }}
+											</div>
+											<div class="min-w-0">
+												<div class="truncate text-base text-ink-gray-9">
+													{{ item.title }}
+												</div>
+												<div v-if="item.size" class="text-xs text-ink-gray-5">
+													Size {{ item.size }}
+												</div>
+											</div>
+										</div>
+									</ListCell>
+									<ListCell class="justify-end">
+										<span class="text-base text-ink-gray-7">{{ item.qty }}</span>
+									</ListCell>
+									<ListCell class="justify-end">
+										<span
+											class="text-base"
+											:class="item.delivered_qty >= item.qty ? 'text-ink-green-6' : 'text-ink-gray-5'"
 										>
-											{{ item.title.slice(0, 1) }}
-										</div>
-										<div class="min-w-0">
-											<div class="truncate text-base text-ink-gray-9">
-												{{ item.title }}
-											</div>
-											<div v-if="item.size" class="text-xs text-ink-gray-5">
-												Size {{ item.size }}
-											</div>
-										</div>
-									</div>
-								</ListCell>
-								<ListCell class="justify-end">
-									<span class="text-base text-ink-gray-7">{{ item.qty }}</span>
-								</ListCell>
-								<ListCell class="justify-end">
-									<span
-										class="text-base"
-										:class="item.delivered_qty >= item.qty ? 'text-ink-green-6' : 'text-ink-gray-5'"
-									>
-										{{ item.delivered_qty }}
-									</span>
-								</ListCell>
-								<ListCell class="justify-end">
-									<span class="text-base text-ink-gray-7">
-										{{ formatMoney(item.rate, order.data.currency) }}
-									</span>
-								</ListCell>
-								<ListCell class="justify-end">
-									<span class="text-base text-ink-gray-9">
-										{{ formatMoney(item.amount, order.data.currency) }}
-									</span>
-								</ListCell>
-							</ListRow>
-						</ListRows>
-					</List>
+											{{ item.delivered_qty }}
+										</span>
+									</ListCell>
+									<ListCell class="justify-end">
+										<span class="text-base text-ink-gray-7">
+											{{ formatMoney(item.rate, order.data.currency) }}
+										</span>
+									</ListCell>
+									<ListCell class="justify-end">
+										<span class="text-base text-ink-gray-9">
+											{{ formatMoney(item.amount, order.data.currency) }}
+										</span>
+									</ListCell>
+								</ListRow>
+							</ListRows>
+						</List>
+					</ScrollFade>
 
 					<div class="mt-3 flex justify-end">
 						<dl class="w-64 space-y-1.5 text-base">
