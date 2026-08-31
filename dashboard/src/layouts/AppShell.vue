@@ -99,6 +99,20 @@ const menuItems = computed(() => [
 					:menu-items="menuItems"
 				/>
 
+				<div class="shrink-0 px-2 pb-2">
+					<Button
+						class="w-full !justify-start"
+						variant="ghost"
+						icon-left="lucide-search"
+						@click="showPalette = true"
+					>
+						<span class="flex-1 text-start">Search</span>
+						<template #suffix>
+							<KeyboardShortcut combo="Mod+K" bg />
+						</template>
+					</Button>
+				</div>
+
 				<ScrollArea class="min-h-0 flex-1" viewport-class="px-2 pb-6">
 					<nav aria-label="Main">
 						<div v-for="section in navSections" :key="section.label" class="mb-3">
@@ -116,20 +130,6 @@ const menuItems = computed(() => [
 						</div>
 					</nav>
 				</ScrollArea>
-
-				<div class="shrink-0 border-t border-outline-gray-1 p-2">
-					<Button
-						class="w-full !justify-start"
-						variant="ghost"
-						icon-left="lucide-search"
-						@click="showPalette = true"
-					>
-						<span class="flex-1 text-start">Search</span>
-						<template #suffix>
-							<KeyboardShortcut combo="Mod+K" bg />
-						</template>
-					</Button>
-				</div>
 			</Sidebar>
 		</template>
 
