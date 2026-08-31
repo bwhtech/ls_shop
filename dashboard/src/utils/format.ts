@@ -60,12 +60,17 @@ export function publishStatus(publishedCount: number, variantCount: number) {
 
 /**
  * Keyed by the stage key the API returns rather than its English label, so translation cannot break the mapping.
- * Badge ships six themes for nine stages, so the ladder is separated on the theme x variant grid.
+ * Badge ships six themes for ten stages, so the ladder is separated on the theme x variant grid.
  */
 const orderStateBadges: Record<
 	string,
 	{ theme: BadgeTheme; variant: BadgeVariant; icon: string }
 > = {
+	confirmation_pending: {
+		theme: "amber",
+		variant: "outline",
+		icon: "lucide-clock",
+	},
 	to_fulfil: { theme: "amber", variant: "subtle", icon: "lucide-inbox" },
 	delivery_note_drafted: {
 		theme: "gray",

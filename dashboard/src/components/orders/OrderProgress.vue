@@ -10,6 +10,11 @@ const stepColours: Record<
 	string,
 	{ node: string; ring: string; label: string }
 > = {
+	confirmation_pending: {
+		node: "bg-surface-amber-2 text-ink-amber-7",
+		ring: "ring-outline-amber-3",
+		label: "text-ink-amber-7",
+	},
 	to_fulfil: {
 		node: "bg-surface-amber-2 text-ink-amber-7",
 		ring: "ring-outline-amber-3",

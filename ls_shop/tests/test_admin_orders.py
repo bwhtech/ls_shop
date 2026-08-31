@@ -169,6 +169,16 @@ class TestFulfilmentLadder(UnitTestCase):
 		state = describe_state(make_order())
 		self.assertEqual(state["label"], STAGE_LABELS["to_fulfil"])
 
+	def test_an_unsubmitted_order_reads_as_awaiting_confirmation_not_as_draft(self):
+		state = describe_state(make_order(docstatus=0, status="Draft"))
+		self.assertEqual(state["key"], "confirmation_pending")
+		self.assertEqual(state["label"], STAGE_LABELS["confirmation_pending"])
+
+	def test_an_unsubmitted_order_stands_on_the_confirmation_node(self):
+		states = self.states(make_order(docstatus=0, status="Draft"))
+		self.assertEqual(states["confirmation_pending"], "current")
+		self.assertEqual(states["to_fulfil"], "upcoming")
+
 	def test_a_cancelled_order_outranks_every_other_rung(self):
 		lifecycle = frappe._dict(has_return=True, stage_from_shipment="delivered")
 		state = describe_state(make_order(docstatus=2, per_delivered=100), lifecycle)
@@ -254,7 +264,7 @@ class TestFulfilmentSteps(UnitTestCase):
 
 	def test_a_cancelled_order_ends_the_path_instead_of_leaving_it_half_walked(self):
 		steps = describe_progress(make_order(docstatus=2))
-		self.assertEqual([step["key"] for step in steps], ["to_fulfil", "cancelled"])
+		self.assertEqual([step["key"] for step in steps], ["confirmation_pending", "to_fulfil", "cancelled"])
 		self.assertEqual(steps[-1]["state"], "current")
 		self.assertNotIn("upcoming", [step["state"] for step in steps])
 
@@ -262,7 +272,7 @@ class TestFulfilmentSteps(UnitTestCase):
 		lifecycle = frappe._dict(has_packing_slip=True, has_draft_delivery_note=True)
 		self.assertEqual(
 			self.keys(make_order(docstatus=2), lifecycle),
-			["to_fulfil", "delivery_note_drafted", "packed", "cancelled"],
+			["confirmation_pending", "to_fulfil", "delivery_note_drafted", "packed", "cancelled"],
 		)
 
 	def test_a_returned_order_walked_as_far_as_dispatch_and_stops_there(self):
@@ -272,7 +282,14 @@ class TestFulfilmentSteps(UnitTestCase):
 		steps = describe_progress(make_order(), lifecycle)
 		self.assertEqual(
 			[step["key"] for step in steps],
-			["to_fulfil", "delivery_note_drafted", "packed", "shipped", "returned"],
+			[
+				"confirmation_pending",
+				"to_fulfil",
+				"delivery_note_drafted",
+				"packed",
+				"shipped",
+				"returned",
+			],
 		)
 		self.assertEqual(steps[-1]["state"], "current")
 		self.assertNotIn("delivered", [step["key"] for step in steps])

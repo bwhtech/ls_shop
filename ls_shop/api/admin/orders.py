@@ -32,16 +32,26 @@ STAGE_LABELS = {
 	"packed": "Packed",
 	"delivery_note_drafted": "Preparing for shipment",
 	"to_fulfil": "To fulfil",
+	# An unsubmitted order is waiting on the owner, which is what "Draft" failed to tell them.
+	"confirmation_pending": "Confirmation pending",
 }
 
 # Sequential timeline, unlike STAGE_LABELS above, which is a priority ordering.
-STEP_SEQUENCE = ("to_fulfil", "delivery_note_drafted", "packed", "shipped", "delivered")
+STEP_SEQUENCE = (
+	"confirmation_pending",
+	"to_fulfil",
+	"delivery_note_drafted",
+	"packed",
+	"shipped",
+	"delivered",
+)
 STEP_POSITIONS = {key: index for index, key in enumerate(STEP_SEQUENCE)}
 
 # Milestone wording, not badge wording; same keys as STAGE_LABELS.
 # Shop owners don't know what a Delivery Note is, so the wording stays plain even where the key isn't.
 STEP_LABELS = {
-	"to_fulfil": "Order placed",
+	"confirmation_pending": "Confirmation pending",
+	"to_fulfil": "Order confirmed",
 	"delivery_note_drafted": "Preparing",
 	"packed": "Packed",
 	"shipped": "Shipped",
@@ -241,6 +251,8 @@ def pick_stage(order, lifecycle) -> str:
 		return "packed"
 	if lifecycle.get("has_draft_delivery_note"):
 		return "delivery_note_drafted"
+	if cint(order.docstatus) == 0:
+		return "confirmation_pending"
 	if order.status in OPEN_STATUSES:
 		return "to_fulfil"
 	# On Hold, Closed and friends keep ERPNext's own word rather than a rung they never reached.
@@ -287,7 +299,8 @@ def build_step(key: str, state: str, timestamps: dict, note: str | None = None) 
 
 def furthest_step_reached(order, lifecycle) -> int:
 	"""How far along the sequence the paperwork proves this order got."""
-	reached = 0
+	# A submitted order has cleared confirmation, so its walk starts a rung above a draft's.
+	reached = 0 if cint(order.docstatus) == 0 else STEP_POSITIONS["to_fulfil"]
 	if lifecycle.get("has_draft_delivery_note") or lifecycle.get("delivery_notes"):
 		reached = STEP_POSITIONS["delivery_note_drafted"]
 	if lifecycle.get("has_packing_slip"):
@@ -306,7 +319,9 @@ def furthest_step_reached(order, lifecycle) -> int:
 def read_step_timestamps(order, lifecycle) -> dict:
 	"""When each node happened, from the documents the lifecycle reader already fetched."""
 	return {
-		"to_fulfil": order.transaction_date,
+		"confirmation_pending": order.get("creation"),
+		# A draft carries an order date already, but nothing has been confirmed on it yet.
+		"to_fulfil": order.transaction_date if cint(order.docstatus) else None,
 		"delivery_note_drafted": lifecycle.get("drafted_on"),
 		"packed": lifecycle.get("packed_on"),
 		"shipped": lifecycle.get("shipped_on") or lifecycle.get("dispatched_on"),
@@ -476,6 +491,7 @@ def get_order(sales_order: str):
 			"contact_email",
 			"contact_phone",
 			"transaction_date",
+			"creation",
 			"status",
 			"docstatus",
 			"currency",
