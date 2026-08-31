@@ -466,6 +466,9 @@ def _remove_coupon_code(quotation):
 
 
 def add_billing_address(party_name, address):
+	if not party_name:
+		frappe.throw(_("Cannot save an address without a customer"))
+
 	address_doc = frappe.get_doc(
 		{
 			"doctype": "Address",
@@ -481,11 +484,17 @@ def add_billing_address(party_name, address):
 			"first_name": address.get("billing_address", {}).get("first_name"),
 			"last_name": address.get("billing_address", {}).get("last_name"),
 		}
-	).insert(ignore_permissions=True)
+	)
+	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
+	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
+	address_doc.insert(ignore_permissions=True)
 	return address_doc
 
 
 def add_shipping_address(party_name, address):
+	if not party_name:
+		frappe.throw(_("Cannot save an address without a customer"))
+
 	address_doc = frappe.get_doc(
 		{
 			"doctype": "Address",
@@ -501,7 +510,10 @@ def add_shipping_address(party_name, address):
 			"first_name": address.get("shipping_address", {}).get("first_name"),
 			"last_name": address.get("shipping_address", {}).get("last_name"),
 		}
-	).insert(ignore_permissions=True)
+	)
+	# ERPNext resolves a transaction address through Dynamic Link; unlinked addresses are refused.
+	address_doc.append("links", {"link_doctype": "Customer", "link_name": party_name})
+	address_doc.insert(ignore_permissions=True)
 	return address_doc
 
 
