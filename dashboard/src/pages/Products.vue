@@ -13,6 +13,7 @@ import { useAdminRead, useAdminAction } from '../data/api'
 import { priceRange, shortDate, stockTone } from '../data/format'
 import { ia } from '../ia/store'
 import { openImport } from '../data/importFlow'
+import { openAddProduct } from '../data/addProduct'
 
 const STATUS_TABS = [
   { label: 'All', value: 'all' },
@@ -96,7 +97,7 @@ function toggleSort(key) {
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
 
 const addOptions = [
-  { label: 'Add product', icon: 'lucide-plus', onClick: () => toast.info('Add product form is coming soon') },
+  { label: 'Add product', icon: 'lucide-plus', onClick: openAddProduct },
   { label: 'Import from CSV', icon: 'lucide-upload', onClick: openImport },
 ]
 

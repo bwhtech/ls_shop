@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Badge, Button, Dialog } from 'frappe-ui'
-import { STEPS, closeImport, counts, imp } from '../../data/importFlow'
+import { REQUIRED_FIELDS, STEPS, closeImport, imp } from '../../data/importFlow'
 import ImportStepNav from './ImportStepNav.vue'
 import SourceStep from './steps/SourceStep.vue'
 import UploadStep from './steps/UploadStep.vue'
@@ -13,16 +13,15 @@ import RunStep from './steps/RunStep.vue'
 const stepComponents = [SourceStep, UploadStep, MapStep, ImagesStep, ReviewStep, RunStep]
 const current = computed(() => stepComponents[imp.step])
 
-const required = ['item_name', 'item_code', 'price']
 const canContinue = computed(() => {
   if (imp.step === 1) return imp.parsed
-  if (imp.step === 2) return required.every((f) => Object.values(imp.mapping).includes(f))
+  if (imp.step === 2) return REQUIRED_FIELDS.every((f) => Object.values(imp.mapping).includes(f))
   return true
 })
 
 const nextLabel = computed(() => {
   if (imp.step === 3) return imp.imagesDone || imp.imagesMode !== 'bulk' ? 'Continue' : 'Skip photos for now'
-  if (imp.step === 4) return `Import ${counts.ready} products`
+  if (imp.step === 4) return `Import ${imp.counts.ready} product${imp.counts.ready === 1 ? '' : 's'}`
   return 'Continue'
 })
 

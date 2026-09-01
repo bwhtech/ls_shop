@@ -1,20 +1,19 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge, Button, TabButtons, Tooltip } from 'frappe-ui'
+import { Badge, Tooltip } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
-import { IMPORT_ROWS, TOTAL_ROWS, counts, imp } from '../../../data/importFlow'
+import { TabButtons } from 'frappe-ui'
+import { imp } from '../../../data/importFlow'
 import { money } from '../../../data/format'
 import ProductThumb from '../ProductThumb.vue'
 import CoachTip from '../CoachTip.vue'
 
 const filtered = computed(() => {
-  if (imp.reviewFilter === 'errors') return IMPORT_ROWS.filter((r) => r.issue?.level === 'error')
-  if (imp.reviewFilter === 'warnings') return IMPORT_ROWS.filter((r) => r.issue?.level === 'warning')
-  if (imp.reviewFilter === 'ready') return IMPORT_ROWS.filter((r) => !r.issue)
-  return IMPORT_ROWS
+  if (imp.reviewFilter === 'errors') return imp.rows.filter((r) => r.issue?.level === 'error')
+  if (imp.reviewFilter === 'warnings') return imp.rows.filter((r) => r.issue?.level === 'warning')
+  if (imp.reviewFilter === 'ready') return imp.rows.filter((r) => !r.issue)
+  return imp.rows
 })
-
-const newGroups = ['Footwear', 'Sweatshirts']
 </script>
 
 <template>
@@ -22,26 +21,26 @@ const newGroups = ['Footwear', 'Sweatshirts']
     <div>
       <h2 class="text-xl text-ink-gray-9">Check before it goes live</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
-        Nothing has been saved yet. Rows with an error are left out; everything else imports.
+        Nothing has been saved yet. Rows with an error are left out entirely; everything else imports.
       </p>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-4">
       <div class="rounded-5 border border-outline-gray-1 p-4">
-        <div class="text-2xl text-ink-gray-9 tabular-nums">{{ counts.ready }}</div>
+        <div class="text-2xl text-ink-gray-9 tabular-nums">{{ imp.counts.ready }}</div>
         <div class="mt-0.5 text-sm text-ink-gray-5">ready to import</div>
       </div>
       <div class="rounded-5 border border-outline-gray-1 p-4">
-        <div class="text-2xl text-ink-amber-7 tabular-nums">{{ counts.warnings }}</div>
+        <div class="text-2xl text-ink-amber-7 tabular-nums">{{ imp.counts.warnings }}</div>
         <div class="mt-0.5 text-sm text-ink-gray-5">warnings, still imported</div>
       </div>
       <div class="rounded-5 border border-outline-gray-1 p-4">
-        <div class="text-2xl text-ink-red-6 tabular-nums">{{ counts.errors }}</div>
+        <div class="text-2xl text-ink-red-6 tabular-nums">{{ imp.counts.errors }}</div>
         <div class="mt-0.5 text-sm text-ink-gray-5">errors, skipped</div>
       </div>
       <div class="rounded-5 border border-outline-gray-1 p-4">
-        <div class="text-2xl text-ink-gray-9 tabular-nums">{{ newGroups.length }}</div>
-        <div class="mt-0.5 text-sm text-ink-gray-5">new categories created</div>
+        <div class="text-2xl text-ink-gray-9 tabular-nums">{{ imp.counts.products }}</div>
+        <div class="mt-0.5 text-sm text-ink-gray-5">products</div>
       </div>
     </div>
 
@@ -55,13 +54,6 @@ const newGroups = ['Footwear', 'Sweatshirts']
           { label: 'Errors', value: 'errors' },
         ]"
       />
-      <Tooltip text="Categories that do not exist yet are created for you">
-        <div class="flex items-center gap-1.5">
-          <span class="text-sm text-ink-gray-5">New categories:</span>
-          <Badge v-for="g in newGroups" :key="g" :label="g" theme="blue" variant="subtle" />
-        </div>
-      </Tooltip>
-      <Button class="ml-auto" variant="subtle" icon-left="lucide-download" label="Download error rows" />
     </div>
 
     <div class="overflow-hidden rounded-5 border border-outline-gray-1">
@@ -73,33 +65,33 @@ const newGroups = ['Footwear', 'Sweatshirts']
         >
           <ListHeader>
             <ListHeaderCell>Product</ListHeaderCell>
-            <ListHeaderCell>Category</ListHeaderCell>
+            <ListHeaderCell>Collection</ListHeaderCell>
             <ListHeaderCell>Price</ListHeaderCell>
             <ListHeaderCell>Stock</ListHeaderCell>
             <ListHeaderCell>Status</ListHeaderCell>
           </ListHeader>
-          <ListRows :items="filtered" row-key="sku" v-slot="{ item }">
-            <ListRow :value="item.sku">
+          <ListRows :items="filtered" row-key="row" v-slot="{ item }">
+            <ListRow :value="String(item.row)">
               <ListCell>
                 <div class="flex min-w-0 items-center gap-2.5">
-                  <ProductThumb
-                    :seed="item.sku"
-                    :icon="item.icon"
-                    size="size-8"
-                    icon-size="size-3.5"
-                    :empty="item.images === 0"
-                  />
+                  <ProductThumb :seed="`${item.title}-${item.color}`" size="size-8" icon-size="size-3.5" empty />
                   <div class="min-w-0">
-                    <div class="truncate text-base text-ink-gray-8">{{ item.name }}</div>
-                    <div class="truncate text-sm text-ink-gray-5">{{ item.variant }} · {{ item.sku }}</div>
+                    <div class="truncate text-base text-ink-gray-8">{{ item.title || '—' }}</div>
+                    <div class="truncate text-sm text-ink-gray-5">
+                      {{ [item.color, item.size].filter(Boolean).join(' / ') || '—' }} · row {{ item.row }}
+                    </div>
                   </div>
                 </div>
               </ListCell>
-              <ListCell><span class="truncate text-sm text-ink-gray-7">{{ item.group }}</span></ListCell>
-              <ListCell><span class="text-sm text-ink-gray-7 tabular-nums">{{ money(item.price) }}</span></ListCell>
+              <ListCell><span class="truncate text-sm text-ink-gray-7">{{ item.collection || '—' }}</span></ListCell>
+              <ListCell>
+                <span class="text-sm text-ink-gray-7 tabular-nums">
+                  {{ item.sale_price || item.compare_at_price ? money(item.sale_price || item.compare_at_price) : '—' }}
+                </span>
+              </ListCell>
               <ListCell>
                 <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-4'">
-                  {{ item.stock }}
+                  {{ item.stock || 0 }}
                 </span>
               </ListCell>
               <ListCell>
@@ -129,14 +121,14 @@ const newGroups = ['Footwear', 'Sweatshirts']
       </div>
 
       <div v-else class="border-t border-outline-gray-1 bg-surface-gray-1 px-4 py-2.5 text-sm text-ink-gray-5">
-        Showing {{ filtered.length }} of {{ TOTAL_ROWS }} rows
+        Showing {{ filtered.length }} of {{ imp.counts.total }} rows
       </div>
     </div>
 
     <CoachTip
       icon="lucide-shield-check"
       title="Errors do not stop the import"
-      text="Every other row goes in, and you get a small file of just the failed rows to fix and upload again."
+      text="Every other row goes in — the row with the problem is simply left out, and none of its data is written."
     />
   </div>
 </template>

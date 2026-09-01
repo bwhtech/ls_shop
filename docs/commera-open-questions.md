@@ -147,3 +147,81 @@ about whether staff-initiated cancellation should behave identically. Three ways
   needs the Refund bug fixed before "cancel now, refund later" is a complete story.
 - **Leave cancellation to the ERP Desk.** "View in ERP" already exists on this screen. Lowest-risk,
   but it sends the owner out of the tool this section is meant to keep them inside.
+
+## Section 7 — Home, search, analytics
+
+**Dashboard's "Needs attention" dropped a row rather than fabricate one.** The old mock's fourth
+item ("N payments pending — Bank transfer not yet reconciled") has no real counterpart:
+`orders.describe_payment_state` reports every COD order — this shop's entire seeded book — as
+"pending" until the courier collects cash at the door, so a live count would just read "how many
+COD orders exist", not something actionable. Left out rather than wired to a number that would
+always be large and never mean anything. The remaining three rows (orders to fulfil, low stock,
+products needing attention before they publish) come straight off `orders.get_overview`.
+
+**Inventory report's "Stock value over time" is a modelled trend, not a ledger read.** Real per-day
+value would need `Stock Ledger Entry.stock_value` (ERPNext's landed-cost valuation) walked per item
+per day — expensive and, worse, it prices the shelf in cost terms, whereas the mock (and this
+report) prices it in today's selling price, which is what an owner reading "what my shelves are
+worth to sell" expects. `get_inventory_report` instead reuses `analytics_dashboard.get_stock_movement`'s
+existing day-by-day on-hand walk for the warehouse total and multiplies by today's blended average
+selling price. Because this shop's stock was seeded as a single Stock Reconciliation dated at seed
+time, the walk-back drifts negative for months before that point — clamped to zero rather than
+shown as negative inventory (`ls_shop/api/admin/analytics.py`, `get_inventory_report`).
+
+**Storefront report's "Search terms" table is an honest empty state.** `Storefront Analytics Event`
+carries no search-term field at all (`event`, `session_id`, `device`, `item_code`, `path`, `utm_*`
+only — checked the doctype). There is nothing to report, so the section stays in the frozen layout
+with a stated "not tracked yet" note and an empty list, rather than the old mock's fabricated terms.
+Search tracking would need a new event type and a frontend emitter — out of scope here.
+
+**Storefront report's "Top pages" repurposes `analytics_dashboard.get_landing_pages`.** That
+function counts landing sessions per page (first page_view of a session), not a raw page-view
+count — the doctype has no per-view aggregate endpoint of its own. Labelled "Landing sessions per
+page" in the UI rather than silently presenting it as "views" so the number means what it says.
+
+**`catalog.get_recent_product_sales` (used by `ProductDetail.vue`, section 6) still filters
+`docstatus == 1`** — the exact draft-COD trap this brief warns about, on a screen outside this
+section's scope. Every seeded order is docstatus 0, so a product's "recent sales" panel on its own
+detail page currently reads zero units/revenue for the trailing 30 days even for a genuine
+bestseller. Not touched here since `ProductDetail.vue` and `catalog.py`'s existing call sites belong
+to section 6 and to the agent currently owning `ProductTypes.vue`/import-flow work in this catalog
+file; flagging so it isn't re-discovered as a new bug later.
+
+## Add product + bulk import — this commit
+
+**`AddProductDialog.vue` did not exist.** The brief for this session pointed at it as an already-built
+prototype to wire, but no such file was in the tree — only the "Add product" dropdown item with a
+`toast.info` placeholder. Built new, matching the existing dialog conventions (`VariantDialog.vue`'s
+`Dialog` + `FormControl` + section layout, `Attributes.vue`'s `dialog.prompt` for inline "New
+collection") rather than inventing a different pattern. It is a single-screen form, not a wizard —
+title, collection, one option attribute + its values, sizes (shared across every option, not a
+per-option matrix), price/compare-at. Flag if a per-color size matrix or multi-step flow was actually
+expected; this is the simplest shape that still drives `catalog.create_product` end to end.
+
+**Abbreviations are not exposed in the Add Product UI.** `create_product` now accepts optional
+`option_abbreviations`/`size_abbreviations` overrides (checked by `check_abbreviations_are_distinct`)
+so the collision guard is reachable during product creation, not just from the Attributes screen's
+`add_attribute_value`. But the dialog never shows a shop owner an "abbreviation" — Shopify doesn't
+either, and every other SKU-shaped concept in this app is already read-only for the same reason. The
+capability exists for a future bulk-import "variant code" column, and for the verification in this
+session's own report; nothing in the frozen UI currently sends it.
+
+**Bulk import's Review step lost its "Download error rows" button.** The original prototype had one;
+building a real download-my-failed-rows-as-a-file endpoint was not part of this session's brief
+(which asked for per-row errors on screen, not a re-downloadable error file), and a fake button would
+have been worse than none. The Run step's finished screen shows the same row/message list instead.
+Worth adding if the owner wants to fix-and-re-upload rather than fix-and-retype.
+
+**The Images step (bulk photo matching) is still fully simulated**, per the existing "zip-based bulk
+photo import" inert-control note above — its placeholder rows now come from the real uploaded file
+instead of a fixed fixture, but drag-a-folder / URL-column / one-by-one matching still fake their
+numbers. Out of scope for this session; the real ask (template + working import) does not need it.
+
+**The import template's Collection example is whatever non-group `Item Group` exists first**
+(`Apparel` on this seed — the same unfiltered set `catalog.get_collections` already offers, not a
+stricter leaf-only list), not a fixed name — `create_product` refuses a collection that does not
+already exist,
+so a hardcoded example name would 404 on a fresh store with different collections. The importer
+itself does not auto-create collections for the same reason: an unapproved "create categories on
+import" decision was not made here, matching how `create_product` already behaves for the single-add
+dialog.

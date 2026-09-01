@@ -7,6 +7,7 @@ import logoUrl from '../assets/commera.svg'
 import AppSettingsDialog from './settings/AppSettingsDialog.vue'
 import SearchPalette from './SearchPalette.vue'
 import ImportDialog from './import/ImportDialog.vue'
+import AddProductDialog from './AddProductDialog.vue'
 import { openSettings } from '../ia/settings'
 import NavSection from './NavSection.vue'
 
@@ -51,4 +52,5 @@ const headerMenu = [
   <AppSettingsDialog />
   <SearchPalette />
   <ImportDialog />
+  <AddProductDialog />
 </template>

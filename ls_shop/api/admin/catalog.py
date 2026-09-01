@@ -4,7 +4,8 @@
 import frappe
 from erpnext.controllers.item_variant import create_variant
 from frappe import _
-from frappe.query_builder.functions import Count
+from frappe.query_builder import Order
+from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, get_url, nowdate
 from frappe.utils.data import cint, cstr, flt
 
@@ -461,6 +462,133 @@ def get_recent_product_sales(item_codes, window_days: int = 30):
 		"order_count": len({row.name for row in rows}),
 		"revenue": sum(flt(row.amount) for row in rows),
 	}
+
+
+TOP_PRODUCTS_LIMIT = 4
+
+
+@frappe.whitelist()
+def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
+	"""Home screen bestsellers, one row per product template. A Sales Order Item's item_code is a
+	single size, so this walks size -> Style Attribute Variant -> Style Attribute Configurator to
+	get back to the template every size belongs to, and sums in SQL from there - the whole join
+	and aggregation is one query regardless of how many orders or sizes exist.
+
+	Drafts count, same as orders.get_overview/is_webshop_order: this site's entire seeded order
+	book is a draft COD order, and excluding drafts would read every bestseller as zero.
+	"""
+	frappe.has_permission("Item", ptype="read", throw=True)
+
+	# Delayed import: orders.py imports this module at import time, so a module-level import here
+	# would cycle - same guard get_products() above already uses for get_reporting_currency.
+	from ls_shop.api.admin.orders import get_reporting_currency, is_webshop_order
+
+	sales_order = frappe.qb.DocType("Sales Order")
+	sales_order_item = frappe.qb.DocType("Sales Order Item")
+	color_size_item = frappe.qb.DocType("Color Size Item")
+	variant = frappe.qb.DocType("Style Attribute Variant")
+	configurator = frappe.qb.DocType("Style Attribute Configurator")
+	revenue = Sum(sales_order_item.base_amount)
+
+	rows = (
+		frappe.qb.from_(sales_order_item)
+		.join(sales_order)
+		.on(sales_order.name == sales_order_item.parent)
+		.join(color_size_item)
+		.on(
+			(color_size_item.item_code == sales_order_item.item_code)
+			& (color_size_item.parenttype == "Style Attribute Variant")
+		)
+		.join(variant)
+		.on(variant.name == color_size_item.parent)
+		.join(configurator)
+		.on(configurator.name == variant.configurator)
+		.select(configurator.item_template, Sum(sales_order_item.qty), revenue)
+		.where(is_webshop_order(sales_order))
+		.groupby(configurator.item_template)
+		.orderby(revenue, order=Order.desc)
+		.limit(cint(limit) or TOP_PRODUCTS_LIMIT)
+		.run()
+	)
+	currency = get_reporting_currency()
+	if not rows:
+		return {"products": [], "currency": currency}
+
+	templates = [row[0] for row in rows]
+	items_by_name = {
+		row.name: row
+		for row in frappe.get_all("Item", filters={"name": ["in", templates]}, fields=["name", "item_name", "image"])
+	}
+
+	configurators = frappe.get_all(
+		"Style Attribute Configurator", filters={"item_template": ["in", templates]}, fields=["name", "item_template"]
+	)
+	template_by_configurator = {row.name: row.item_template for row in configurators}
+	template_variants = (
+		frappe.get_all(
+			"Style Attribute Variant",
+			filters={"configurator": ["in", list(template_by_configurator)]},
+			fields=["name", "configurator"],
+		)
+		if configurators
+		else []
+	)
+	template_by_variant = {row.name: template_by_configurator.get(row.configurator) for row in template_variants}
+	sizes = (
+		frappe.get_all(
+			"Color Size Item",
+			filters={"parent": ["in", list(template_by_variant)], "parenttype": "Style Attribute Variant"},
+			fields=["parent", "item_code"],
+		)
+		if template_by_variant
+		else []
+	)
+	item_codes_by_template = {}
+	for row in sizes:
+		template = template_by_variant.get(row.parent)
+		if template and row.item_code:
+			item_codes_by_template.setdefault(template, []).append(row.item_code)
+	all_item_codes = [code for codes in item_codes_by_template.values() for code in codes]
+	stock_by_item_code = get_ecommerce_stock(all_item_codes)
+
+	return {
+		"products": [
+			{
+				"name": row[0],
+				"title": items_by_name.get(row[0], {}).get("item_name") or row[0],
+				"image": items_by_name.get(row[0], {}).get("image"),
+				"units": cint(row[1]),
+				"revenue": flt(row[2]),
+				"stock": sum(stock_by_item_code.get(code, 0) for code in item_codes_by_template.get(row[0], [])),
+			}
+			for row in rows
+		],
+		"currency": currency,
+	}
+
+
+def get_item_templates_by_item_code(item_codes):
+	"""One batched hop from a sellable size (Sales Order Item.item_code / Bin.item_code) up to the
+	product template it belongs to - the same size -> variant -> configurator join get_top_products
+	does inline, exposed here so the analytics report can reuse it instead of re-deriving the join."""
+	if not item_codes:
+		return {}
+
+	color_size_item = frappe.qb.DocType("Color Size Item")
+	variant = frappe.qb.DocType("Style Attribute Variant")
+	configurator = frappe.qb.DocType("Style Attribute Configurator")
+	rows = (
+		frappe.qb.from_(color_size_item)
+		.join(variant)
+		.on(variant.name == color_size_item.parent)
+		.join(configurator)
+		.on(configurator.name == variant.configurator)
+		.select(color_size_item.item_code, configurator.item_template)
+		.where(color_size_item.parenttype == "Style Attribute Variant")
+		.where(color_size_item.item_code.isin(item_codes))
+		.run()
+	)
+	return {row[0]: row[1] for row in rows}
 
 
 def get_publish_blockers(images, sizes):

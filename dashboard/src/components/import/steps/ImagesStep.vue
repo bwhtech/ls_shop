@@ -1,9 +1,27 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast } from 'frappe-ui'
-import { IMPORT_ROWS, delay, imp } from '../../../data/importFlow'
+import { imp } from '../../../data/importFlow'
 import ProductThumb from '../ProductThumb.vue'
 import CoachTip from '../CoachTip.vue'
+
+const delay = (ms) => ms
+
+// Bulk photo matching (a zip of files matched to a SKU, or a URL column fetched server-side) has
+// no backend behind it yet — documented as deliberately inert in docs/commera-open-questions.md,
+// the same way the rest of this step already was. What changed is only where its placeholder rows
+// come from: the real title/colour/size read off the uploaded file, instead of a fixed fixture.
+const IMPORT_ROWS = computed(() =>
+  imp.rows
+    .filter((row) => !row.issue || row.issue.level === 'warning')
+    .map((row) => ({
+      sku: `${row.title}-${row.color}-${row.size}`,
+      name: row.title,
+      variant: [row.color, row.size].filter(Boolean).join(' / '),
+      icon: 'lucide-shirt',
+      images: 0,
+    })),
+)
 
 const uploading = ref(false)
 const pct = ref(0)
@@ -13,7 +31,7 @@ const UNMATCHED = ['IMG_4471.jpg', 'IMG_4472.jpg', 'shoot-final-v2.png', 'socks 
 const assign = ref({})
 const productOptions = computed(() => [
   { label: 'Leave unmatched', value: '' },
-  ...IMPORT_ROWS.map((p) => ({ label: `${p.name} — ${p.variant}`, value: p.sku })),
+  ...IMPORT_ROWS.value.map((p) => ({ label: `${p.name} — ${p.variant}`, value: p.sku })),
 ])
 
 function upload() {
@@ -33,7 +51,7 @@ function upload() {
 }
 
 const urlRows = computed(() =>
-  IMPORT_ROWS.map((p, i) => ({
+  IMPORT_ROWS.value.map((p, i) => ({
     ...p,
     url: `https://cdn.kirana.co/catalog/${p.sku.toLowerCase()}-1.jpg`,
     ok: !(i === 3 || i === 8 || i === 12),
@@ -41,7 +59,7 @@ const urlRows = computed(() =>
 )
 const broken = computed(() => urlRows.value.filter((r) => !r.ok).length)
 
-const perProduct = ref(IMPORT_ROWS.slice(0, 6).map((p) => ({ ...p, uploaded: p.images > 0 })))
+const perProduct = ref(IMPORT_ROWS.value.slice(0, 6).map((p) => ({ ...p, uploaded: p.images > 0 })))
 const perDone = computed(() => perProduct.value.filter((p) => p.uploaded).length)
 </script>
 
