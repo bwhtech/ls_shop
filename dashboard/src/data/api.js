@@ -5,7 +5,10 @@
 import { toast, useCall } from 'frappe-ui'
 import { errorMessage } from './errors'
 
-const ADMIN_MODULE_PREFIX = 'ls_shop.api.admin.'
+// useCall fetches `baseUrl + url` verbatim — it does NOT prepend /api/method/. Without the
+// absolute prefix the browser resolves the dotted path against the current page, the SPA
+// catch-all route serves the shell back, and every screen dies on `Unexpected token '<'`.
+const ADMIN_MODULE_PREFIX = '/api/method/ls_shop.api.admin.'
 
 // A GET read. Every list/detail screen fetches the same way, and a failure
 // surfaces the same way — as a toast, not a silently empty screen.
