@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AddProductDialog: typeof import('./src/components/AddProductDialog.vue')['default']
     AppPageHeader: typeof import('./src/components/AppPageHeader.vue')['default']
     AppSettingsDialog: typeof import('./src/components/settings/AppSettingsDialog.vue')['default']
     AppShell: typeof import('./src/components/AppShell.vue')['default']

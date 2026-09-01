@@ -873,21 +873,42 @@ def create_product(
 	option_sizes: list | str,
 	price=None,
 	sale_price=None,
+	option_abbreviations: dict | str | None = None,
+	size_abbreviations: dict | str | None = None,
 ):
 	"""Create a sellable product. Company, warehouse, price list, UOM and naming series
-	come from Lifestyle Settings."""
+	come from Lifestyle Settings.
+
+	option_abbreviations/size_abbreviations are optional {value: abbreviation} overrides for any
+	value that does not exist on the attribute yet — omit a value and one is auto-generated
+	(see add_missing_attribute_values), which by construction cannot collide. An explicit override
+	can collide, and is refused up front by check_abbreviations_are_distinct rather than left to
+	surface later as a DuplicateEntryError from the variant insert.
+	"""
 	frappe.has_permission("Item", ptype="create", throw=True)
 
 	title = cstr(title).strip()
 	if not title:
 		frappe.throw(_("Enter a product title"))
 
+	# generate_variants() lowercases the attribute name into a "Color Size Item" fieldname — any
+	# other spelling (e.g. this store's own decoy "Colour" attribute) fails deep inside variant
+	# generation with "Value missing for: Size", far from the create call that caused it.
+	if cstr(size_attribute) != "Size":
+		frappe.throw(_('The size option must use the attribute named exactly "Size" — {0} will not work.').format(size_attribute))
+
 	option_sizes = parse_option_sizes(option_sizes)
 
 	if not frappe.db.exists("Item Group", collection):
 		frappe.throw(_("Collection {0} does not exist. Create it first.").format(collection))
 
-	option_sizes = resolve_option_sizes(option_attribute, size_attribute, option_sizes)
+	option_sizes = resolve_option_sizes(
+		option_attribute,
+		size_attribute,
+		option_sizes,
+		option_abbreviations=frappe.parse_json(option_abbreviations) if isinstance(option_abbreviations, str) else option_abbreviations,
+		size_abbreviations=frappe.parse_json(size_abbreviations) if isinstance(size_abbreviations, str) else size_abbreviations,
+	)
 
 	item_template = frappe.new_doc("Item")
 	item_template.item_code = title
@@ -951,7 +972,13 @@ def parse_option_sizes(option_sizes: list | str):
 	return list(merged.values())
 
 
-def resolve_option_sizes(option_attribute: str, size_attribute: str, option_sizes: list):
+def resolve_option_sizes(
+	option_attribute: str,
+	size_attribute: str,
+	option_sizes: list,
+	option_abbreviations: dict | None = None,
+	size_abbreviations: dict | None = None,
+):
 	"""Swap what the owner typed for the spelling the Item Attribute already holds."""
 	typed_options = [option for option, _sizes in option_sizes]
 	typed_sizes = []
@@ -962,8 +989,8 @@ def resolve_option_sizes(option_attribute: str, size_attribute: str, option_size
 				typed_sizes.append(size)
 				taken.add(size.casefold())
 
-	canonical_options = add_missing_attribute_values(option_attribute, typed_options)
-	canonical_sizes = add_missing_attribute_values(size_attribute, typed_sizes)
+	canonical_options = add_missing_attribute_values(option_attribute, typed_options, option_abbreviations)
+	canonical_sizes = add_missing_attribute_values(size_attribute, typed_sizes, size_abbreviations)
 	size_by_typed = dict(zip(typed_sizes, canonical_sizes, strict=True))
 
 	return [
@@ -972,11 +999,17 @@ def resolve_option_sizes(option_attribute: str, size_attribute: str, option_size
 	]
 
 
-def add_missing_attribute_values(attribute: str, values: list):
+def add_missing_attribute_values(attribute: str, values: list, abbreviations: dict | None = None):
 	"""Let the owner type a new colour without visiting the Item Attribute form.
 
 	ERPNext compares attribute values case-insensitively, so "red" beside "Red" appends a duplicate.
+
+	abbreviations is an optional {value: abbreviation} override. Left unset, an abbreviation is
+	auto-generated against every abbreviation already taken (including ones added earlier in this
+	same call) and so cannot collide. An explicit override skips generation and is instead refused
+	up front by check_abbreviations_are_distinct if it collides.
 	"""
+	abbreviations = abbreviations or {}
 	attribute_doc = frappe.get_doc("Item Attribute", attribute)
 	canonical_by_key = {
 		cstr(row.attribute_value).casefold(): cstr(row.attribute_value)
@@ -992,7 +1025,13 @@ def add_missing_attribute_values(attribute: str, values: list):
 			resolved.append(canonical)
 			continue
 
-		abbreviation = make_unique_abbreviation(value, taken)
+		explicit_abbreviation = abbreviations.get(value)
+		if explicit_abbreviation:
+			abbreviation = cstr(explicit_abbreviation).strip().upper()
+			check_abbreviations_are_distinct(attribute_doc, abbreviation)
+		else:
+			abbreviation = make_unique_abbreviation(value, taken)
+
 		taken.add(abbreviation.casefold())
 		canonical_by_key[cstr(value).casefold()] = value
 		attribute_doc.append("item_attribute_values", {"attribute_value": value, "abbr": abbreviation})
