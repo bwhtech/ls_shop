@@ -11,8 +11,8 @@ import {
   CommandPaletteItem,
   CommandPaletteList,
 } from 'frappe-ui/experimental'
-import { collections, customers, orders, products } from '../data/mock'
-import { money } from '../data/format'
+import { useAdminRead } from '../data/api'
+import { money, priceRange } from '../data/format'
 import { openSettings } from '../ia/settings'
 import { search } from '../ia/search'
 import { openImport } from '../data/importFlow'
@@ -29,29 +29,40 @@ useKeyboardShortcut({
   allowInInput: true,
 })
 
-const needle = computed(() => query.value.trim().toLowerCase())
+const needle = computed(() => query.value.trim())
+
+// `immediate: false` keeps this idle on mount — the palette is always in the DOM behind ⌘K, so an
+// eager fetch would hit the backend on every page load before anyone has typed anything.
+// `refetch: true` re-runs the call whenever `needle` changes the request's params, which is the
+// only trigger this needs — no debounce here, matching how every other search box in this app
+// (Products.vue, Customers.vue) fires on each keystroke.
+const productsRequest = useAdminRead('catalog.get_products', {
+  params: () => ({ search: needle.value || undefined, page_length: LIMIT }),
+  immediate: false,
+  refetch: true,
+})
+const ordersRequest = useAdminRead('orders.get_orders', {
+  params: () => ({ search: needle.value || undefined, page_length: LIMIT }),
+  immediate: false,
+  refetch: true,
+})
+const customersRequest = useAdminRead('customers.get_customers', {
+  params: () => ({ search: needle.value || undefined, page_length: LIMIT }),
+  immediate: false,
+  refetch: true,
+})
+const collectionsRequest = useAdminRead('catalog.list_collections', {
+  params: () => ({ search: needle.value || undefined, page_length: LIMIT }),
+  immediate: false,
+  refetch: true,
+})
 
 // Records only appear once there is something to match; with an empty query the
 // palette is a short list of what you most likely came for.
-function match(haystack) {
-  return needle.value && haystack.some((text) => String(text ?? '').toLowerCase().includes(needle.value))
-}
-
-const productHits = computed(() =>
-  needle.value ? products.filter((p) => match([p.title, p.sku, p.vendor])).slice(0, LIMIT) : [],
-)
-
-const orderHits = computed(() =>
-  needle.value ? orders.filter((o) => match([o.id, o.customer, o.email])).slice(0, LIMIT) : [],
-)
-
-const customerHits = computed(() =>
-  needle.value ? customers.filter((c) => match([c.name, c.email, c.city])).slice(0, LIMIT) : [],
-)
-
-const collectionHits = computed(() =>
-  needle.value ? collections.filter((c) => match([c.title])).slice(0, LIMIT) : [],
-)
+const productHits = computed(() => (needle.value ? (productsRequest.data?.products ?? []) : []))
+const orderHits = computed(() => (needle.value ? (ordersRequest.data?.orders ?? []) : []))
+const customerHits = computed(() => (needle.value ? (customersRequest.data?.customers ?? []) : []))
+const collectionHits = computed(() => (needle.value ? (collectionsRequest.data?.collections ?? []) : []))
 
 // Everything reachable by keyboard, including the screens the sidebar does not
 // list — stock, prices and product types are reached from the catalogue, but
@@ -108,6 +119,10 @@ const commandGroups = computed(() => {
   })).filter((group) => group.commands.length)
 })
 
+// Every id here is a real record name straight off the admin API (catalog.get_products'
+// item_template, orders.get_orders' Sales Order name, customers.get_customers' Customer name) —
+// the same class of link the Dashboard's recent-orders/top-products rows needed fixing for, since
+// this palette is reachable from every screen at all times.
 function onSelect(value) {
   if (value.kind === 'product') return router.push(`/products/${value.id}`)
   if (value.kind === 'order') return router.push(`/orders/${value.id}`)
@@ -133,17 +148,15 @@ function onSelect(value) {
       <CommandPaletteGroup v-if="productHits.length" label="Products">
         <CommandPaletteItem
           v-for="product in productHits"
-          :key="product.id"
-          :value="{ kind: 'product', id: product.id }"
+          :key="product.name"
+          :value="{ kind: 'product', id: product.name }"
         >
           <template #prefix>
-            <span class="mr-2.5 grid size-4 shrink-0 place-content-center text-sm" aria-hidden="true">
-              {{ product.thumb }}
-            </span>
+            <span class="lucide-package mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
           {{ product.title }}
           <template #suffix>
-            <span class="text-sm text-ink-gray-5">{{ product.sku }}</span>
+            <span class="text-sm text-ink-gray-5">{{ priceRange(product.price_from, product.price_to) }}</span>
           </template>
         </CommandPaletteItem>
       </CommandPaletteGroup>
@@ -151,13 +164,13 @@ function onSelect(value) {
       <CommandPaletteGroup v-if="orderHits.length" label="Orders">
         <CommandPaletteItem
           v-for="order in orderHits"
-          :key="order.id"
-          :value="{ kind: 'order', id: order.slug }"
+          :key="order.name"
+          :value="{ kind: 'order', id: order.name }"
         >
           <template #prefix>
             <span class="lucide-shopping-bag mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
-          {{ order.id }} · {{ order.customer }}
+          {{ order.name }} · {{ order.customer }}
           <template #suffix>
             <span class="text-sm text-ink-gray-5 tabular-nums">{{ money(order.total) }}</span>
           </template>
@@ -183,13 +196,13 @@ function onSelect(value) {
       <CommandPaletteGroup v-if="collectionHits.length" label="Collections">
         <CommandPaletteItem
           v-for="collection in collectionHits"
-          :key="collection.id"
-          :value="{ kind: 'collection', id: collection.id }"
+          :key="collection.name"
+          :value="{ kind: 'collection', id: collection.name }"
         >
           <template #prefix>
             <span class="lucide-layers mr-2.5 size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
           </template>
-          {{ collection.title }}
+          {{ collection.name }}
           <template #suffix>
             <span class="text-sm text-ink-gray-5">{{ collection.count }} products</span>
           </template>
