@@ -92,7 +92,7 @@ def get_products(
 	)
 	item_codes = [row.item_code for row in sizes if row.item_code]
 
-	rates_by_item_code = get_default_rates(item_codes)
+	rates_by_item_code = get_selling_rates(item_codes)
 	stock_by_item_code = get_ecommerce_stock(item_codes)
 
 	# A dashboard-created product never sets Item.image, so fall back to the first option image.
@@ -173,6 +173,27 @@ def get_default_rates(item_codes):
 		fields=["item_code", "price_list_rate"],
 	)
 	return {cstr(row.item_code): flt(row.price_list_rate) for row in rows}
+
+
+def get_selling_rates(item_codes):
+	"""The rate a shopper actually pays, keyed by item_code: the sale rate where one is set,
+	the default rate otherwise. get_default_rates() above is the list price, which is what
+	stock valuation wants but not what a catalogue should quote - a discounted product would
+	advertise its struck-through price, and one priced only on the sale list would read as
+	having no price at all."""
+	if not item_codes:
+		return {}
+
+	default_price_list, sale_price_list = get_selling_price_lists()
+	price_rows_by_key = get_base_price_rows_by_key(item_codes, [default_price_list, sale_price_list])
+
+	rates = {}
+	for (item_code, price_list), row in price_rows_by_key.items():
+		if price_list == sale_price_list:
+			rates[item_code] = flt(row.price_list_rate)
+		elif price_list == default_price_list:
+			rates.setdefault(item_code, flt(row.price_list_rate))
+	return rates
 
 
 def get_ecommerce_stock(item_codes):
@@ -890,6 +911,17 @@ def create_product(
 	title = cstr(title).strip()
 	if not title:
 		frappe.throw(_("Enter a product title"))
+
+	# An Item is named after its title (autoname "field:item_code"), so the title inherits Frappe's
+	# naming rules. Both of these surface from deep inside insert() as messages a shop owner cannot
+	# act on - a reserved prefix reads as "There were some errors setting the name, please contact
+	# the administrator" (frappe/model/naming.py validate_name), and a repeat title as a raw
+	# IntegrityError - so they are caught here, where the offending field can still be named.
+	if title.startswith("New Item"):
+		frappe.throw(_('A product title cannot start with "New Item" - Frappe reserves that wording for documents it has not saved yet. Try another title.'))
+
+	if frappe.db.exists("Item", title):
+		frappe.throw(_("A product called {0} already exists. Give this one a different title.").format(title))
 
 	# generate_variants() lowercases the attribute name into a "Color Size Item" fieldname — any
 	# other spelling (e.g. this store's own decoy "Colour" attribute) fails deep inside variant

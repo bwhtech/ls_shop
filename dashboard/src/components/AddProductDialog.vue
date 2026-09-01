@@ -7,9 +7,12 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Alert, Button, Dialog, FormControl, Select, dialog, toast } from 'frappe-ui'
+import { Alert, Button, Dialog, ErrorMessage, FormControl, Select, dialog, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
+import { buildOptionSizes } from '../data/optionSizes'
+import AttributeMultiSelect from './AttributeMultiSelect.vue'
+import OptionSizeGrid from './OptionSizeGrid.vue'
 
 const router = useRouter()
 
@@ -17,20 +20,24 @@ const title = ref('')
 const collection = ref('')
 const optionAttribute = ref('Color')
 const colors = ref([])
-const newColor = ref('')
 const sizes = ref([])
-const newSize = ref('')
+const excludedPairs = ref([])
 const compareAt = ref(null)
 const price = ref(null)
+const colorsOpen = ref(false)
+const sizesOpen = ref(false)
+
+// reka guards only Escape by topmost layer, so one outside click dismisses the
+// popover and the dialog both; the dialog yields while a picker owns that click.
+const pickerOpen = computed(() => colorsOpen.value || sizesOpen.value)
 
 function resetForm() {
   title.value = ''
   collection.value = ''
   optionAttribute.value = 'Color'
   colors.value = []
-  newColor.value = ''
   sizes.value = []
-  newSize.value = ''
+  excludedPairs.value = []
   compareAt.value = null
   price.value = null
 }
@@ -78,46 +85,39 @@ watch(attributes, (list) => {
   }
 })
 
-const colorSuggestionsRequest = useAdminRead('catalog.get_attribute_values', {
-  params: () => ({ attribute: optionAttribute.value }),
-  refetch: true,
+// Values picked off one attribute mean nothing on another, and neither do the pairs they were unticked in.
+watch(optionAttribute, () => {
+  colors.value = []
+  excludedPairs.value = []
 })
-const colorSuggestions = computed(() => (colorSuggestionsRequest.data ?? []).filter((v) => !colors.value.includes(v)))
 
-const sizeSuggestionsRequest = useAdminRead('catalog.get_attribute_values', {
-  params: () => ({ attribute: 'Size' }),
-})
-const sizeSuggestions = computed(() => (sizeSuggestionsRequest.data ?? []).filter((v) => !sizes.value.includes(v)))
-
-function addColor(value) {
-  const trimmed = (value ?? newColor.value).trim()
-  if (trimmed && !colors.value.some((c) => c.toLowerCase() === trimmed.toLowerCase())) colors.value.push(trimmed)
-  newColor.value = ''
-}
-function removeColor(value) {
-  colors.value = colors.value.filter((c) => c !== value)
-}
-
-function addSize(value) {
-  const trimmed = (value ?? newSize.value).trim()
-  if (trimmed && !sizes.value.some((s) => s.toLowerCase() === trimmed.toLowerCase())) sizes.value.push(trimmed)
-  newSize.value = ''
-}
-function removeSize(value) {
-  sizes.value = sizes.value.filter((s) => s !== value)
-}
+const optionSizes = computed(() => buildOptionSizes(colors.value, sizes.value, excludedPairs.value))
+const variantCount = computed(() => optionSizes.value.reduce((total, row) => total + row.sizes.length, 0))
+const emptyOption = computed(() => optionSizes.value.find((row) => !row.sizes.length)?.option)
+const gridError = computed(() => (emptyOption.value ? `Pick at least one size for ${emptyOption.value}` : ''))
 
 const canSubmit = computed(
   () =>
-    title.value.trim() &&
-    collection.value &&
-    optionAttribute.value &&
+    Boolean(title.value.trim()) &&
+    Boolean(collection.value) &&
+    Boolean(optionAttribute.value) &&
     sizeAttributeExists.value &&
-    colors.value.length &&
-    sizes.value.length,
+    variantCount.value > 0 &&
+    !emptyOption.value,
 )
 
 const createAction = useAdminAction('catalog.create_product')
+
+// A disabled button with no reason reads as a broken screen, so the first thing still missing is named.
+const submitHint = computed(() => {
+  if (canSubmit.value || createAction.loading) return ''
+  if (!title.value.trim()) return 'Add a title to continue.'
+  if (!collection.value) return 'Pick a collection to continue.'
+  if (!sizeAttributeExists.value) return 'This store needs a "Size" attribute first.'
+  if (!colors.value.length) return `Pick at least one ${(optionAttribute.value || 'option').toLowerCase()}.`
+  if (!sizes.value.length) return 'Pick at least one size.'
+  return ''
+})
 
 async function submit() {
   if (!canSubmit.value) return
@@ -127,7 +127,7 @@ async function submit() {
     collection: collection.value,
     option_attribute: optionAttribute.value,
     size_attribute: 'Size',
-    option_sizes: colors.value.map((option) => ({ option, sizes: sizes.value })),
+    option_sizes: optionSizes.value,
     price: compareAt.value || undefined,
     sale_price: price.value || undefined,
   })
@@ -143,13 +143,23 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:open="addProduct.open" size="xl" title="Add product" @update:open="(v) => (v ? null : closeAddProduct())">
-    <template #body-content>
+  <Dialog
+    v-model:open="addProduct.open"
+    size="xl"
+    title="Add product"
+    :dismissible="!pickerOpen"
+    @update:open="(v) => (v ? null : closeAddProduct())"
+  >
+    <template #default>
       <div class="space-y-5">
         <FormControl v-model="title" label="Title" placeholder="Cotton oversized tee" required />
 
         <div>
-          <span class="mb-1.5 block text-base text-ink-gray-6">Collection</span>
+          <span class="mb-1.5 block text-base text-ink-gray-6">
+            Collection
+            <span class="text-ink-red-5 select-none" aria-hidden="true">*</span>
+            <span class="sr-only">(required)</span>
+          </span>
           <div class="flex gap-2">
             <Select v-model="collection" class="min-w-0 flex-1" :options="collectionOptions" />
             <Button label="New" icon-left="lucide-plus" @click="addCollection" />
@@ -165,54 +175,26 @@ async function submit() {
           description="Sizes are added below and apply to every option."
         />
 
-        <div>
-          <span class="mb-1.5 block text-base text-ink-gray-6">{{ optionAttribute || 'Options' }}</span>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span
-              v-for="value in colors"
-              :key="value"
-              class="flex items-center gap-1 rounded-1 bg-surface-gray-2 py-0.5 pl-2 pr-1 text-sm text-ink-gray-7"
-            >
-              {{ value }}
-              <button type="button" class="lucide-x size-3.5 text-ink-gray-5" aria-label="Remove" @click="removeColor(value)" />
-            </span>
-            <input
-              v-model="newColor"
-              list="add-product-color-suggestions"
-              class="min-w-32 flex-1 border-none bg-transparent text-base text-ink-gray-8 outline-none placeholder:text-ink-gray-4"
-              :placeholder="colors.length ? 'Add another' : `e.g. Black, Sand`"
-              @keydown.enter.prevent="addColor()"
-              @blur="addColor()"
-            />
-            <datalist id="add-product-color-suggestions">
-              <option v-for="value in colorSuggestions" :key="value" :value="value" />
-            </datalist>
-          </div>
-        </div>
+        <AttributeMultiSelect
+          v-model="colors"
+          v-model:open="colorsOpen"
+          :attribute="optionAttribute"
+          :label="optionAttribute || 'Options'"
+          :placeholder="`Pick or type a ${(optionAttribute || 'option').toLowerCase()}`"
+          :description="`Type a new ${(optionAttribute || 'option').toLowerCase()} to add it`"
+          required
+        />
 
         <div>
-          <span class="mb-1.5 block text-base text-ink-gray-6">Sizes</span>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span
-              v-for="value in sizes"
-              :key="value"
-              class="flex items-center gap-1 rounded-1 bg-surface-gray-2 py-0.5 pl-2 pr-1 text-sm text-ink-gray-7"
-            >
-              {{ value }}
-              <button type="button" class="lucide-x size-3.5 text-ink-gray-5" aria-label="Remove" @click="removeSize(value)" />
-            </span>
-            <input
-              v-model="newSize"
-              list="add-product-size-suggestions"
-              class="min-w-32 flex-1 border-none bg-transparent text-base text-ink-gray-8 outline-none placeholder:text-ink-gray-4"
-              :placeholder="sizes.length ? 'Add another' : `e.g. S, M, L`"
-              @keydown.enter.prevent="addSize()"
-              @blur="addSize()"
-            />
-            <datalist id="add-product-size-suggestions">
-              <option v-for="value in sizeSuggestions" :key="value" :value="value" />
-            </datalist>
-          </div>
+          <AttributeMultiSelect
+            v-model="sizes"
+            v-model:open="sizesOpen"
+            attribute="Size"
+            label="Sizes"
+            placeholder="Pick or type a size"
+            description="Type a new size to add it"
+            required
+          />
           <Alert
             v-if="!sizeAttributeExists"
             class="mt-2"
@@ -221,6 +203,20 @@ async function submit() {
             description="Create it from the Attributes screen first, then come back to add products."
           />
         </div>
+
+        <OptionSizeGrid
+          v-if="colors.length && sizes.length"
+          v-model="excludedPairs"
+          :options="colors"
+          :sizes="sizes"
+          :option-label="optionAttribute || 'Option'"
+        />
+
+        <p v-if="variantCount" class="text-sm text-ink-gray-5">
+          {{ colors.length }} {{ colors.length === 1 ? 'option' : 'options' }} ·
+          {{ variantCount }} {{ variantCount === 1 ? 'variant' : 'variants' }} will be created
+        </p>
+        <ErrorMessage :message="gridError" />
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormControl v-model.number="price" type="number" label="Price" placeholder="0" />
@@ -235,15 +231,18 @@ async function submit() {
     </template>
 
     <template #actions>
-      <Button
-        class="w-full"
-        variant="solid"
-        theme="gray"
-        label="Add product"
-        :disabled="!canSubmit"
-        :loading="createAction.loading"
-        @click="submit"
-      />
+      <div class="w-full">
+        <Button
+          class="w-full"
+          variant="solid"
+          theme="gray"
+          label="Add product"
+          :disabled="!canSubmit"
+          :loading="createAction.loading"
+          @click="submit"
+        />
+        <p v-if="submitHint" class="mt-2 text-center text-sm text-ink-gray-5">{{ submitHint }}</p>
+      </div>
     </template>
   </Dialog>
 </template>

@@ -138,16 +138,40 @@ def system_user_session():
 
 	ERPNext's get_party_account checks frappe.has_permission directly, so no ignore_permissions reaches it.
 	"""
-	session_user = frappe.session.user
+	# frappe.set_user() mutates frappe.local.session in place instead of swapping it out - it even stamps
+	# the dict's "sid" key with the username - so calling it a second time to "restore" the shopper leaves
+	# local.session.sid holding their email instead of the real session id, and wipes local.session.data
+	# (session_ip, user_agent, ...). frappe.request.after_response then persists that corrupted dict into
+	# the session cache under the shopper's still-correct real sid, so their session loses "data.user" and
+	# every request after this one falls back to Guest. Snapshot the live session dict and put it back
+	# verbatim instead of round-tripping through set_user().
+	live_session_snapshot = frappe.local.session.copy()
 	try:
 		frappe.set_user("Administrator")
 		yield
 	finally:
-		frappe.set_user(session_user)
+		frappe.local.session.update(live_session_snapshot)
+		frappe.local.cache = {}
+		frappe.local.role_permissions = {}
+		frappe.local.user_perms = None
+
+
+def stamp_order_owner(sales_order, shopper: str) -> None:
+	"""Hand the order back to the shopper who bought it.
+
+	The accounting documents are placed as Administrator (see system_user_session), so insert()
+	stamps Administrator as owner. Every post-purchase screen gates on owner == frappe.session.user
+	- the account order list, order detail, invoice, returns and shipment tracking - so without this
+	the shopper cannot see the order they just paid for.
+	"""
+	if not shopper or shopper == sales_order.owner:
+		return
+	sales_order.db_set("owner", shopper, update_modified=False)
 
 
 def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_reference=None):
 	"""Submit the cart and bill it. Called once per payment; the Quotation docstatus enforces that."""
+	shopper = frappe.session.user
 	with system_user_session():
 		fix_payment_schedule_dates(quotation)
 		quotation.flags.ignore_permissions = True
@@ -166,6 +190,7 @@ def place_order(quotation, payment_mode: str, gateway_amount=None, gateway_refer
 			create_sales_invoice(sales_order, payment_mode, flt(gateway_amount), gateway_reference)
 
 	# Outside the switch: log_purchase stamps frappe.session.user, so Administrator would own every purchase.
+	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
 	return sales_order
 
@@ -410,6 +435,7 @@ def quotation_purchase_summary(quotation_name: str):
 
 
 def place_cod_order(quotation_name: str):
+	shopper = frappe.session.user
 	with system_user_session():
 		quotation = frappe.get_doc("Quotation", quotation_name)
 		set_cod_charges(quotation)
@@ -423,6 +449,7 @@ def place_cod_order(quotation_name: str):
 		sales_order.insert()
 
 	# COD orders count as purchases even while the Sales Order stays draft.
+	stamp_order_owner(sales_order, shopper)
 	log_purchase(sales_order)
 	return sales_order
 

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e:smoke": "node tests/e2e/check-build.js && node --test tests/e2e/smoke.spec.js",
+    "test:e2e": "node tests/e2e/check-build.js && node --test --test-concurrency=1 tests/e2e/*.spec.js"
   },
   "dependencies": {
     "frappe-ui": "^1.0.0-beta.55",
@@ -19,6 +21,7 @@
     "autoprefixer": "^10.4.20",
     "lucide-static": "^0.469.0",
     "postcss": "^8.4.49",
+    "puppeteer": "^24.43.1",
     "tailwindcss": "^3.4.17",
     "unplugin-auto-import": "^0.19.0",
     "unplugin-icons": "^0.22.0",

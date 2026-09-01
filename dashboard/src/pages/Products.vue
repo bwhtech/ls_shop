@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, Dropdown, Select, TabButtons, TextInput, toast } from 'frappe-ui'
+import { Button, Select, TabButtons, TextInput, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow, ListRows } from 'frappe-ui/list'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import PageBody from '../components/PageBody.vue'
@@ -96,11 +96,6 @@ function toggleSort(key) {
 
 const directionFor = (key) => (sort.value.key === key ? sort.value.direction : null)
 
-const addOptions = [
-  { label: 'Add product', icon: 'lucide-plus', onClick: openAddProduct },
-  { label: 'Import from CSV', icon: 'lucide-upload', onClick: openImport },
-]
-
 const archiveAction = useAdminAction('catalog.update_product')
 
 async function archiveSelected() {
@@ -123,9 +118,7 @@ async function archiveSelected() {
   <AppPageHeader title="Products">
     <template #actions>
       <Button label="Import" icon-left="lucide-upload" @click="openImport" />
-      <Dropdown :options="addOptions">
-        <Button label="Add product" icon-right="lucide-chevron-down" variant="solid" theme="gray" />
-      </Dropdown>
+      <Button label="Add product" icon-left="lucide-plus" variant="solid" theme="gray" @click="openAddProduct" />
     </template>
   </AppPageHeader>
 

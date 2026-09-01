@@ -69,3 +69,6 @@ ls_shop/www/commera.html
 # The Pixio vendor theme, kept locally as the provenance reference the theme templates cite.
 # 14MB of demo pages and duplicated CSS that nothing loads at build or run time.
 reference_themes/
+
+# Commera e2e artifacts — failure screenshots and the cached login session.
+dashboard/tests/e2e/.artifacts/
