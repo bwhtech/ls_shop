@@ -29,14 +29,18 @@
 						</p>
 						{% endif %}
 						<ul class="feature-detail">
+							{% if show_option_axis %}
 							<li>
 								<i class="icon feather icon-check"></i>
 								<h5>{{ product_variant.attribute_name }}: {{ product_variant.attribute_value }}</h5>
 							</li>
+							{% endif %}
+							{% if show_sizes %}
 							<li>
 								<i class="icon feather icon-check"></i>
 								<h5>{{ _("Available in {0} sizes").format(available_sizes | length) }}</h5>
 							</li>
+							{% endif %}
 							{% if selected_item.material %}
 							<li>
 								<i class="icon feather icon-check"></i>
@@ -57,20 +61,24 @@
 							<li><strong>{{ _("Category") }}:</strong></li>
 							<li>{{ product_variant.item_group }}</li>
 						</ul>
+						{% if show_option_axis %}
 						<ul>
 							<li><strong>{{ product_variant.attribute_name }}:</strong></li>
 							<li>{{ product_variant.attribute_value }}</li>
 						</ul>
+						{% endif %}
 						{% if selected_item.style_code %}
 						<ul>
 							<li><strong>{{ _("Style Code") }}:</strong></li>
 							<li>{{ selected_item.style_code }}</li>
 						</ul>
 						{% endif %}
+						{% if show_sizes %}
 						<ul>
 							<li><strong>{{ _("Sizes") }}:</strong></li>
 							<li>{{ available_sizes | map(attribute="size") | join(", ") }}</li>
 						</ul>
+						{% endif %}
 					</div>
 				</div>
 			</div>

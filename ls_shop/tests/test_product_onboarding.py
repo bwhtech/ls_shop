@@ -7,6 +7,10 @@ from erpnext.controllers.item_variant import create_variant
 from frappe.tests import IntegrationTestCase
 
 from ls_shop.api.admin.catalog import (
+	DEFAULT_OPTION_ATTRIBUTE,
+	DEFAULT_OPTION_VALUE,
+	DEFAULT_SIZE_VALUE,
+	SIZE_ATTRIBUTE,
 	create_product,
 	get_attribute_values,
 	get_product,
@@ -439,7 +443,10 @@ class TestCreateProduct(ProductOnboardingTestCase):
 	def setUp(self):
 		super().setUp()
 		self.colour_attribute = self.make_named_attribute("Colour", ["Crimson", "Teal"])
-		self.size_attribute = self.make_named_attribute("Size", ["S", "M", "L"])
+		# The size axis has to be the attribute literally named "Size" — generate_variants() lowercases
+		# it into the Color Size Item fieldname, so a suffixed per-run copy is refused by create_product.
+		# Values it does not hold yet are appended on the way in, and rolled back with the test.
+		self.size_attribute = "Size"
 
 	def make_named_attribute(self, label, values):
 		attribute = frappe.new_doc("Item Attribute")
@@ -503,4 +510,97 @@ class TestCreateProduct(ProductOnboardingTestCase):
 		self.assertEqual(self.get_sizes_by_option(product["name"]), {"Saffron": ["S"]})
 
 	def test_get_attribute_values_keeps_the_stored_order(self):
-		self.assertEqual(get_attribute_values(self.size_attribute), ["S", "M", "L"])
+		# Deliberately not alphabetical, and on an attribute this run owns — the shared "Size"
+		# attribute carries whatever values other products have added to it.
+		stored_order = ["Medium", "Alpha", "Zulu"]
+		attribute = self.make_named_attribute("Order", stored_order)
+
+		self.assertEqual(get_attribute_values(attribute), stored_order)
+
+
+class TestCreateSingleItemProduct(ProductOnboardingTestCase):
+	"""A book has neither a colour nor a size. Both axes are still written underneath — see the
+	note above DEFAULT_OPTION_VALUE in api/admin/catalog.py for the three things that break when
+	they are genuinely absent."""
+
+	def setUp(self):
+		super().setUp()
+		self.format_attribute = self.make_named_attribute("Format", ["Paperback", "Hardcover"])
+
+	def make_named_attribute(self, label, values):
+		attribute = frappe.new_doc("Item Attribute")
+		attribute.attribute_name = f"Onboarding {label} {self.suffix}"
+		for value in values:
+			attribute.append("item_attribute_values", {"attribute_value": value, "abbr": value[:3].upper()})
+		attribute.insert()
+		return attribute.name
+
+	def get_sizes_by_option(self, item_template):
+		return {
+			variant["option"]: sorted(size["size"] for size in variant["sizes"])
+			for variant in get_product(item_template)["variants"]
+		}
+
+	def add_book(self, **kwargs):
+		kwargs.setdefault("title", f"Onboarding Book {frappe.generate_hash(length=6).upper()}")
+		kwargs.setdefault("collection", self.item_group)
+		return create_product(**kwargs)
+
+	def test_a_book_sold_in_two_formats_gets_one_hidden_size_per_format(self):
+		book = self.add_book(
+			option_attribute=self.format_attribute,
+			option_sizes=[{"option": "Paperback"}, {"option": "Hardcover"}],
+		)
+
+		self.assertEqual(
+			self.get_sizes_by_option(book["name"]),
+			{"Paperback": [DEFAULT_SIZE_VALUE], "Hardcover": [DEFAULT_SIZE_VALUE]},
+		)
+
+	def test_a_book_with_no_options_at_all_falls_back_to_a_single_hidden_axis(self):
+		book = self.add_book()
+
+		self.assertEqual(
+			self.get_sizes_by_option(book["name"]), {DEFAULT_OPTION_VALUE: [DEFAULT_SIZE_VALUE]}
+		)
+		self.assertTrue(frappe.db.exists("Item Attribute", DEFAULT_OPTION_ATTRIBUTE))
+
+	def test_the_leaf_item_carries_a_real_size_attribute_row(self):
+		"""www/cart/checkout.py filters cart lines on attribute == "Size". A leaf Item without that
+		row does not error — it silently vanishes from the shopper's own checkout page."""
+		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
+
+		leaf_item_codes = frappe.get_all("Item", filters={"variant_of": book["name"]}, pluck="name")
+		self.assertEqual(len(leaf_item_codes), 1)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Item Variant Attribute",
+				{"parent": leaf_item_codes[0], "attribute": SIZE_ATTRIBUTE},
+				"attribute_value",
+			),
+			DEFAULT_SIZE_VALUE,
+		)
+
+	def test_the_leaf_item_is_sellable_rather_than_a_template(self):
+		"""ERPNext refuses a has_variants template on a Quotation, so the cart's item_code must be
+		the leaf — api/payments.py reads it straight off the cart line."""
+		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
+
+		leaf_item_code = frappe.get_all("Item", filters={"variant_of": book["name"]}, pluck="name")[0]
+		self.assertFalse(frappe.db.get_value("Item", leaf_item_code, "has_variants"))
+		self.assertTrue(frappe.db.get_value("Item", book["name"], "has_variants"))
+
+	def test_a_sizeless_product_has_nothing_blocking_publication_but_its_image(self):
+		"""An empty sizes table unpublishes the variant on its own (unpublish_if_incomplete_data),
+		so the hidden size has to satisfy the publish blockers too."""
+		book = self.add_book(option_attribute=self.format_attribute, option_sizes=[{"option": "Paperback"}])
+
+		blockers = get_product(book["name"])["variants"][0]["blockers"]
+		self.assertEqual(blockers, ["Add at least one image"])
+
+	def test_a_half_filled_size_grid_is_still_the_owner_forgetting_a_row(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.add_book(
+				option_attribute=self.format_attribute,
+				option_sizes=[{"option": "Paperback", "sizes": ["S"]}, {"option": "Hardcover"}],
+			)

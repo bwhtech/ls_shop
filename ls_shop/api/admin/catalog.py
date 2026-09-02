@@ -885,13 +885,25 @@ def add_attribute_value(attribute: str, value: str, abbreviation: str | None = N
 	}
 
 
+# A product that sells as a single item still needs both variant axes present in the data. Color Size
+# Item.size is reqd, www/cart/checkout.py drops a cart line whose Item has no "Size" Item Variant
+# Attribute row, and a Style Attribute Variant with an empty sizes table unpublishes itself
+# (style_attribute_variant.unpublish_if_incomplete_data). So the axes are hidden from the owner, never
+# absent underneath - the same trick Shopify plays with the "Default Title" variant it creates for a
+# product that declares no options.
+SIZE_ATTRIBUTE = "Size"
+DEFAULT_OPTION_ATTRIBUTE = "Title"
+DEFAULT_OPTION_VALUE = "Standard"
+DEFAULT_SIZE_VALUE = "One Size"
+
+
 @frappe.whitelist(methods=["POST"])
 def create_product(
 	title: str,
 	collection: str,
-	option_attribute: str,
-	size_attribute: str,
-	option_sizes: list | str,
+	option_attribute: str | None = None,
+	size_attribute: str | None = None,
+	option_sizes: list | str | None = None,
 	price=None,
 	sale_price=None,
 	option_abbreviations: dict | str | None = None,
@@ -899,6 +911,11 @@ def create_product(
 ):
 	"""Create a sellable product. Company, warehouse, price list, UOM and naming series
 	come from Lifestyle Settings.
+
+	option_attribute/size_attribute/option_sizes are all optional. Omit the sizes and the product
+	sells as a single item per option (a book in Paperback and Hardcover); omit the options too and
+	it is one item on its own. Both axes are still written, carrying DEFAULT_OPTION_VALUE and
+	DEFAULT_SIZE_VALUE - see the note above those constants for why they cannot simply be left out.
 
 	option_abbreviations/size_abbreviations are optional {value: abbreviation} overrides for any
 	value that does not exist on the attribute yet — omit a value and one is auto-generated
@@ -922,6 +939,18 @@ def create_product(
 
 	if frappe.db.exists("Item", title):
 		frappe.throw(_("A product called {0} already exists. Give this one a different title.").format(title))
+
+	# A book has neither a colour nor a size, so both axes fall back to a single hidden value. An
+	# owner who named no options at all hangs on the fallback axis rather than having "Standard"
+	# appended to whichever attribute the form happened to have selected.
+	option_rows = frappe.parse_json(option_sizes) if isinstance(option_sizes, str) else (option_sizes or [])
+	option_attribute = (cstr(option_attribute).strip() if option_rows else "") or ensure_attribute_exists(
+		DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE, "STD"
+	)
+	size_attribute = cstr(size_attribute).strip() or SIZE_ATTRIBUTE
+	# A store that has never sold a garment has no "Size" attribute, and the hidden size still
+	# needs one to live on — otherwise a book is uncreatable on a fresh site.
+	ensure_attribute_exists(SIZE_ATTRIBUTE, DEFAULT_SIZE_VALUE, "OS")
 
 	# generate_variants() lowercases the attribute name into a "Color Size Item" fieldname — any
 	# other spelling (e.g. this store's own decoy "Colour" attribute) fails deep inside variant
@@ -995,11 +1024,17 @@ def parse_option_sizes(option_sizes: list | str):
 				taken.add(size.casefold())
 
 	if not merged:
-		frappe.throw(_("Add at least one option, for example a colour"))
+		merged = {DEFAULT_OPTION_VALUE.casefold(): (DEFAULT_OPTION_VALUE, [])}
 
-	for option, sizes in merged.values():
+	# Every option sizeless is a book. Some sized and some not is a half-filled form, and still an
+	# error - silently stamping "One Size" on the row the owner merely forgot would hide it.
+	sizeless = [option for option, sizes in merged.values() if not sizes]
+	if sizeless and len(sizeless) < len(merged):
+		frappe.throw(_("Pick at least one size for {0}").format(sizeless[0]))
+
+	for _option, sizes in merged.values():
 		if not sizes:
-			frappe.throw(_("Pick at least one size for {0}").format(option))
+			sizes.append(DEFAULT_SIZE_VALUE)
 
 	return list(merged.values())
 
@@ -1074,6 +1109,22 @@ def add_missing_attribute_values(attribute: str, values: list, abbreviations: di
 		attribute_doc.save()
 
 	return resolved
+
+
+def ensure_attribute_exists(attribute_name: str, seed_value: str, abbreviation: str):
+	"""An axis a product falls back to, created on first use.
+
+	generate_variants() emits one Style Attribute Variant per value of the configurator axis and
+	skips the product entirely when that axis is empty, so a product with no axis has no storefront
+	page at all. This gives it a single-value one to hang on.
+	"""
+	if not frappe.db.exists("Item Attribute", attribute_name):
+		attribute_doc = frappe.new_doc("Item Attribute")
+		attribute_doc.attribute_name = attribute_name
+		attribute_doc.append("item_attribute_values", {"attribute_value": seed_value, "abbr": abbreviation})
+		attribute_doc.insert()
+
+	return attribute_name
 
 
 def make_unique_abbreviation(value: str, taken: set):

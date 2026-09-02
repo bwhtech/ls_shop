@@ -70,15 +70,33 @@ function addCollection() {
   })
 }
 
-// Every product this store sells is built on its own Color/Size pair — Size has to keep that
-// exact spelling (generate_variants() depends on it; see catalog.create_product's Trap 2 guard),
-// so the option axis is any OTHER attribute and Size is fixed, not picked.
+// The option axis is any attribute EXCEPT Size — Size has to keep that exact spelling
+// (generate_variants() depends on it; see catalog.create_product's Trap 2 guard), so it is fixed
+// rather than picked. Both axes are optional here: a book has neither, and create_product fills
+// them with a hidden value rather than refusing the product.
 const attributesRequest = useAdminRead('catalog.get_attributes')
 const attributes = computed(() => attributesRequest.data ?? [])
-const sizeAttributeExists = computed(() => attributes.value.some((a) => a.name === 'Size'))
 const optionAttributeOptions = computed(() =>
   attributes.value.filter((a) => a.name !== 'Size').map((a) => ({ label: a.name, value: a.name })),
 )
+
+const createAttributeAction = useAdminAction('catalog.create_attribute')
+function addAttribute() {
+  dialog.prompt({
+    title: 'New option',
+    fields: [
+      { name: 'title', label: 'Name', required: true, placeholder: 'Format' },
+      { name: 'values', label: 'Values', placeholder: 'Paperback, Hardcover' },
+    ],
+    onConfirm: async ({ values }) => {
+      await createAttributeAction.submit({ name: values.title, values: values.values || undefined })
+      if (createAttributeAction.error) return
+      await attributesRequest.reload()
+      optionAttribute.value = values.title
+      toast.success(`"${values.title}" created`)
+    },
+  })
+}
 watch(attributes, (list) => {
   if (!list.some((a) => a.name === optionAttribute.value)) {
     optionAttribute.value = list.find((a) => a.name === 'Color')?.name ?? list.find((a) => a.name !== 'Size')?.name ?? ''
@@ -93,18 +111,32 @@ watch(optionAttribute, () => {
 
 const optionSizes = computed(() => buildOptionSizes(colors.value, sizes.value, excludedPairs.value))
 const variantCount = computed(() => optionSizes.value.reduce((total, row) => total + row.sizes.length, 0))
-const emptyOption = computed(() => optionSizes.value.find((row) => !row.sizes.length)?.option)
-const gridError = computed(() => (emptyOption.value ? `Pick at least one size for ${emptyOption.value}` : ''))
+
+// Every option sizeless is a book, and allowed. Some sized and some not is a half-filled grid, and
+// still the owner forgetting a row — create_product refuses that pairing for the same reason.
+const sizelessOptions = computed(() => optionSizes.value.filter((row) => !row.sizes.length))
+const mixedOption = computed(() =>
+  sizelessOptions.value.length && sizelessOptions.value.length < optionSizes.value.length
+    ? sizelessOptions.value[0].option
+    : '',
+)
+const gridError = computed(() => (mixedOption.value ? `Pick at least one size for ${mixedOption.value}` : ''))
 
 const canSubmit = computed(
-  () =>
-    Boolean(title.value.trim()) &&
-    Boolean(collection.value) &&
-    Boolean(optionAttribute.value) &&
-    sizeAttributeExists.value &&
-    variantCount.value > 0 &&
-    !emptyOption.value,
+  () => Boolean(title.value.trim()) && Boolean(collection.value) && !mixedOption.value,
 )
+
+// What the owner is about to get, in their words rather than ERPNext's.
+const summary = computed(() => {
+  const optionCount = colors.value.length
+  const optionWord = optionCount === 1 ? 'option' : 'options'
+  if (variantCount.value) {
+    const variantWord = variantCount.value === 1 ? 'variant' : 'variants'
+    return `${optionCount} ${optionWord} · ${variantCount.value} ${variantWord} will be created`
+  }
+  if (optionCount) return `${optionCount} ${optionWord} · no sizes, so each one sells as a single item`
+  return 'No options — this sells as a single item, the way a book does'
+})
 
 const createAction = useAdminAction('catalog.create_product')
 
@@ -113,9 +145,6 @@ const submitHint = computed(() => {
   if (canSubmit.value || createAction.loading) return ''
   if (!title.value.trim()) return 'Add a title to continue.'
   if (!collection.value) return 'Pick a collection to continue.'
-  if (!sizeAttributeExists.value) return 'This store needs a "Size" attribute first.'
-  if (!colors.value.length) return `Pick at least one ${(optionAttribute.value || 'option').toLowerCase()}.`
-  if (!sizes.value.length) return 'Pick at least one size.'
   return ''
 })
 
@@ -125,7 +154,7 @@ async function submit() {
   await createAction.submit({
     title: title.value.trim(),
     collection: collection.value,
-    option_attribute: optionAttribute.value,
+    option_attribute: colors.value.length ? optionAttribute.value : undefined,
     size_attribute: 'Size',
     option_sizes: optionSizes.value,
     price: compareAt.value || undefined,
@@ -166,43 +195,35 @@ async function submit() {
           </div>
         </div>
 
-        <FormControl
-          v-if="optionAttributeOptions.length > 1"
-          v-model="optionAttribute"
-          type="select"
-          label="Option"
-          :options="optionAttributeOptions"
-          description="Sizes are added below and apply to every option."
-        />
+        <div>
+          <span class="mb-1.5 block text-base text-ink-gray-6">Option</span>
+          <div class="flex gap-2">
+            <Select v-model="optionAttribute" class="min-w-0 flex-1" :options="optionAttributeOptions" />
+            <Button label="New" icon-left="lucide-plus" @click="addAttribute" />
+          </div>
+          <p class="mt-1.5 text-p-sm text-ink-gray-5">
+            What this product varies by. Sizes are added below and apply to every option.
+          </p>
+        </div>
 
         <AttributeMultiSelect
+          v-if="optionAttribute"
           v-model="colors"
           v-model:open="colorsOpen"
           :attribute="optionAttribute"
-          :label="optionAttribute || 'Options'"
-          :placeholder="`Pick or type a ${(optionAttribute || 'option').toLowerCase()}`"
-          :description="`Type a new ${(optionAttribute || 'option').toLowerCase()} to add it`"
-          required
+          :label="optionAttribute"
+          :placeholder="`Pick or type a ${optionAttribute.toLowerCase()}`"
+          :description="`Type a new ${optionAttribute.toLowerCase()} to add it — leave empty if this product has none`"
         />
 
-        <div>
-          <AttributeMultiSelect
-            v-model="sizes"
-            v-model:open="sizesOpen"
-            attribute="Size"
-            label="Sizes"
-            placeholder="Pick or type a size"
-            description="Type a new size to add it"
-            required
-          />
-          <Alert
-            v-if="!sizeAttributeExists"
-            class="mt-2"
-            theme="red"
-            title='This store has no "Size" attribute yet'
-            description="Create it from the Attributes screen first, then come back to add products."
-          />
-        </div>
+        <AttributeMultiSelect
+          v-model="sizes"
+          v-model:open="sizesOpen"
+          attribute="Size"
+          label="Sizes"
+          placeholder="Pick or type a size"
+          description="Leave empty for a product that has no sizes, like a book"
+        />
 
         <OptionSizeGrid
           v-if="colors.length && sizes.length"
@@ -212,10 +233,7 @@ async function submit() {
           :option-label="optionAttribute || 'Option'"
         />
 
-        <p v-if="variantCount" class="text-sm text-ink-gray-5">
-          {{ colors.length }} {{ colors.length === 1 ? 'option' : 'options' }} ·
-          {{ variantCount }} {{ variantCount === 1 ? 'variant' : 'variants' }} will be created
-        </p>
+        <p class="text-sm text-ink-gray-5">{{ summary }}</p>
         <ErrorMessage :message="gridError" />
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

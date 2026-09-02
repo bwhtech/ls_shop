@@ -85,6 +85,8 @@
 							</div>
 						</div>
 						{% endif %}
+						{# One size is no choice at all - the controller pre-selects it and the picker stays hidden. #}
+						{% if available_sizes | length > 1 %}
 						<div class="d-block">
 							<label class="form-label">{{ _("Size") }}</label>
 							<div class="btn-group product-size m-0">
@@ -97,6 +99,7 @@
 								{% endfor %}
 							</div>
 						</div>
+						{% endif %}
 					</div>
 
 					{% if other_variants %}
