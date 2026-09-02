@@ -1,6 +1,7 @@
 import frappe
 
 from ls_shop import seo
+from ls_shop.api.admin.catalog import DEFAULT_OPTION_ATTRIBUTE, DEFAULT_SIZE_VALUE
 from ls_shop.product_detail import get_product_detail
 from ls_shop.utils import get_available_stock, get_product_list
 
@@ -36,10 +37,24 @@ def get_context(context):
 
 	context.available_sizes = detail["available_sizes"]
 	context.selected_size = detail["selected_size"]
-	context.size_selected = size_selected
+	# A product with a single size has nothing to pick, so the picker below is hidden — nothing would
+	# ever put ?size= in the URL, and add_to_cart refuses an item with no size chosen. The lone size
+	# counts as already chosen, which is what makes a book buyable at all.
+	context.size_selected = size_selected or (
+		detail["selected_size"] if len(detail["available_sizes"]) == 1 else None
+	)
 	context.selected_item = selected_item
 	context.selected_price = detail["selected_price"]
 	context.default_price = detail["default_price"]
+	# A product created with no options hangs on the fallback axis, and a sizeless one on the fallback
+	# size. Naming either on the page would read as "Standard: Standard" or "Available in 1 sizes".
+	context.show_option_axis = (
+		frappe.db.get_value("Style Attribute Configurator", product_variant.configurator, "item_attribute")
+		!= DEFAULT_OPTION_ATTRIBUTE
+	)
+	context.show_sizes = (
+		len(detail["available_sizes"]) > 1 or detail["selected_size"] != DEFAULT_SIZE_VALUE
+	)
 	context.recommended_items = get_recommended_products(product_variant)
 	context.other_variants = get_other_variants(product_variant)
 	context.discount_percent = detail["discount_percent"]
