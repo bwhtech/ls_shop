@@ -399,3 +399,13 @@ export const kpis = [
 export const salesSeries = [
   22, 31, 28, 44, 39, 52, 47, 61, 55, 49, 63, 71, 66, 58, 74, 81, 69, 77, 85, 92, 79, 88, 96, 104, 91, 99, 87, 112, 105, 118, 124,
 ]
+
+// Analytics and accounting services the prototype shows but does not yet talk to.
+// Shipping carriers used to live here too. They are real now and come from the server
+// (see data/integrations.js), so listing them here as well would contradict the Shipping
+// tab, which reads the site's actual carriers.
+export const appIntegrations = [
+  { id: 'ga4', name: 'Google Analytics 4', mark: 'G', brand: '#E37400', category: 'Analytics', blurb: 'Purchase and view-item events from the storefront.', connected: false },
+  { id: 'meta', name: 'Meta Pixel', mark: 'M', brand: '#0866FF', category: 'Analytics', blurb: 'Conversions API for Instagram and Facebook ads.', connected: false },
+  { id: 'tally', name: 'Tally', mark: 'T', brand: '#1A73E8', category: 'Accounting', blurb: 'Nightly export of invoices and credit notes.', connected: false },
+]

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Badge,
   Button,
@@ -19,49 +19,36 @@ import {
   toast,
 } from 'frappe-ui'
 import BrandMark from './BrandMark.vue'
-import GatewayCard from './GatewayCard.vue'
-import GatewayConfig from './GatewayConfig.vue'
-import { appIntegrations, paymentGateways } from '../../data/integrations'
-import { locations } from '../../data/mock'
+import IntegrationsPanel from './IntegrationsPanel.vue'
+import { paymentIntegrations, shippingIntegrations } from '../../data/integrations'
+import { appIntegrations, locations } from '../../data/mock'
 import { company, erpnextLink } from '../../data/erpnext'
 import { settings } from '../../ia/settings'
 
-const defaultGateway = ref('razorpay')
 const taxInclusive = ref(true)
-const autoFulfil = ref(false)
 const weightUnit = ref('g')
 const notifyOrders = ref(true)
 const notifyLowStock = ref(true)
 const notifyPayouts = ref(false)
 
-// One record per gateway: several can be enabled at once, each with its own
-// environment and keys, so nothing here is exclusive except the checkout
-// default below.
-const config = reactive(
-  Object.fromEntries(
-    paymentGateways.map((g) => [
-      g.id,
-      {
-        enabled: g.connected,
-        mode: g.mode,
-        configured: g.connected,
-        captureManually: false,
-        values: Object.fromEntries(g.fields.map((f) => [f.key, ''])),
-      },
-    ]),
-  ),
-)
-
-const enabledGateways = computed(() => paymentGateways.filter((g) => config[g.id].enabled))
-const needsKeys = (id) => config[id].enabled && !config[id].configured
-const incomplete = computed(() => enabledGateways.value.filter((g) => needsKeys(g.id)))
-
-// Configuring one gateway swaps the panel for its own screen.
-const configuring = ref(null)
-const current = computed(() => paymentGateways.find((g) => g.id === configuring.value) ?? null)
-
-const connectedCount = computed(() => enabledGateways.value.length)
+// The counts beside the sidebar entries are the server's answer, not a local tally, so
+// they cannot claim a provider is live when the site says otherwise.
+const connectedCount = paymentIntegrations.connectedCount
+const shippingConnected = shippingIntegrations.connectedCount
 const appsConnected = computed(() => appIntegrations.filter((a) => a.connected).length)
+
+// Both registries load when the dialog opens, not when their tab is first shown: the
+// counts sit in the sidebar from the start, and an unread registry counts zero, which
+// reads as "nothing is connected" rather than "not looked yet".
+watch(
+  () => settings.open,
+  (isOpen) => {
+    if (!isOpen) return
+    paymentIntegrations.loadOnce()
+    shippingIntegrations.loadOnce()
+  },
+  { immediate: true },
+)
 
 const appsByCategory = computed(() => {
   const groups = new Map()
@@ -93,11 +80,6 @@ function inviteUser() {
     ],
     onConfirm: ({ values }) => toast.success(`Invite sent to ${values.email}`),
   })
-}
-
-function makeDefault(id) {
-  defaultGateway.value = id
-  toast.success(`${paymentGateways.find((g) => g.id === id).name} is now the checkout default`)
 }
 </script>
 
@@ -136,6 +118,9 @@ function makeDefault(id) {
         <SettingsNavItem value="shipping">
           <template #prefix><span class="lucide-truck size-4" aria-hidden="true" /></template>
           Shipping
+          <template #suffix>
+            <span class="text-sm text-ink-gray-5 tabular-nums">{{ shippingConnected }}</span>
+          </template>
         </SettingsNavItem>
         <SettingsNavItem value="taxes">
           <template #prefix><span class="lucide-receipt size-4" aria-hidden="true" /></template>
@@ -267,91 +252,21 @@ function makeDefault(id) {
       </SettingsPanel>
 
       <SettingsPanel value="payments">
-        <template v-if="!current">
-          <SettingsHeader
-            title="Payments"
-            description="Turn on as many providers as you like. Each keeps its own keys and environment."
-          >
-            <template #actions>
-              <Badge
-                v-if="incomplete.length"
-                :label="`${incomplete.length} ${incomplete.length === 1 ? 'needs' : 'need'} keys`"
-                theme="orange"
-                variant="subtle"
-              />
-              <Button
-                label="Payout report"
-                icon-left="lucide-download"
-                @click="toast.info('Payout report queued')"
-              />
-            </template>
-          </SettingsHeader>
-          <SettingsBody>
-            <div class="divide-y divide-outline-gray-1">
-              <GatewayCard
-                v-for="gateway in paymentGateways"
-                :key="gateway.id"
-                :gateway="gateway"
-                :config="config[gateway.id]"
-                :is-default="defaultGateway === gateway.id"
-                :needs-keys="needsKeys(gateway.id)"
-                @configure="configuring = $event"
-              />
-            </div>
-
-            <div class="mt-4 divide-y divide-outline-gray-1 border-t border-outline-gray-1">
-              <SettingsRow
-                title="Default at checkout"
-                description="Preselected for the customer. The rest still show as alternatives."
-              >
-                <Select
-                  v-model="defaultGateway"
-                  class="w-56"
-                  :options="enabledGateways.map((g) => ({ label: g.name, value: g.id }))"
-                  :disabled="enabledGateways.length < 2"
-                />
-              </SettingsRow>
-            </div>
-          </SettingsBody>
-        </template>
-
-        <!-- One gateway, its own screen. -->
-        <GatewayConfig
-          v-else
-          :gateway="current"
-          :config="config[current.id]"
-          :is-default="defaultGateway === current.id"
-          @back="configuring = null"
-          @make-default="makeDefault"
+        <IntegrationsPanel
+          :store="paymentIntegrations"
+          :active="settings.tab === 'payments'"
+          title="Payments"
+          description="Turn on as many providers as you like. Each keeps its own keys."
         />
       </SettingsPanel>
 
       <SettingsPanel value="shipping">
-        <SettingsHeader title="Shipping" description="Rates offered at checkout." />
-        <SettingsBody>
-          <div class="divide-y divide-outline-gray-1">
-            <div class="flex items-center justify-between py-3">
-              <div>
-                <p class="text-base text-ink-gray-8">Standard — India</p>
-                <p class="mt-1 text-sm text-ink-gray-5">₹79, free over ₹3,000, 3–5 days</p>
-              </div>
-              <Button label="Edit" variant="ghost" />
-            </div>
-            <div class="flex items-center justify-between py-3">
-              <div>
-                <p class="text-base text-ink-gray-8">Express — metros</p>
-                <p class="mt-1 text-sm text-ink-gray-5">₹199, 1–2 days</p>
-              </div>
-              <Button label="Edit" variant="ghost" />
-            </div>
-            <SettingsRow
-              title="Auto-fulfil digital products"
-              description="Sends the download link as soon as payment clears."
-            >
-              <Switch v-model="autoFulfil" size="sm" />
-            </SettingsRow>
-          </div>
-        </SettingsBody>
+        <IntegrationsPanel
+          :store="shippingIntegrations"
+          :active="settings.tab === 'shipping'"
+          title="Shipping"
+          description="Carriers this store books with. Each quotes its own rates at checkout."
+        />
       </SettingsPanel>
 
       <SettingsPanel value="taxes">
