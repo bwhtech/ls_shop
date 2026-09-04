@@ -9,10 +9,8 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.editor_input im
 	require_value,
 )
 
-# The storefront's own pages are served by hooks.website_route_rules, not by Web Page documents, so
-# they are invisible to the link picker unless they are listed here. Routes that need a query
-# parameter or a cart to exist (checkout, order confirmation, order detail) are deliberately absent —
-# a footer link to them lands the shopper on an empty page.
+# Storefront pages come from hooks.website_route_rules, not Web Page docs, so the picker cannot see them.
+# Routes needing a query param or a cart (checkout, confirmation, order detail) are deliberately absent.
 STATIC_STOREFRONT_ROUTES = (
 	("Home", "/en"),
 	("Products", "/en/products"),
@@ -84,11 +82,7 @@ def add_footer_section(title: str):
 
 	title = require_value(title, frappe._("Column title is required."))
 
-	# Point the mapping at the document's name rather than the title that was typed. They are equal
-	# today only because require_value strips the title and every other divergence autoname could
-	# introduce raises instead. A mapping row naming a document that does not exist is skipped
-	# silently by get_footer_editor_data, so the column would vanish from the board with no error —
-	# too quiet a failure to leave resting on that coincidence.
+	# Map on name, not the typed title: get_footer_editor_data silently skips a mapping whose doc is missing.
 	section = frappe.get_doc({"doctype": "Footer Section Config", "section_title": title}).insert()
 
 	settings = frappe.get_single("Lifestyle Settings")

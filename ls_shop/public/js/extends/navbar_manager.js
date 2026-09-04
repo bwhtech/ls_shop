@@ -347,11 +347,11 @@
 			{ fieldtype: 'Section Break' },
 			{
 				fieldname: 'item_groups',
-				fieldtype: 'MultiSelectPills',
+				fieldtype: 'MultiSelectList',
 				label: __('Item Groups'),
 				depends_on: 'eval:doc.link_type == "Item Group"',
 				default: node.item_groups,
-				get_data: (txt) => frappe.db.get_link_options('Item Group', txt),
+				get_data: (search_text) => frappe.db.get_link_options('Item Group', search_text),
 			},
 			{
 				fieldname: 'brand',

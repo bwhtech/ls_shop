@@ -310,14 +310,11 @@ def get_linked_nodes():
 	return linked
 
 
-@frappe.whitelist(methods=["POST"])
-def import_from_item_group(item_group=None, parent=None):
-	frappe.has_permission("Ecommerce Category", "create", throw=True)
-
-	parent = (parent or "").strip()
+def seed_categories_from_item_groups(item_group=None, parent=""):
+	"""Copy the Item Group tree into the menu - a one-time copy, never a live mirror, and safe to re-run."""
 	root_names, source_groups = get_source_item_groups(item_group)
 	if not source_groups:
-		return get_menu_editor_data()
+		return
 
 	linked_nodes = get_linked_nodes()
 	base_level = get_depth(parent) + 1
@@ -361,6 +358,22 @@ def import_from_item_group(item_group=None, parent=None):
 		rebuild_tree("Ecommerce Category")
 	finally:
 		frappe.local.flags.ignore_ecommerce_category_nsm = previous_flag
+
+
+def seed_menu_when_empty():
+	"""Give a store with no menu one copied from its Item Group tree. Install and upgrade only - never
+	on every migrate, or a menu the shop owner emptied on purpose gets refilled."""
+	if frappe.db.count("Ecommerce Category"):
+		return
+
+	seed_categories_from_item_groups()
+
+
+@frappe.whitelist(methods=["POST"])
+def import_from_item_group(item_group=None, parent=None):
+	frappe.has_permission("Ecommerce Category", "create", throw=True)
+
+	seed_categories_from_item_groups(item_group, (parent or "").strip())
 
 	return get_menu_editor_data()
 

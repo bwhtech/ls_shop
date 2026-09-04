@@ -17,13 +17,13 @@ from ls_shop.lifestyle_shop_ecommerce.doctype.lifestyle_settings.footer.footer_p
 	reorder_footer_sections,
 	update_footer_link,
 )
+from ls_shop.shop_themes.doctype.shop_theme.shop_theme import get_theme_context, resolve_active_theme
 from ls_shop.www.footer_editor_preview import COLOR_PATTERN, get_context
 
 
 class TestFooterEditor(IntegrationTestCase):
-	# IntegrationTestCase registers its rollback with addClassCleanup, so it fires once after the
-	# whole class — every test still has to clean up after itself or the next one hits a duplicate
-	# Footer Section Config (autoname is field:section_title).
+	# IntegrationTestCase rolls back once per class (addClassCleanup), so each test must clean up after
+	# itself or the next hits a duplicate Footer Section Config (autoname is field:section_title).
 	SECTION_TITLES = ("Help", "About", "Contact", "Support")
 	WEB_PAGE_ROUTES = ("footer-editor-test-page", "footer-editor-draft-page")
 
@@ -248,6 +248,40 @@ class TestFooterEditor(IntegrationTestCase):
 		self.assertNotIn("expression(1)", html)
 		self.assertNotIn("<script>alert(2)", html)
 		self.assertIn("&lt;script&gt;alert(2)", html)
+
+	def render_preview(self, **overrides):
+		original_form_dict = frappe.local.form_dict
+		frappe.local.form_dict = frappe._dict(lang="en", **overrides)
+		try:
+			context = frappe._dict()
+			get_context(context)
+			return context.rendered_html
+		finally:
+			frappe.local.form_dict = original_form_dict
+
+	def test_preview_renders_the_active_theme_not_the_base_footer(self):
+		"""The base template hardcodes columns the board does not manage, so a fallback disagrees with it."""
+		html = self.render_preview()
+
+		theme_name = resolve_active_theme()
+		if not get_theme_context(theme_name)["dirs"]:
+			self.skipTest("no theme active on this site")
+
+		self.assertIn("page-wraper" if theme_name == "Pixio Theme" else "theme-shop-default", html)
+
+	def test_preview_hides_every_chrome_but_the_footer(self):
+		html = self.render_preview()
+
+		self.assertIn("<footer", html)
+		self.assertNotIn("<header", html)
+		self.assertNotIn("<nav", html)
+		self.assertNotIn("breadcrumb", html)
+
+	def test_preview_markup_is_balanced(self):
+		"""The wrapper opens in one block and closes in another, so blanking the wrong one unscopes the footer."""
+		html = self.render_preview()
+
+		self.assertEqual(html.count("<div"), html.count("</div>"))
 
 	def test_get_context_applies_accepted_overrides(self):
 		original_form_dict = frappe.local.form_dict

@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"ignore": ["public/js/vendor/**/*"]
+		"ignore": ["public/js/vendor/**/*", "dashboard/**/*"]
 	},
 	"formatter": {
 		"enabled": true,
